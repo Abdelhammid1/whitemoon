@@ -16,6 +16,16 @@ from .accounting.models import (
     Period,
 )
 from .audit.models import AuditEvent
+from .inventory.models import (
+    Batch,
+    Product,
+    ReorderAlert,
+    Shortage,
+    StockBalance,
+    SupplierOffer,
+    TransferOrder,
+    TransferOrderLine,
+)
 from .identity.models import (
     BackupCode,
     ChannelPartnerProfile,
@@ -37,6 +47,7 @@ __all__ = [
     "AuditEvent",
     "BackupCode",
     "BankReceipt",
+    "Batch",
     "ChannelPartnerProfile",
     "CustomerProfile",
     "DeferredTerm",
@@ -47,11 +58,18 @@ __all__ = [
     "OtpRequest",
     "Period",
     "Permission",
+    "Product",
+    "ReorderAlert",
     "Role",
     "RolePermission",
     "Session",
+    "Shortage",
+    "StockBalance",
+    "SupplierOffer",
     "SupplierProfile",
     "TotpSecret",
+    "TransferOrder",
+    "TransferOrderLine",
     "User",
     "UserRole",
 ]
