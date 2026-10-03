@@ -10,7 +10,7 @@ a single Shariah-compliant `accounting.deferred_terms` row is created.
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -25,20 +25,28 @@ from ...inventory.models import Product, SupplierOffer
 from ..models import Cart, Order, OrderLine, OrderSubOrder
 from . import pricelock
 
+# Deferred-pricing schedule — PLACEHOLDER values pending a schedule signed by
+# the finance lead (same rule as the Chart of Accounts / credit rules: a
+# business rule, never customer input nor developer discretion in prod).
+# docs/03-journal-map.md §2 + docs/04 note these must be approved before go-live.
+DEFERRED_MARKUP_PCT = Decimal("0.10")  # deferred_total = cash × (1 + markup)
+EARLY_DISCOUNT_PCT = Decimal("0.50")  # discount = spread × pct (0 ≤ disc < spread)
+EARLY_WINDOW_DAYS = 14
+
 
 def _number() -> str:
     return f"ORD-{datetime.now(UTC).strftime('%Y%m')}-"
 
 
-def checkout(  # noqa: PLR0912 — cash/deferred × per-category × per-supplier flow
+def checkout(  # noqa: PLR0912, PLR0915 — cash/deferred × per-category × per-supplier
     *,
     customer_id: int,
     payment_mode: str,
-    deferred_total: Decimal | None = None,
-    early_settlement_discount: Decimal | None = None,
-    early_settlement_before: date | None = None,
     entry_date: date | None = None,
 ) -> Order:
+    """Place the active cart. Financial terms (deferred price, discount,
+    window) are computed SERVER-SIDE from the approved schedule — never taken
+    from the client (US-3.4)."""
     if payment_mode not in ("cash", "deferred"):
         raise BadRequest("payment_mode must be cash|deferred", code="bad_payment_mode")
 
@@ -57,6 +65,12 @@ def checkout(  # noqa: PLR0912 — cash/deferred × per-category × per-supplier
         offer = db.session.get(SupplierOffer, item.supplier_offer_id)
         product = db.session.get(Product, item.product_id)
         assert offer is not None and product is not None
+        if not offer.is_active:
+            raise BadRequest(
+                f"عرض لم يعد متاحًا في السلة (منتج {item.product_id})",
+                code="offer_unavailable",
+            )
+        # Honour a LIVE lock only; an expired hold reverts to the live price.
         lock = pricelock.lock_for_cart_item(item.id)
         unit_price = to_money(lock.locked_price) if lock is not None else to_money(offer.unit_price)
         line_total = to_money(item.qty) * unit_price
@@ -64,14 +78,16 @@ def checkout(  # noqa: PLR0912 — cash/deferred × per-category × per-supplier
         cash_by_category[product.category] += line_total
         total_cash += line_total
 
+    # Deferred terms are SERVER-COMPUTED from the approved schedule.
     if payment_mode == "deferred":
-        if deferred_total is None:
-            raise BadRequest("deferred_total required for deferred orders", code="deferred_total_required")
-        d_total = to_money(deferred_total)
-        if d_total < total_cash:
-            raise BadRequest("deferred_total must be ≥ cash total", code="deferred_lt_cash")
+        d_total = to_money(total_cash * (Decimal("1") + DEFERRED_MARKUP_PCT))
+        spread = d_total - total_cash
+        discount = to_money(spread * EARLY_DISCOUNT_PCT)
+        before = date.today() + timedelta(days=EARLY_WINDOW_DAYS)
     else:
         d_total = total_cash
+        discount = Decimal("0")
+        before = None
 
     # Create the order shell.
     order = Order(
@@ -143,8 +159,8 @@ def checkout(  # noqa: PLR0912 — cash/deferred × per-category × per-supplier
             order_id=order.id,
             cash_price=total_cash,
             deferred_price=d_total,
-            early_settlement_discount=early_settlement_discount or Decimal("0"),
-            early_settlement_before=early_settlement_before,
+            early_settlement_discount=discount,
+            early_settlement_before=before,
         )
 
     # Consume the price locks and close the cart.

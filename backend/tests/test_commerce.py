@@ -125,12 +125,37 @@ def test_checkout_deferred_creates_terms_and_spread(client) -> None:
     cust = create_user(kind="customer", email="c5@example.com", roles=("customer",))
     db.session.commit()
     cart_svc.add_item(customer_id=cust.id, offer_id=oa.id, qty=Decimal("10"))  # cash=1000
-    order = orders_svc.checkout(customer_id=cust.id, payment_mode="deferred", deferred_total=Decimal("1150"))
+    # Deferred terms are server-computed (10% markup placeholder) — not client input.
+    order = orders_svc.checkout(customer_id=cust.id, payment_mode="deferred")
     assert order.total_cash == Decimal("1000.0000")
-    assert order.total_deferred == Decimal("1150.0000")
+    assert order.total_deferred == Decimal("1100.0000")  # 1000 × 1.10
     from app.accounting.models import DeferredTerm
     term = db.session.execute(select(DeferredTerm).where(DeferredTerm.order_id == order.id)).scalar_one()
-    assert term.deferred_price == Decimal("1150.0000")
+    assert term.deferred_price == Decimal("1100.0000")
+    assert term.early_settlement_discount == Decimal("50.0000")  # spread 100 × 50%
+
+
+def test_expired_lock_reverts_to_current_price(client) -> None:
+    from datetime import UTC, datetime, timedelta
+
+    from app.commerce.models import PriceLock
+
+    _, (a, oa), _ = _setup_two_suppliers(price_a="100")
+    cust = create_user(kind="customer", email="c6b@example.com", roles=("customer",))
+    db.session.commit()
+    cart_svc.add_item(customer_id=cust.id, offer_id=oa.id, qty=Decimal("4"))  # locked at 100
+
+    # Expire the lock, then the supplier raises the price (allowed — no live lock).
+    pl = db.session.execute(select(PriceLock)).scalars().one()
+    pl.expires_at = datetime.now(UTC) - timedelta(minutes=1)
+    db.session.commit()
+    offers_svc.upsert_offer(supplier_id=a.id, product_id=oa.product_id, unit_price=Decimal("130"))
+
+    # Cart + checkout now use the live price (130), not the expired lock (100).
+    summary = cart_svc.serialize_cart(cust.id)
+    assert summary["items"][0]["locked_unit_price"] == "130.0000"
+    order = orders_svc.checkout(customer_id=cust.id, payment_mode="cash")
+    assert order.total_cash == Decimal("520.0000")  # 4 × 130
 
 
 def test_checkout_uses_locked_price_after_cut(client) -> None:

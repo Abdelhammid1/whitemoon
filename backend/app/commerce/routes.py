@@ -97,13 +97,7 @@ def delete_cart_item(item_id: int):
 def checkout():
     payload = _parse(CheckoutIn)
     uid = _uid()
-    order = orders_svc.checkout(
-        customer_id=uid,
-        payment_mode=payload.payment_mode,
-        deferred_total=Decimal(str(payload.deferred_total)) if payload.deferred_total is not None else None,
-        early_settlement_discount=Decimal(str(payload.early_settlement_discount)) if payload.early_settlement_discount is not None else None,
-        early_settlement_before=payload.early_settlement_before,
-    )
+    order = orders_svc.checkout(customer_id=uid, payment_mode=payload.payment_mode)
     audit_emit("commerce.order.placed", actor_user_id=uid, target_type="order", target_id=order.id)
     return jsonify(orders_svc.serialize_order(order, for_customer=True)), 201
 

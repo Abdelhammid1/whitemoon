@@ -34,15 +34,9 @@ class UpdateCartItemIn(BaseModel):
 
 
 class CheckoutIn(BaseModel):
+    # Financial terms (deferred price, discount, window) are computed
+    # server-side from the approved schedule — never accepted from the client.
     payment_mode: str = Field(pattern="^(cash|deferred)$")
-    deferred_total: Decimal | None = None
-    early_settlement_discount: Decimal | None = None
-    early_settlement_before: date | None = None
-
-    @field_validator("deferred_total", "early_settlement_discount", mode="before")
-    @classmethod
-    def _v(cls, v: object) -> object:
-        return _no_float(v)
 
 
 class RfqIn(BaseModel):

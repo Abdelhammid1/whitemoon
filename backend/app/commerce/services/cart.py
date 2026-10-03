@@ -69,14 +69,20 @@ def update_qty(*, customer_id: int, item_id: int, qty: Decimal) -> CartItem:
     assert offer is not None
     if to_money(qty) < to_money(offer.moq):
         raise BadRequest(f"الكمية أقل من الحد الأدنى ({offer.moq})", code="below_moq")
-    item.qty = to_money(qty)
-    # Re-lock: release the old lock and create a fresh one at the current price
-    # (if the supplier lowered it, the customer benefits; a raise is blocked
-    # at the offer-update path, so the live price here is never above the lock).
+    if not offer.is_active:
+        raise Conflict("العرض لم يعد متاحًا", code="offer_unavailable")
+    new_qty = to_money(qty)
+    item.qty = new_qty
+    # Re-lock. Honour the held price ONLY while the lock is still live AND the
+    # new quantity does not exceed what was reserved; otherwise lock at the
+    # supplier's current price (the hold is for the originally reserved qty).
     lock = pricelock.lock_for_cart_item(item.id)
-    locked_price = lock.locked_price if lock is not None else offer.unit_price
+    if lock is not None and new_qty <= to_money(lock.locked_qty):
+        locked_price = lock.locked_price
+    else:
+        locked_price = offer.unit_price
     pricelock.release_lock_for_cart_item(item.id)
-    pricelock.create_lock(offer_id=offer.id, cart_item_id=item.id, qty=qty, price=locked_price)
+    pricelock.create_lock(offer_id=offer.id, cart_item_id=item.id, qty=new_qty, price=locked_price)
     db.session.commit()
     return item
 
@@ -106,7 +112,12 @@ def serialize_cart(customer_id: int) -> dict[str, Any]:
     for item in cart.items:
         product = db.session.get(Product, item.product_id)
         lock = pricelock.lock_for_cart_item(item.id)
-        unit_price = lock.locked_price if lock is not None else Decimal("0")
+        if lock is not None:
+            unit_price = lock.locked_price
+        else:
+            # Lock expired → fall back to the supplier's current live price.
+            offer = db.session.get(SupplierOffer, item.supplier_offer_id)
+            unit_price = offer.unit_price if offer else Decimal("0")
         line_total = to_money(item.qty) * to_money(unit_price)
         total += line_total
         items.append(

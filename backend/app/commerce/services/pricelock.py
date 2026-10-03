@@ -56,6 +56,7 @@ def lock_for_cart_item(cart_item_id: int) -> PriceLock | None:
         PriceLock.cart_item_id == cart_item_id,
         PriceLock.released_at.is_(None),
         PriceLock.consumed_at.is_(None),
+        PriceLock.expires_at > _now(),
     )
     return db.session.execute(stmt).scalar_one_or_none()
 
