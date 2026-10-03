@@ -1,19 +1,24 @@
 import type { ReactNode } from 'react'
+import { Brand } from '../components/Brand'
 
 /**
- * Centered page for unauthenticated flows (login / register / OTP / 2FA).
- * Follows DESIGN.md: parchment background, centered column, no shadows
- * outside the card itself.
+ * Centered page for unauthenticated flows. DESIGN.md stays strict:
+ * parchment canvas, 400–500 weights, hairline borders, teal reserved.
+ * Composition only — brand gets room, the card has serious internal
+ * padding, and a column max-width of 420px keeps the surface compact
+ * on huge screens instead of looking lost at 640px.
  */
 export function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-parchment text-ink">
-      <div className="mx-auto flex min-h-screen max-w-[640px] flex-col items-center justify-center px-6 py-10">
-        <div className="mb-8 flex items-center gap-2">
-          <div className="h-4 w-4 rounded-sm bg-ink" aria-hidden />
-          <span className="text-body-lg text-ink">وايت مون</span>
+      <div className="mx-auto flex min-h-screen w-full max-w-[420px] flex-col items-stretch justify-center px-6 py-12">
+        <div className="mb-10 flex items-center justify-center">
+          <Brand size={36} />
         </div>
-        <div className="w-full">{children}</div>
+        {children}
+        <p className="mt-8 text-center text-caption text-ash">
+          © {new Date().getFullYear()} وايت مون · منصة الأعمال
+        </p>
       </div>
     </div>
   )

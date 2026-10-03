@@ -39,7 +39,7 @@ export function RegisterCustomerPage() {
 
   return (
     <AuthLayout>
-      <Card>
+      <Card padding="lg">
         <CardHeader
           title="حساب عميل جديد"
           subtitle="يفعّل حسابك فور التحقق من رقم الهاتف."

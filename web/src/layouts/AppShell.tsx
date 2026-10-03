@@ -2,6 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { Button } from '../components/Button'
 import { Badge } from '../components/Badge'
+import { Brand } from '../components/Brand'
 
 /**
  * Two-pane layout from DESIGN.md: fixed ~260px right-side sidebar (RTL),
@@ -29,9 +30,8 @@ export function AppShell() {
         className="fixed inset-y-0 end-0 w-[260px] border-s border-warm-mist bg-parchment px-3 py-6"
         aria-label="القائمة الجانبية"
       >
-        <div className="mb-6 flex items-center gap-2 px-3">
-          <div className="h-4 w-4 rounded-sm bg-ink" aria-hidden />
-          <span className="text-body-lg text-ink">وايت مون</span>
+        <div className="mb-6 px-3">
+          <Brand size={24} />
         </div>
 
         <div className="flex flex-col gap-1">

@@ -45,7 +45,7 @@ export function OtpVerifyPage() {
 
   return (
     <AuthLayout>
-      <Card>
+      <Card padding="lg">
         <CardHeader
           title="التحقق برمز OTP"
           subtitle={

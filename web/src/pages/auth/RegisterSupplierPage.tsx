@@ -45,7 +45,7 @@ export function RegisterSupplierPage() {
 
   return (
     <AuthLayout>
-      <Card>
+      <Card padding="lg">
         <CardHeader
           title="تسجيل مورد"
           subtitle="لن يُفعّل الحساب إلا بعد اعتماد الإدارة لبياناتك الرسمية."

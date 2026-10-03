@@ -56,8 +56,8 @@ export function LoginPage() {
 
   return (
     <AuthLayout>
-      <Card>
-        <CardHeader title="تسجيل الدخول" subtitle="وايت مون — منصة الأعمال" />
+      <Card padding="lg">
+        <CardHeader title="تسجيل الدخول" subtitle="أدخل بياناتك للمتابعة." />
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <div className="flex gap-2">
             <Chip
