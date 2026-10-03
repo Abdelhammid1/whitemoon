@@ -51,6 +51,12 @@ from .inventory.models import (
     TransferOrder,
     TransferOrderLine,
 )
+from .sales.models import (
+    CreditOverride,
+    CustomerCreditTier,
+    CustomerDue,
+    EscalationEvent,
+)
 
 __all__ = [
     "Account",
@@ -61,8 +67,12 @@ __all__ = [
     "Cart",
     "CartItem",
     "ChannelPartnerProfile",
+    "CreditOverride",
+    "CustomerCreditTier",
+    "CustomerDue",
     "CustomerProfile",
     "DeferredTerm",
+    "EscalationEvent",
     "EventJournalMap",
     "ImpersonationGrant",
     "JournalEntry",

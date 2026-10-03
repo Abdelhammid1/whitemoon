@@ -32,6 +32,7 @@ from . import pricelock
 DEFERRED_MARKUP_PCT = Decimal("0.10")  # deferred_total = cash × (1 + markup)
 EARLY_DISCOUNT_PCT = Decimal("0.50")  # discount = spread × pct (0 ≤ disc < spread)
 EARLY_WINDOW_DAYS = 14
+CREDIT_NET_DAYS = 30  # deferred payment due date = placed + net days
 
 
 def _number() -> str:
@@ -89,6 +90,14 @@ def checkout(  # noqa: PLR0912, PLR0915 — cash/deferred × per-category × per
         discount = Decimal("0")
         before = None
 
+    # Credit control (US-5.2): block a deferred order that would exceed the
+    # customer's limit, and reject deferred entirely for a red-tier customer.
+    from ...sales.services import credit as credit_svc
+
+    credit_svc.check_credit(
+        customer_id=customer_id, order_amount=d_total, deferred=(payment_mode == "deferred")
+    )
+
     # Create the order shell.
     order = Order(
         number="PENDING",
@@ -97,7 +106,7 @@ def checkout(  # noqa: PLR0912, PLR0915 — cash/deferred × per-category × per
         payment_mode=payment_mode,
         total_cash=total_cash,
         total_deferred=d_total,
-        credit_check_at=datetime.now(UTC),  # hook; full credit logic = Phase 6
+        credit_check_at=datetime.now(UTC),
     )
     db.session.add(order)
     db.session.flush()
@@ -161,6 +170,13 @@ def checkout(  # noqa: PLR0912, PLR0915 — cash/deferred × per-category × per
             deferred_price=d_total,
             early_settlement_discount=discount,
             early_settlement_before=before,
+        )
+        # Record the receivable that feeds the credit algorithm (US-5.1/5.3).
+        credit_svc.record_due(
+            customer_id=customer_id,
+            order_id=order.id,
+            amount=d_total,
+            due_date=date.today() + timedelta(days=CREDIT_NET_DAYS),
         )
 
     # Consume the price locks and close the cart.

@@ -80,5 +80,8 @@ ignore = [
 # Commerce source has dense Arabic-labelled flows; a few lines run long but
 # wrapping them hurts readability more than it helps.
 "app/commerce/**/*.py" = ["E501"]
+# Credit-rule thresholds/weights are the documented business rule (docs/04);
+# extracting each literal to a constant hurts more than it helps.
+"app/sales/**/*.py" = ["E501", "PLR2004"]
 "tests/**/*.py" = ["PLR2004", "S101", "ARG001", "E501"]
 "migrations/**/*.py" = ["N999", "E501"]
