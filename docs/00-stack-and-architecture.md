@@ -1,10 +1,18 @@
 # 00 — Stack & Architecture
 
 **Project:** White Moon (منظومة وايت مون المتكاملة) — B2B Multi-Vendor Marketplace + ERP
-**Scope of this doc:** Final technology stack, service topology, cloud choice, and monorepo layout for v1 (web only; mobile deferred).
+**Scope of this doc:** Final technology stack, service topology, host choice, and monorepo layout for v1.
 **Author:** Zyad Wael
 **Date:** 2026-10-03
-**Status:** Draft — awaiting client sign-off before Phase 1 starts.
+**Status:** Second review — host swapped from AWS to Hetzner per Abdel-Hameed; mobile deferral precondition made explicit.
+
+### Scope of v1 — web only, with an explicit mobile precondition
+
+v1 ships the **web platforms only** (customer, supplier, admin). The two Flutter mobile apps (customer + supplier) are **conditionally deferred** — the condition is explicit, not a lapse:
+
+> Mobile development does **not** begin until the full web platform is complete, released to production, and confirmed stable by the client in writing. "Complete and confirmed" means: all 11 Epics shipped on web, UAT signed off, and no open P0/P1 defects for 14 consecutive days.
+
+Agents and branches already use the responsive web platform per the spec (US-2.3), so this does not block any Epic.
 
 ---
 
@@ -21,9 +29,9 @@
 | OTP delivery | Pluggable provider interface. v1 adapters: Twilio SMS, Twilio WhatsApp Business API. | US-0.1 requires SMS or WhatsApp OTP. We abstract behind an interface so Egyptian local providers (Vodafone/WE/Etisalat gateways) can be swapped in without touching call sites. |
 | Background jobs | Celery + Redis | OCR, notifications, OCR-on-image chat filter (US-10.2), scheduled reports (ميزة اضافية under EPIC 3), reorder escalations (US-4.3). |
 | Scheduler | Celery Beat | Daily/weekly report emails, period-close reminders, credit-rating recomputation. |
-| OCR engine | Tesseract via `pytesseract` for v1; adapter interface so AWS Textract / Google Document AI can be swapped in for receipts if accuracy demands. | US-3.3 (bank receipt matching) + US-10.2 (phone-number detection in images). |
-| File storage | S3-compatible object storage (AWS S3 or GCS). Local MinIO for dev. | Receipts, chat images, supplier KYC docs, invoice PDFs, backups. |
-| Email | Amazon SES (if AWS) / SendGrid (if GCP) | Weekly reports to Abdel-Hameed, order notifications, password resets. |
+| OCR engine | Tesseract via `pytesseract` for v1 behind an adapter interface; a hosted OCR provider can be swapped in later for receipts if accuracy demands. | US-3.3 (bank receipt matching) + US-10.2 (phone-number detection in images). |
+| File storage | **Hetzner Object Storage** (S3-compatible API; standard `boto3` client with endpoint override). Local S3Mock in dev. | Receipts, chat images, supplier KYC docs, invoice PDFs, backups. |
+| Email | SMTP via a transactional provider (SendGrid / Mailgun / local Egyptian provider) — chosen at provisioning time. | Weekly reports to Abdel-Hameed, order notifications, password resets. |
 | Maps / GPS | Google Maps JS + Routes API for live tracking (US-9.2). Driver app sends GPS pings via WebSocket. | Egypt has reliable Google Maps coverage; alternative Mapbox adapter kept behind an interface. |
 | Realtime | Flask-SocketIO on Redis pubsub | GPS live updates (US-9.2), mediated chat (Epic 10), order status push. |
 | PDF export | WeasyPrint (HTML → PDF) with Arabic/RTL support via a Noto Naskh / IBM Plex Sans Arabic font bundle. | Reports export per US-3.5. |
@@ -36,52 +44,49 @@
 
 Rejected / deferred: FastAPI (client asked for Flask), MongoDB (ACID is mandatory for accounting), MySQL (Postgres schemas + partial indexes + CHECK constraints are a better fit).
 
-## 2. Cloud choice: **AWS** (recommended)
+## 2. Host: **Hetzner** (locked by client — standard Manasati stack for Egypt projects)
 
-| Factor | AWS | GCP |
-|---|---|---|
-| Managed Postgres | RDS for PostgreSQL (PITR, automated snapshots, read replicas, multi-AZ) | Cloud SQL for PostgreSQL (similar, slightly fewer regions in MENA) |
-| Object storage | S3 (cheaper egress for Egypt via Middle East Bahrain / Cairo-adjacent) | GCS (fine, Egypt-adjacent regions are EU-west) |
-| OCR option | AWS Textract (strong for Arabic/English receipts and tables) | Document AI (strong, slightly costlier) |
-| Email | SES (cheap, straightforward DKIM/SPF) | Not first-party; needs SendGrid |
-| MENA presence | AWS Middle East (Bahrain) `me-south-1` and UAE `me-central-1` — lowest latency to Egypt | GCP has no dedicated MENA region; nearest is EU |
-| Price (small/mid workload) | ~15–20% cheaper for our shape | — |
+Decision made by Abdel-Hameed in review round 3 (2026-10-03). Primary location **FSN1 (Falkenstein, Germany)** with hot standby in **NBG1 (Nuremberg)** across datacenters, mirroring other Manasati Egypt-facing deployments.
 
-**Decision:** AWS, region `me-south-1` (Bahrain) for prod, `me-south-1` second AZ for failover. Dev/staging in the same region. Confirm with the client before provisioning — if there is a strong preference for GCP, swap the adapters; nothing in the codebase is AWS-specific below the storage/email layer.
+Nothing in the application code is Hetzner-specific — the storage adapter is S3-compatible, the SMS/WhatsApp adapter is behind an interface, and the DB is self-managed Postgres on Linux. See `docs/05-backup-and-dr.md` for the full host-side layout, backup chain, and failover plan.
 
 ## 3. Service topology (v1)
 
 ```
-                                  Internet
-                                      |
-                               [CloudFront CDN]
-                                      |
-                             [ALB — HTTPS only]
-                                      |
-             -------------------------+-------------------------
-             |                        |                        |
-       [Flask API]              [SocketIO node]          [Static web]
-       (gunicorn, 2+)           (gunicorn+eventlet)      (customer, supplier, admin SPAs)
-             |                        |
-             +-----------+------------+
-                         |
-                   [RDS Postgres]     [ElastiCache Redis]
-                   me-south-1a         (cache + queues + pubsub)
-                   multi-AZ to -1b
-                         |
-                   [S3 bucket set]
-                   receipts/, chat-images/, kyc/, invoices/, backups/
+                                 Internet
+                                     |
+                        [Hetzner Load Balancer, TLS]
+                                     |
+            -------------------------+-------------------------
+            |                        |                        |
+   [Flask API × 2]            [SocketIO node × 2]       [Static web]
+   (gunicorn, CCX23)          (gunicorn+eventlet)       (customer, supplier, admin SPAs)
+            |                        |
+            +-----------+------------+
+                        |         Private vSwitch 10.10.0.0/16
+         ---------------+---------------
+         |                              |
+  [Postgres primary]            [Redis — CPX21]
+  CCX33 + Volume (FSN1)         (cache + queues + pubsub)
+         |
+         | streaming replica
+         v
+  [Postgres standby]  (NBG1, different DC)
 
 Background:
-   [Celery workers] × N — pulls from Redis
+   [Celery workers × N — CPX31]
       - ocr-worker        (receipts + image chat scan)
       - notification-worker (push/SMS/WhatsApp/email)
       - accounting-worker (period close, batch POS journal posting)
       - reports-worker    (scheduled report generation)
    [Celery Beat] — single instance, scheduled jobs
+
+Backups + archive:
+   [Hetzner Object Storage]     — receipts, chat, kyc, invoices (versioned, FSN1 + NBG1 mirror)
+   [Hetzner Storage Box × 2]    — pgBackRest repo, GPG-encrypted logical dumps
 ```
 
-Everything behind the ALB terminates TLS; internal traffic is VPC-private. Secrets live in AWS Secrets Manager, not in `.env` files in prod.
+Only the Load Balancer and a jump host face the public internet; everything else is on the private vSwitch. Secrets live in **HashiCorp Vault** (HA), not in `.env` files in prod. See §5 of `05-backup-and-dr.md`.
 
 ## 4. Monorepo layout
 
@@ -148,7 +153,7 @@ white-moon/
 └── README.md
 ```
 
-Mobile apps live in a sibling `mobile/` folder when Phase 8 begins. They're explicitly deferred for v1 per the latest client decision.
+Mobile apps live in a sibling `mobile/` folder when they begin. They're deferred under the **explicit precondition stated in §1 above**: web platform complete, released, and client-confirmed stable for 14 consecutive days before mobile work starts.
 
 ## 5. Non-negotiable architectural rules
 
@@ -168,14 +173,14 @@ These are enforced in code reviews and in CI where possible:
 |---|---|---|---|
 | local | Dockerized Postgres | seeded | each developer |
 | ci | ephemeral Postgres per job | synthetic | tests only |
-| staging | RDS t4g.small | internal + Abdel-Hameed | acceptance per phase |
-| prod | RDS r6g.large multi-AZ | real users | live |
+| staging | Hetzner CCX13 Postgres (FSN1) | internal + Abdel-Hameed | acceptance per phase |
+| prod | Hetzner CCX33 Postgres + NBG1 standby | real users | live |
 
 Promotion is strictly: local → PR → ci green → merge → staging deploy → sign-off → prod deploy.
 
-## 7. Open items for client sign-off before Phase 1
+## 7. Open items for client sign-off before Phase 2
 
-1. Confirm AWS region `me-south-1` (Bahrain) is acceptable. Alternative: `me-central-1` (UAE) if preferred.
-2. Confirm Twilio is acceptable as the v1 SMS/WhatsApp provider, or name the preferred Egyptian gateway so we build its adapter first.
-3. Confirm Google Maps JS/Routes API licensing budget is approved; otherwise we start on Mapbox.
+1. Confirm **FSN1 + NBG1** as the two Hetzner locations (default). Alternative HEL1 (Helsinki) if different latency / GDPR shaping is desired.
+2. Confirm **Twilio** as the v1 SMS/WhatsApp provider, or name the preferred Egyptian gateway so we build its adapter first.
+3. Confirm **Google Maps** JS/Routes API licensing budget is approved; otherwise we start on Mapbox.
 4. Confirm the brand name on the identity provider / sender: "White Moon" vs "وايت مون" for Arabic-first OTP messages and emails.

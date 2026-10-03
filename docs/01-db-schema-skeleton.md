@@ -73,7 +73,7 @@ Conventions:
 | `rfqs` | US-1.4. `initiator_user_id`, `initiator_type` (`customer`, `supplier`), `product_id`, `qty`, `deadline`, `qualification_requirements`, `status`. |
 | `rfq_offers` | `rfq_id`, `supplier_id`, `unit_price`, `moq`, `submitted_at`. |
 | `price_locks` | US-1.6. `supplier_offer_id`, `locked_qty`, `locked_price`, `expires_at`, `cart_item_id`. |
-| `customer_credit_tiers` | `customer_id`, `tier` (`green`, `yellow`, `orange`, `red`), `credit_limit`, `last_recomputed_at`. |
+| `customer_credit_tiers` | `customer_id`, `tier` (`white`, `green`, `yellow`, `red`), `credit_limit`, `last_recomputed_at`. Four-color scheme per `docs/04-credit-rating-rules.md` (reviewer round 3, 2026-10-03). |
 | `escalation_events` | US-5.3. `customer_id`, `level` (1..5), `triggered_at`, `trigger_reason`, `is_automatic`, `actor_user_id` (null for 1–4, required for 5). |
 
 ## Schema: `logistics` — EPIC 9

@@ -24,7 +24,7 @@ Each phase ends with a stop/audit gate. Nothing moves forward until the gate's a
 | 11 | 7 | Basic manufacturing orders | End-to-end MO close with journal |
 | 12 | 11 | ETA-ready structure, EGP enforcement | USD attempt blocked; ETA payload shape |
 | 13 | — | BI dashboard, Notification Center, scheduled reports | Restore drill passes |
-| 14 (later) | 2 | Flutter customer + supplier apps | Separate planning cycle |
+| 14 (later) | 2 | Flutter customer + supplier apps | Starts only after web is **released, live and client-confirmed stable for 14 consecutive days** (see `docs/00-stack-and-architecture.md` §1 — explicit precondition). |
 
 ## Local setup (will be fleshed out in Phase 1)
 
