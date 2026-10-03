@@ -1,33 +1,28 @@
-/**
- * White-Moon brand mark — a crescent cut from a disc.
- * Ink filled, monochrome, scalable. DESIGN.md says the sidebar mark is
- * 16px; use `size={16}` there. On the auth pages a 36–40px treatment
- * reads as an identifying anchor rather than a glyph placeholder.
- */
 interface Props {
   size?: number
   withWordmark?: boolean
 }
 
-export function Brand({ size = 32, withWordmark = true }: Props) {
+/** White Moon crescent mark + bilingual wordmark, inline (no external image). */
+export function Brand({ size = 24, withWordmark = true }: Props) {
   return (
-    <div className="inline-flex items-center gap-3">
+    <div className="flex items-center gap-space-sm">
       <svg
         width={size}
         height={size}
-        viewBox="0 0 32 32"
+        viewBox="0 0 24 24"
         fill="none"
         aria-hidden
         xmlns="http://www.w3.org/2000/svg"
       >
         <path
-          d="M20.5 2a14 14 0 1 0 9.5 24 11 11 0 0 1-9.5-22Z"
+          d="M15.5 2a10 10 0 1 0 6.5 17.3A8 8 0 0 1 15.5 2Z"
           fill="currentColor"
-          className="text-ink"
+          className="text-primary"
         />
       </svg>
       {withWordmark && (
-        <span className="text-body-lg text-ink" style={{ letterSpacing: 0 }}>
+        <span className="font-headline-2 text-headline-2 text-primary font-medium tracking-tight">
           وايت مون
         </span>
       )}

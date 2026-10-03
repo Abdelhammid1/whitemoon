@@ -1,23 +1,82 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import { useAuth } from '../auth/AuthContext'
-import { Button } from '../components/Button'
-import { Badge } from '../components/Badge'
 import { Brand } from '../components/Brand'
+import { Icon } from '../components/Icon'
+import { ImpersonationBanner } from '../components/ImpersonationBanner'
 
-/**
- * Two-pane layout from DESIGN.md: fixed ~260px right-side sidebar (RTL),
- * centered main content capped at 900px. Everything flat.
- */
+interface NavEntry {
+  to: string
+  label: string
+  end?: boolean
+}
+interface NavGroup {
+  label: string
+  items: NavEntry[]
+  roles: string[]
+}
+
+const GROUPS: NavGroup[] = [
+  {
+    label: 'النظام',
+    roles: ['admin', 'staff'],
+    items: [
+      { to: '/', label: 'لوحة التحكم', end: true },
+      { to: '/admin/users', label: 'المستخدمون' },
+      { to: '/admin/suppliers/pending', label: 'الموردون المعلقون' },
+      { to: '/admin/audit', label: 'سجل التدقيق' },
+      { to: '/admin/impersonation', label: 'الدخول كمستخدم' },
+    ],
+  },
+  {
+    label: 'المالية',
+    roles: ['admin', 'staff'],
+    items: [
+      { to: '/accounting/chart', label: 'دليل الحسابات' },
+      { to: '/accounting/periods', label: 'الفترات المالية' },
+      { to: '/accounting/journal/manual', label: 'قيد يدوي' },
+      { to: '/accounting/receipts', label: 'الإيصالات والعمليات' },
+      { to: '/accounting/deferred', label: 'البيع الآجل' },
+      { to: '/accounting/reports', label: 'التقارير' },
+    ],
+  },
+  {
+    label: 'المستودع',
+    roles: ['admin', 'staff'],
+    items: [
+      { to: '/inventory/products', label: 'المنتجات والمخزون' },
+      { to: '/inventory/stock', label: 'أرصدة المخزون' },
+      { to: '/inventory/transfers', label: 'إذون التحويل' },
+      { to: '/inventory/shortages', label: 'النواقص والمرتجعات' },
+    ],
+  },
+  {
+    label: 'المورد',
+    roles: ['supplier'],
+    items: [
+      { to: '/', label: 'لوحة التحكم', end: true },
+      { to: '/inventory/offers', label: 'عروضي' },
+      { to: '/inventory/stock', label: 'مخزوني' },
+    ],
+  },
+  {
+    label: 'حسابي',
+    roles: ['customer', 'agent', 'branch'],
+    items: [{ to: '/', label: 'لوحة التحكم', end: true }],
+  },
+]
+
 export function AppShell() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const role = user?.kind ?? 'customer'
 
-  const navItem =
-    'flex items-center gap-2 rounded-xl px-3 py-2 text-body text-graphite hover:text-ink'
-  const activeItem = 'bg-deep-teal text-parchment hover:text-parchment'
-
-  const canSeeAdmin = user && (user.kind === 'admin' || user.kind === 'staff')
-  const canSeeAccounting = user && (user.kind === 'admin' || user.kind === 'staff')
+  const navItem = (active: boolean) =>
+    `px-space-lg py-1.5 font-body text-body transition-colors border-r-2 ${
+      active
+        ? 'text-primary font-medium border-primary'
+        : 'text-secondary hover:text-primary border-transparent'
+    }`
 
   async function onSignOut() {
     await signOut()
@@ -25,122 +84,67 @@ export function AppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-parchment text-ink">
-      <aside
-        className="fixed inset-y-0 end-0 w-[260px] border-s border-warm-mist bg-parchment px-3 py-6"
-        aria-label="القائمة الجانبية"
-      >
-        <div className="mb-6 px-3">
-          <Brand size={24} />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <NavLink
-            to="/"
-            end
-            className={({ isActive }) => `${navItem} ${isActive ? activeItem : ''}`}
-          >
-            <span>الصفحة الرئيسية</span>
-          </NavLink>
-
-          {canSeeAccounting && (
-            <>
-              <p className="mt-4 px-3 text-body-sm text-graphite">المحاسبة</p>
-              <NavLink
-                to="/accounting/periods"
-                className={({ isActive }) => `${navItem} ${isActive ? activeItem : ''}`}
-              >
-                الفترات المحاسبية
-              </NavLink>
-              <NavLink
-                to="/accounting/journal/manual"
-                className={({ isActive }) => `${navItem} ${isActive ? activeItem : ''}`}
-              >
-                قيد يدوي
-              </NavLink>
-              <NavLink
-                to="/accounting/receipts"
-                className={({ isActive }) => `${navItem} ${isActive ? activeItem : ''}`}
-              >
-                إيصالات التحصيل
-              </NavLink>
-              <NavLink
-                to="/accounting/deferred"
-                className={({ isActive }) => `${navItem} ${isActive ? activeItem : ''}`}
-              >
-                الآجل والخصم المبكر
-              </NavLink>
-              <NavLink
-                to="/accounting/reports/trial-balance"
-                className={({ isActive }) => `${navItem} ${isActive ? activeItem : ''}`}
-              >
-                التقارير
-              </NavLink>
-            </>
-          )}
-
-          {canSeeAdmin && (
-            <>
-              <p className="mt-4 px-3 text-body-sm text-graphite">الإدارة</p>
-              <NavLink
-                to="/admin/users"
-                className={({ isActive }) => `${navItem} ${isActive ? activeItem : ''}`}
-              >
-                المستخدمون
-              </NavLink>
-              <NavLink
-                to="/admin/suppliers/pending"
-                className={({ isActive }) => `${navItem} ${isActive ? activeItem : ''}`}
-              >
-                الموردون قيد الاعتماد
-              </NavLink>
-              <NavLink
-                to="/admin/impersonation"
-                className={({ isActive }) => `${navItem} ${isActive ? activeItem : ''}`}
-              >
-                الدخول كمستخدم
-              </NavLink>
-            </>
-          )}
-        </div>
-
-        <div className="absolute inset-x-3 bottom-6">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-body-sm text-graphite truncate">
-              {user?.email ?? user?.phone ?? 'ضيف'}
-            </span>
-            {user && <Badge tone="neutral">{roleLabel(user.kind)}</Badge>}
+    <div className="min-h-screen bg-surface-container-lowest">
+      <aside className="fixed top-0 right-0 h-screen w-[224px] bg-surface-container-lowest border-l border-surface-container-highest z-40 flex flex-col justify-between select-none">
+        <div className="flex flex-col overflow-y-auto">
+          <div className="h-16 px-space-lg flex items-center border-b border-surface-container-highest">
+            <Brand size={24} />
           </div>
-          <Button className="w-full" onClick={onSignOut}>
-            تسجيل الخروج
-          </Button>
+          <nav className="flex flex-col pt-space-md pb-space-md">
+            {GROUPS.filter((g) => g.roles.includes(role)).map((g) => (
+              <div key={g.label} className="flex flex-col">
+                <div className="px-space-lg pt-space-md pb-space-xs font-small text-small text-secondary tracking-wider">
+                  {g.label}
+                </div>
+                {g.items.map((it) => (
+                  <NavLink
+                    key={it.to}
+                    to={it.to}
+                    end={it.end}
+                    className={({ isActive }) => navItem(isActive)}
+                  >
+                    {it.label}
+                  </NavLink>
+                ))}
+              </div>
+            ))}
+          </nav>
+        </div>
+
+        <div className="p-space-md border-t border-surface-container-highest">
+          <button
+            onClick={onSignOut}
+            className="w-full flex items-center justify-between px-space-xs py-space-xs text-on-surface hover:text-primary transition-colors"
+          >
+            <span className="flex items-center gap-space-sm min-w-0">
+              <span className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
+                <Icon name="person" size={18} className="text-on-primary" />
+              </span>
+              <span className="font-body-medium text-body-medium text-primary truncate">
+                {user?.email ?? user?.phone ?? 'حسابي'}
+              </span>
+            </span>
+            <Icon name="logout" size={18} className="text-secondary" />
+          </button>
         </div>
       </aside>
 
-      <main className="pe-[260px]">
-        <div className="mx-auto max-w-[900px] px-6 py-8">
+      <div className="mr-[224px]">
+        <ImpersonationBanner />
+        <main className="max-w-[1040px] mx-auto pt-[48px] px-[32px] pb-[96px] min-h-screen">
           <Outlet />
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   )
 }
 
-function roleLabel(kind: string): string {
-  switch (kind) {
-    case 'admin':
-      return 'مدير'
-    case 'staff':
-      return 'موظف'
-    case 'customer':
-      return 'عميل'
-    case 'supplier':
-      return 'مورد'
-    case 'agent':
-      return 'وكيل'
-    case 'branch':
-      return 'فرع'
-    default:
-      return kind
-  }
+/** Centered reading/form column (760px) used by most pages. */
+export function Narrow({ children }: { children: ReactNode }) {
+  return <div className="w-full max-w-[760px] mx-auto">{children}</div>
+}
+
+/** Wide column (1040px) for dense tables — the shell already caps at 1040. */
+export function Wide({ children }: { children: ReactNode }) {
+  return <div className="w-full">{children}</div>
 }

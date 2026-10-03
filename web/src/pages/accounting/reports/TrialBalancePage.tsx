@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { Card, CardHeader } from '../../../components/Card'
+import { Wide } from '../../../layouts/AppShell'
+import { PageTitle, Pill } from '../../../components/ui'
 import { ReportFilterForm } from '../../../components/ReportFilterForm'
-import { Table } from '../../../components/Table'
-import { Badge } from '../../../components/Badge'
+import { DataTable, Mono } from '../../../components/DataTable'
 import { trialBalance, type TrialBalanceResponse } from '../../../api/accounting'
 import { ApiError } from '../../../api/client'
 import { useToast } from '../../../components/Toast'
@@ -11,58 +11,39 @@ import { formatMoney } from '../../../lib/format'
 export function TrialBalancePage() {
   const toast = useToast()
   const [data, setData] = useState<TrialBalanceResponse | null>(null)
-  const [busy, setBusy] = useState<boolean>(false)
+  const [busy, setBusy] = useState(false)
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader title="ميزان المراجعة" subtitle="US-3.5" />
-        <ReportFilterForm
-          busy={busy}
-          onRun={async (filter) => {
-            setBusy(true)
-            try {
-              setData(await trialBalance(filter))
-            } catch (err) {
-              toast.error(err instanceof ApiError ? err.message : 'فشل تشغيل التقرير')
-            } finally {
-              setBusy(false)
-            }
-          }}
-        />
-      </Card>
+    <Wide>
+      <PageTitle title="ميزان المراجعة" />
+      <div className="mt-space-xl">
+        <ReportFilterForm busy={busy} onRun={async (f) => {
+          setBusy(true)
+          try { setData(await trialBalance(f)) }
+          catch (err) { toast.error(err instanceof ApiError ? err.message : 'فشل التشغيل') }
+          finally { setBusy(false) }
+        }} />
+      </div>
 
       {data && (
         <>
-          <Card elevated>
-            <div className="flex items-center justify-between gap-4 text-body text-ink">
-              <span>
-                إجمالي المدين: <span className="font-mono">{formatMoney(data.totals.debit)}</span>
-              </span>
-              <span>
-                إجمالي الدائن: <span className="font-mono">{formatMoney(data.totals.credit)}</span>
-              </span>
-              <Badge tone="neutral">
-                {data.totals.balanced ? 'متوازن' : 'غير متوازن ⚠'}
-              </Badge>
-            </div>
-          </Card>
-          <Card>
-            <Table
-              rowKey={(r) => r.code}
-              rows={data.rows}
-              columns={[
-                { header: 'الكود', cell: (r) => <span className="font-mono">{r.code}</span>, width: '90px' },
-                { header: 'الاسم', cell: (r) => r.name_ar },
-                { header: 'النوع', cell: (r) => <Badge tone="muted">{r.type}</Badge> },
-                { header: 'مدين', align: 'end', cell: (r) => <span className="font-mono">{formatMoney(r.debit)}</span> },
-                { header: 'دائن', align: 'end', cell: (r) => <span className="font-mono">{formatMoney(r.credit)}</span> },
-                { header: 'الرصيد', align: 'end', cell: (r) => <span className="font-mono">{formatMoney(r.balance)}</span> },
-              ]}
-            />
-          </Card>
+          <div className="mt-space-lg flex items-center gap-space-xl border-y border-surface-container-high py-space-md">
+            <span className="font-body text-body text-secondary">إجمالي المدين: <Mono className="font-mono-medium">{formatMoney(data.totals.debit)}</Mono></span>
+            <span className="font-body text-body text-secondary">إجمالي الدائن: <Mono className="font-mono-medium">{formatMoney(data.totals.credit)}</Mono></span>
+            <Pill tone={data.totals.balanced ? 'signal' : 'error'}>{data.totals.balanced ? 'متوازن' : 'غير متوازن'}</Pill>
+          </div>
+          <div className="mt-space-md">
+            <DataTable rows={data.rows} rowKey={(r) => r.code} columns={[
+              { header: 'الكود', width: '90px', cell: (r) => <Mono>{r.code}</Mono> },
+              { header: 'اسم الحساب', cell: (r) => <span className="font-body text-body">{r.name_ar}</span> },
+              { header: 'النوع', cell: (r) => <Pill tone="neutral">{r.type}</Pill> },
+              { header: 'مدين', align: 'end', cell: (r) => <Mono>{formatMoney(r.debit)}</Mono> },
+              { header: 'دائن', align: 'end', cell: (r) => <Mono>{formatMoney(r.credit)}</Mono> },
+              { header: 'الرصيد', align: 'end', cell: (r) => <Mono>{formatMoney(r.balance)}</Mono> },
+            ]} />
+          </div>
         </>
       )}
-    </div>
+    </Wide>
   )
 }

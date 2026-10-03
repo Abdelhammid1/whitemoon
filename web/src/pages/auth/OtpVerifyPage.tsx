@@ -1,10 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { AuthLayout } from '../../layouts/AuthLayout'
-import { Card, CardHeader } from '../../components/Card'
-import { Input } from '../../components/Input'
-import { Button } from '../../components/Button'
-import { Badge } from '../../components/Badge'
+import { Button, Field, InlineError, Pill } from '../../components/ui'
 import { verifyOtp } from '../../api/auth'
 import { ApiError } from '../../api/client'
 
@@ -16,8 +13,8 @@ export function OtpVerifyPage() {
   const debug = params.get('debug') ?? ''
   const isSupplier = params.get('supplier') === '1'
 
-  const [code, setCode] = useState<string>('')
-  const [busy, setBusy] = useState<boolean>(false)
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
 
@@ -25,7 +22,7 @@ export function OtpVerifyPage() {
     if (debug) setCode(debug)
   }, [debug])
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
     if (!userId) return
     setBusy(true)
@@ -33,9 +30,7 @@ export function OtpVerifyPage() {
     try {
       const resp = await verifyOtp(userId, code)
       setStatus(resp.status)
-      if (resp.status === 'active') {
-        setTimeout(() => navigate('/login'), 800)
-      }
+      if (resp.status === 'active') setTimeout(() => navigate('/login'), 900)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'حدث خطأ غير متوقع')
     } finally {
@@ -44,54 +39,31 @@ export function OtpVerifyPage() {
   }
 
   return (
-    <AuthLayout>
-      <Card padding="lg">
-        <CardHeader
-          title="التحقق برمز OTP"
-          subtitle={
-            channel === 'email'
-              ? 'أرسلنا رمزًا على بريدك الإلكتروني.'
-              : 'أرسلنا رمزًا على رقم هاتفك.'
-          }
-        />
-        <form onSubmit={onSubmit} className="flex flex-col gap-3">
-          <Input
-            label="الرمز"
-            dir="ltr"
-            inputMode="numeric"
-            maxLength={10}
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            required
-          />
-          {debug && (
-            <div className="text-caption text-graphite">
-              رمز التطوير: <span className="font-mono text-ink">{debug}</span>
-            </div>
-          )}
-
-          {status === 'pending' && isSupplier && (
-            <div className="rounded-xl border border-warm-mist bg-soft-paper px-3 py-2 text-body-sm text-ink">
-              تم التحقق بنجاح. حسابك كمورد <Badge tone="muted">قيد الاعتماد</Badge>{' '}
-              من الإدارة. سنعلمك فور الموافقة.
-            </div>
-          )}
-          {status === 'active' && (
-            <div className="rounded-xl border border-warm-mist bg-soft-paper px-3 py-2 text-body-sm text-ink">
-              تم التفعيل بنجاح. سيتم تحويلك لتسجيل الدخول…
-            </div>
-          )}
-
-          {error && (
-            <div className="rounded-md border border-warm-mist bg-soft-paper px-3 py-2 text-body-sm text-ink">
-              {error}
-            </div>
-          )}
-          <Button variant="filled" type="submit" disabled={busy}>
-            {busy ? 'جار التحقق…' : 'تأكيد الرمز'}
-          </Button>
-        </form>
-      </Card>
+    <AuthLayout
+      title="التحقق من الرمز"
+      subtitle={channel === 'email' ? 'أرسلنا رمزًا على بريدك الإلكتروني.' : 'أرسلنا رمزًا على رقم هاتفك.'}
+    >
+      <form onSubmit={onSubmit} className="w-full flex flex-col gap-5">
+        <Field label="الرمز" dir="ltr" mono inputMode="numeric" maxLength={10} value={code} onChange={(e) => setCode(e.target.value)} required />
+        {debug && (
+          <p className="font-small text-small text-secondary">
+            رمز التطوير:{' '}
+            <bdi dir="ltr" className="font-mono-medium text-on-surface">{debug}</bdi>
+          </p>
+        )}
+        {status === 'pending' && isSupplier && (
+          <p className="font-small text-small text-on-surface">
+            تم التحقق بنجاح. حسابك كمورد <Pill tone="warning">قيد الاعتماد</Pill> من الإدارة.
+          </p>
+        )}
+        {status === 'active' && (
+          <p className="font-small text-small text-on-surface">تم التفعيل — سيتم تحويلك لتسجيل الدخول…</p>
+        )}
+        {error && <InlineError message={error} />}
+        <Button variant="primary" type="submit" disabled={busy} className="w-full">
+          {busy ? 'جار التحقق…' : 'تأكيد الرمز'}
+        </Button>
+      </form>
     </AuthLayout>
   )
 }

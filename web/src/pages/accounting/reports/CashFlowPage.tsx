@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Card, CardHeader } from '../../../components/Card'
+import { Narrow } from '../../../layouts/AppShell'
+import { PageTitle } from '../../../components/ui'
 import { ReportFilterForm } from '../../../components/ReportFilterForm'
-import { Table } from '../../../components/Table'
+import { DataTable, Mono } from '../../../components/DataTable'
 import { cashFlow, type CashFlowResponse } from '../../../api/accounting'
 import { ApiError } from '../../../api/client'
 import { useToast } from '../../../components/Toast'
@@ -10,67 +11,34 @@ import { formatMoney } from '../../../lib/format'
 export function CashFlowPage() {
   const toast = useToast()
   const [data, setData] = useState<CashFlowResponse | null>(null)
-  const [busy, setBusy] = useState<boolean>(false)
-
+  const [busy, setBusy] = useState(false)
+  const cols = [
+    { header: 'الكود', width: '80px', cell: (r: { code: string }) => <Mono>{r.code}</Mono> },
+    { header: 'الاسم', cell: (r: { name_ar: string }) => <span className="font-body text-body">{r.name_ar}</span> },
+    { header: 'القيمة', align: 'end' as const, cell: (r: { amount: string }) => <Mono>{formatMoney(r.amount)}</Mono> },
+  ]
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader title="التدفقات النقدية" />
-        <ReportFilterForm
-          busy={busy}
-          showAccountPrefix={false}
-          showPartner={false}
-          onRun={async (f) => {
-            setBusy(true)
-            try {
-              setData(await cashFlow(f))
-            } catch (err) {
-              toast.error(err instanceof ApiError ? err.message : 'فشل تشغيل التقرير')
-            } finally {
-              setBusy(false)
-            }
-          }}
-        />
-      </Card>
-
+    <Narrow>
+      <PageTitle title="قائمة التدفقات النقدية" />
+      <div className="mt-space-xl">
+        <ReportFilterForm busy={busy} showAccountPrefix={false} showPartner={false} onRun={async (f) => {
+          setBusy(true)
+          try { setData(await cashFlow(f)) }
+          catch (err) { toast.error(err instanceof ApiError ? err.message : 'فشل التشغيل') }
+          finally { setBusy(false) }
+        }} />
+      </div>
       {data && (
         <>
-          <Card elevated>
-            <p className="text-body text-ink">
-              صافي التغيّر النقدي:{' '}
-              <span className="font-mono">{formatMoney(data.net_cash_change)}</span>
-            </p>
-          </Card>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <Card>
-              <CardHeader title="المصادر (دخل نقدي)" />
-              <Table
-                rowKey={(r) => r.code}
-                rows={data.sources}
-                empty="لا توجد حركات دخل في الفترة."
-                columns={[
-                  { header: 'الكود', cell: (r) => <span className="font-mono">{r.code}</span> },
-                  { header: 'الاسم', cell: (r) => r.name_ar },
-                  { header: 'القيمة', align: 'end', cell: (r) => <span className="font-mono">{formatMoney(r.amount)}</span> },
-                ]}
-              />
-            </Card>
-            <Card>
-              <CardHeader title="الاستخدامات (مصروف نقدي)" />
-              <Table
-                rowKey={(r) => r.code}
-                rows={data.uses}
-                empty="لا توجد حركات صرف في الفترة."
-                columns={[
-                  { header: 'الكود', cell: (r) => <span className="font-mono">{r.code}</span> },
-                  { header: 'الاسم', cell: (r) => r.name_ar },
-                  { header: 'القيمة', align: 'end', cell: (r) => <span className="font-mono">{formatMoney(r.amount)}</span> },
-                ]}
-              />
-            </Card>
+          <p className="mt-space-lg font-display text-display text-primary border-y border-surface-container-high py-space-md">
+            صافي التغير النقدي: <Mono className="font-mono-medium">{formatMoney(data.net_cash_change)}</Mono>
+          </p>
+          <div className="mt-space-lg grid grid-cols-1 md:grid-cols-2 gap-space-xl">
+            <div><h3 className="font-headline-2 text-headline-2 text-primary font-medium pb-space-sm border-b border-surface-container-high">مصادر النقد</h3><div className="mt-space-sm"><DataTable rows={data.sources} rowKey={(r) => r.code} columns={cols} empty="لا توجد حركات دخل." /></div></div>
+            <div><h3 className="font-headline-2 text-headline-2 text-primary font-medium pb-space-sm border-b border-surface-container-high">استخدامات النقد</h3><div className="mt-space-sm"><DataTable rows={data.uses} rowKey={(r) => r.code} columns={cols} empty="لا توجد حركات صرف." /></div></div>
           </div>
         </>
       )}
-    </div>
+    </Narrow>
   )
 }

@@ -1,42 +1,32 @@
 import { useEffect, useState } from 'react'
-import { Card, CardHeader } from '../../components/Card'
-import { Button } from '../../components/Button'
-import { Table } from '../../components/Table'
-import { Input } from '../../components/Input'
-import {
-  approveSupplier,
-  listPendingSuppliers,
-  rejectSupplier,
-  type PendingSupplier,
-} from '../../api/admin'
-import { ApiError } from '../../api/client'
+import { Wide } from '../../layouts/AppShell'
+import { PageTitle, Pill, Button, Spinner, Field } from '../../components/ui'
+import { DataTable, Mono } from '../../components/DataTable'
+import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
+import { approveSupplier, listPendingSuppliers, rejectSupplier, type PendingSupplier } from '../../api/admin'
+import { ApiError } from '../../api/client'
 import { formatDate } from '../../lib/format'
 
 export function PendingSuppliersPage() {
   const toast = useToast()
   const [rows, setRows] = useState<PendingSupplier[]>([])
-  const [loading, setLoading] = useState<boolean>(true)
+  const [loading, setLoading] = useState(true)
   const [rejectId, setRejectId] = useState<number | null>(null)
-  const [reason, setReason] = useState<string>('')
+  const [reason, setReason] = useState('')
   const [busyId, setBusyId] = useState<number | null>(null)
 
   async function load() {
     setLoading(true)
     try {
-      const resp = await listPendingSuppliers()
-      setRows(resp.items)
+      setRows((await listPendingSuppliers()).items)
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'تعذّر التحميل')
     } finally {
       setLoading(false)
     }
   }
-
-  useEffect(() => {
-    void load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  useEffect(() => { void load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function onApprove(id: number) {
     setBusyId(id)
@@ -51,10 +41,11 @@ export function PendingSuppliersPage() {
     }
   }
 
-  async function onReject(id: number) {
-    setBusyId(id)
+  async function onReject() {
+    if (rejectId === null) return
+    setBusyId(rejectId)
     try {
-      await rejectSupplier(id, reason)
+      await rejectSupplier(rejectId, reason)
       toast.success('تم رفض المورد مع تسجيل السبب.')
       setRejectId(null)
       setReason('')
@@ -67,75 +58,55 @@ export function PendingSuppliersPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader
-          title="الموردون قيد الاعتماد"
-          subtitle="لا يُسمح للمورد ببيع أي شيء قبل اعتماد ملفه هنا."
-        />
+    <Wide>
+      <PageTitle title="الموردون المعلقون" subtitle="مراجعة ملفات التسجيل التجاري والوثائق الضريبية للموردين الجدد." />
+      <div className="mt-space-xl flex items-center gap-space-sm">
+        <Pill tone="warning">{rows.length} معلق</Pill>
+      </div>
+
+      <div className="mt-space-md">
         {loading ? (
-          <div className="text-body text-graphite">جار التحميل…</div>
+          <Spinner />
         ) : (
-          <Table
-            rowKey={(r) => r.user_id}
+          <DataTable
             rows={rows}
+            rowKey={(r) => r.user_id}
             empty="لا توجد ملفات قيد الاعتماد."
             columns={[
-              { header: 'المعرّف', cell: (r) => <span className="font-mono">{r.user_id}</span>, width: '80px' },
-              { header: 'الاسم القانوني', cell: (r) => r.legal_name },
-              { header: 'السجل التجاري', cell: (r) => <span dir="ltr">{r.commercial_register_no}</span> },
-              { header: 'البطاقة الضريبية', cell: (r) => <span dir="ltr">{r.tax_card_no}</span> },
-              { header: 'الرقم القومي', cell: (r) => <span dir="ltr">{r.national_id}</span> },
-              { header: 'تاريخ الطلب', cell: (r) => formatDate(r.created_at) },
+              { header: 'المعرف', width: '70px', cell: (r) => <Mono>{r.user_id}</Mono> },
+              { header: 'الاسم القانوني', cell: (r) => <span className="font-body text-body">{r.legal_name}</span> },
+              { header: 'السجل التجاري', cell: (r) => <Mono>{r.commercial_register_no}</Mono> },
+              { header: 'البطاقة الضريبية', cell: (r) => <Mono>{r.tax_card_no}</Mono> },
+              { header: 'تاريخ التقديم', cell: (r) => <Mono>{formatDate(r.created_at)}</Mono> },
               {
-                header: 'إجراء',
+                header: 'الإجراءات',
                 align: 'end',
                 cell: (r) => (
-                  <div className="flex gap-2 justify-end">
-                    <Button
-                      variant="filled"
-                      onClick={() => onApprove(r.user_id)}
-                      disabled={busyId === r.user_id}
-                    >
-                      اعتماد
-                    </Button>
-                    <Button
-                      onClick={() => setRejectId(r.user_id)}
-                      disabled={busyId === r.user_id}
-                    >
-                      رفض
-                    </Button>
+                  <div className="flex gap-space-sm justify-end">
+                    <Button variant="primary" onClick={() => onApprove(r.user_id)} disabled={busyId === r.user_id}>اعتماد</Button>
+                    <Button variant="destructive" onClick={() => setRejectId(r.user_id)} disabled={busyId === r.user_id}>رفض</Button>
                   </div>
                 ),
               },
             ]}
           />
         )}
-      </Card>
+      </div>
 
-      {rejectId !== null && (
-        <Card>
-          <CardHeader title={`رفض المورد #${rejectId}`} subtitle="السبب إلزامي (5 أحرف فأكثر)." />
-          <div className="flex flex-col gap-3">
-            <Input
-              label="سبب الرفض"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              required
-            />
-            <div className="flex gap-2 justify-end">
-              <Button onClick={() => { setRejectId(null); setReason('') }}>إلغاء</Button>
-              <Button
-                variant="filled"
-                onClick={() => onReject(rejectId)}
-                disabled={reason.trim().length < 5 || busyId === rejectId}
-              >
-                تأكيد الرفض
-              </Button>
-            </div>
-          </div>
-        </Card>
-      )}
-    </div>
+      <Modal
+        open={rejectId !== null}
+        onClose={() => { setRejectId(null); setReason('') }}
+        title={`رفض المورد #${rejectId ?? ''}`}
+        footer={
+          <>
+            <Button onClick={() => { setRejectId(null); setReason('') }}>إلغاء</Button>
+            <Button variant="destructive" onClick={onReject} disabled={reason.trim().length < 5 || busyId === rejectId}>تأكيد الرفض</Button>
+          </>
+        }
+      >
+        <p className="font-body text-body text-secondary mb-space-md">السبب إلزامي (٥ أحرف فأكثر) ويُوثَّق في سجل التدقيق.</p>
+        <Field label="سبب الرفض" value={reason} onChange={(e) => setReason(e.target.value)} />
+      </Modal>
+    </Wide>
   )
 }

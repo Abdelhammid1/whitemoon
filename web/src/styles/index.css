@@ -1,98 +1,44 @@
-@import 'tailwindcss';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* Tokens from DESIGN.md — Perplexity-style parchment + teal.
- * All names map to Tailwind v4 utility classes:
- *   --color-X        → bg-X / text-X / border-X / etc.
- *   --font-sans      → font-sans
- *   --text-X + --text-X--line-height → text-X (size + line-height)
- *   --radius-X       → rounded-X
- *   --shadow-X       → shadow-X
- */
-@theme {
-  /* Colors */
-  --color-parchment: #faf8f5;
-  --color-soft-paper: #fdfbfa;
-  --color-warm-mist: #d1d1cd;
-  --color-ash: #92918b;
-  --color-graphite: #72706b;
-  --color-ink: #27251e;
-  --color-pure-black: #000000;
-  --color-deep-teal: #016a71;
-
-  /* Fonts — Arabic first, then English fallbacks. pplxSans isn't licensed
-   * for the project, so we use its documented substitute stack. */
-  --font-sans:
-    'IBM Plex Sans Arabic', 'Inter', ui-sans-serif, system-ui, -apple-system,
-    BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-
-  /* Type scale — size + paired line-height (DESIGN.md). */
-  --text-caption: 11px;
-  --text-caption--line-height: 1.43;
-  --text-body-sm: 12px;
-  --text-body-sm--line-height: 1.43;
-  --text-body: 14px;
-  --text-body--line-height: 1.43;
-  --text-body-lg: 16px;
-  --text-body-lg--line-height: 1.5;
-
-  /* Radii — Tailwind defaults are fine but DESIGN.md pins these semantic
-   * roles. We keep the Tailwind-named stops that match. */
-  --radius-md: 6px;    /* ghost buttons */
-  --radius-xl: 12px;   /* inputs + filled buttons */
-  --radius-2xl: 16px;  /* cards */
-  --radius-full: 9999px; /* chips + badges */
-
-  /* The one allowed shadow — attached to .card-shadow (below) because
-   * Tailwind v4 doesn't auto-generate shadow utilities with multi-arg
-   * values in all setups. Using a utility class keeps it portable. */
+/* Match the Stitch export's base. */
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+  body {
+    overscroll-behavior: none;
+    background: #ffffff; /* surface-container-lowest */
+    color: #1b1c1c; /* on-surface */
+  }
+  /* Hide scrollbars like the export (content still scrolls). */
+  ::-webkit-scrollbar {
+    display: none;
+  }
 }
 
-/* Base layer — guarantees the parchment canvas and Ink text even if a
- * utility class is missed somewhere. */
-:root {
-  color-scheme: light;
-  font-family: var(--font-sans);
-  font-size: 16px;
-  line-height: 1.5;
-  font-weight: 400;
-  color: var(--color-ink);
-  background: var(--color-parchment);
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
+/* Transient overlays (modals, side-sheets, menus) — the one allowed shadow. */
+.overlay-shadow {
+  box-shadow:
+    0 4px 20px -2px rgba(17, 17, 17, 0.06),
+    0 2px 6px -1px rgba(17, 17, 17, 0.04);
 }
 
-html,
-body,
-#root {
-  min-height: 100%;
-  background: var(--color-parchment);
+.modal-backdrop {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(4px);
 }
 
-body {
-  margin: 0;
-}
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-button {
-  font-family: inherit;
-  font-weight: inherit;
-  cursor: pointer;
-}
-
-input,
-textarea,
-select {
-  font-family: inherit;
-  font-size: 14px;
-  color: var(--color-ink);
-  background: var(--color-parchment);
-}
-
-/* The one shadow in the design system (DESIGN.md § Elevation). */
-.card-shadow {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+/* Material Symbols baseline alignment helper. */
+.material-symbols-outlined {
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+  line-height: 1;
+  user-select: none;
 }

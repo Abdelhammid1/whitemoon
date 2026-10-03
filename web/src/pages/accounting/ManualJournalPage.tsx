@@ -1,210 +1,110 @@
 import { useMemo, useState, type FormEvent } from 'react'
-import { Card, CardHeader } from '../../components/Card'
-import { Input } from '../../components/Input'
-import { Button } from '../../components/Button'
-import { Badge } from '../../components/Badge'
+import { Narrow } from '../../layouts/AppShell'
+import { PageTitle, Button, Field, Pill, InlineError } from '../../components/ui'
+import { useToast } from '../../components/Toast'
 import { postManualJournal, type ManualJournalLine } from '../../api/accounting'
 import { ApiError } from '../../api/client'
-import { useToast } from '../../components/Toast'
 import { todayIso } from '../../lib/format'
 
-function emptyLine(): ManualJournalLine {
-  return { account_code: '', debit: '0', credit: '0' }
-}
+const emptyLine = (): ManualJournalLine => ({ account_code: '', debit: '0', credit: '0' })
 
 export function ManualJournalPage() {
   const toast = useToast()
-  const [entryDate, setEntryDate] = useState<string>(todayIso())
-  const [description, setDescription] = useState<string>('')
-  const [reason, setReason] = useState<string>('')
-  const [allowClosedPeriod, setAllowClosedPeriod] = useState<boolean>(false)
+  const [entryDate, setEntryDate] = useState(todayIso())
+  const [description, setDescription] = useState('')
+  const [reason, setReason] = useState('')
+  const [allowClosed, setAllowClosed] = useState(false)
   const [lines, setLines] = useState<ManualJournalLine[]>([emptyLine(), emptyLine()])
-  const [busy, setBusy] = useState<boolean>(false)
-  const [result, setResult] = useState<{ entry_id: number; entry_no: string } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<{ entry_no: string } | null>(null)
 
-  const totalDebit = useMemo(
-    () => lines.reduce((sum, l) => sum + (parseFloat(l.debit) || 0), 0),
-    [lines],
-  )
-  const totalCredit = useMemo(
-    () => lines.reduce((sum, l) => sum + (parseFloat(l.credit) || 0), 0),
-    [lines],
-  )
+  const totalDebit = useMemo(() => lines.reduce((s, l) => s + (parseFloat(l.debit) || 0), 0), [lines])
+  const totalCredit = useMemo(() => lines.reduce((s, l) => s + (parseFloat(l.credit) || 0), 0), [lines])
   const balanced = Math.abs(totalDebit - totalCredit) < 0.0001
 
-  function setLine(i: number, next: Partial<ManualJournalLine>) {
-    setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...next } : l)))
-  }
+  const setLine = (i: number, next: Partial<ManualJournalLine>) =>
+    setLines((p) => p.map((l, idx) => (idx === i ? { ...l, ...next } : l)))
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    if (!balanced) {
-      toast.error('المجموع المدين لا يساوي الدائن.')
-      return
-    }
+    setError(null)
+    if (!balanced) return setError('المجموع المدين لا يساوي الدائن.')
     setBusy(true)
     try {
-      const resp = await postManualJournal({
-        entry_date: entryDate,
-        description,
-        reason,
-        allow_closed_period: allowClosedPeriod,
-        lines,
-      })
+      const resp = await postManualJournal({ entry_date: entryDate, description, reason, allow_closed_period: allowClosed, lines })
       setResult(resp)
       toast.success(`تم ترحيل القيد ${resp.entry_no}.`)
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'فشل ترحيل القيد')
+      setError(err instanceof ApiError ? err.message : 'فشل ترحيل القيد')
     } finally {
       setBusy(false)
     }
   }
 
+  const cell = 'w-full bg-transparent border-b border-surface-container-high focus:border-primary focus:border-b-2 focus:outline-none py-1 font-mono-body text-mono-body text-on-surface'
+
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader
-          title="قيد يدوي"
-          subtitle="يتطلب صلاحية high.manual_journal — الوصف والسبب لا يقل عن 10 أحرف."
-        />
-        <form onSubmit={onSubmit} className="flex flex-col gap-3">
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-            <Input
-              label="تاريخ القيد"
-              type="date"
-              dir="ltr"
-              value={entryDate}
-              onChange={(e) => setEntryDate(e.target.value)}
-              required
-            />
-            <div className="md:col-span-2">
-              <Input
-                label="الوصف"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                minLength={10}
-                required
-              />
-            </div>
-          </div>
-          <Input
-            label="السبب (يُسجَّل في Audit)"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            minLength={10}
-            required
-          />
-          <label className="inline-flex items-center gap-2 text-body text-ink">
-            <input
-              type="checkbox"
-              checked={allowClosedPeriod}
-              onChange={(e) => setAllowClosedPeriod(e.target.checked)}
-            />
-            السماح بالترحيل على فترة مُقفلة (يتطلب صلاحية إضافية)
-          </label>
+    <Narrow>
+      <PageTitle title="إنشاء قيد يومية يدوي" subtitle="يتطلب صلاحية قيد يدوي — الوصف والسبب لا يقل كل منهما عن ١٠ أحرف." />
 
-          <div className="mt-2 overflow-x-auto rounded-xl border border-warm-mist">
-            <table className="min-w-full text-body">
-              <thead className="bg-soft-paper">
-                <tr>
-                  <th className="px-3 py-2 text-start text-body-sm text-graphite">الحساب</th>
-                  <th className="px-3 py-2 text-start text-body-sm text-graphite">مدين</th>
-                  <th className="px-3 py-2 text-start text-body-sm text-graphite">دائن</th>
-                  <th className="px-3 py-2 text-start text-body-sm text-graphite">تحليلي (اختياري)</th>
-                  <th className="px-3 py-2 text-start text-body-sm text-graphite">وصف السطر</th>
+      <form onSubmit={onSubmit} className="mt-space-xl flex flex-col gap-space-lg">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-space-md">
+          <Field label="تاريخ القيد" type="date" dir="ltr" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} required />
+          <div className="md:col-span-2"><Field label="الوصف / البيان العام" value={description} onChange={(e) => setDescription(e.target.value)} minLength={10} required /></div>
+        </div>
+        <Field label="السبب (يُسجَّل في التدقيق)" value={reason} onChange={(e) => setReason(e.target.value)} minLength={10} required />
+
+        <label className="flex items-center gap-space-sm font-body text-body text-on-surface">
+          <input type="checkbox" checked={allowClosed} onChange={(e) => setAllowClosed(e.target.checked)} />
+          السماح بالترحيل على فترة مُقفلة (يتطلب صلاحية إضافية)
+        </label>
+
+        <div className="mt-space-sm">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-surface-container-low border-b border-surface-container-high">
+                <th className="px-space-sm py-space-sm text-start font-small text-small text-secondary">كود الحساب</th>
+                <th className="px-space-sm py-space-sm text-start font-small text-small text-secondary">مدين</th>
+                <th className="px-space-sm py-space-sm text-start font-small text-small text-secondary">دائن</th>
+                <th className="px-space-sm py-space-sm text-start font-small text-small text-secondary">البيان التفصيلي</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l, i) => (
+                <tr key={i} className="border-b border-surface-container-high">
+                  <td className="px-space-sm py-space-sm"><input dir="ltr" className={cell} placeholder="1111" value={l.account_code} onChange={(e) => setLine(i, { account_code: e.target.value })} required /></td>
+                  <td className="px-space-sm py-space-sm"><input dir="ltr" className={`${cell} text-end`} value={l.debit} onChange={(e) => setLine(i, { debit: e.target.value })} /></td>
+                  <td className="px-space-sm py-space-sm"><input dir="ltr" className={`${cell} text-end`} value={l.credit} onChange={(e) => setLine(i, { credit: e.target.value })} /></td>
+                  <td className="px-space-sm py-space-sm"><input className={cell.replace('font-mono-body text-mono-body', 'font-body text-body')} value={l.description ?? ''} onChange={(e) => setLine(i, { description: e.target.value })} /></td>
                 </tr>
-              </thead>
-              <tbody>
-                {lines.map((l, i) => (
-                  <tr key={i} className="border-t border-warm-mist">
-                    <td className="px-2 py-2">
-                      <input
-                        className="w-28 rounded-md border border-warm-mist bg-parchment px-2 py-1 font-mono text-ink"
-                        dir="ltr"
-                        value={l.account_code}
-                        onChange={(e) => setLine(i, { account_code: e.target.value })}
-                        placeholder="1111"
-                        required
-                      />
-                    </td>
-                    <td className="px-2 py-2">
-                      <input
-                        className="w-32 rounded-md border border-warm-mist bg-parchment px-2 py-1 text-end font-mono text-ink"
-                        dir="ltr"
-                        value={l.debit}
-                        onChange={(e) => setLine(i, { debit: e.target.value })}
-                      />
-                    </td>
-                    <td className="px-2 py-2">
-                      <input
-                        className="w-32 rounded-md border border-warm-mist bg-parchment px-2 py-1 text-end font-mono text-ink"
-                        dir="ltr"
-                        value={l.credit}
-                        onChange={(e) => setLine(i, { credit: e.target.value })}
-                      />
-                    </td>
-                    <td className="px-2 py-2">
-                      <input
-                        className="w-40 rounded-md border border-warm-mist bg-parchment px-2 py-1 text-ink"
-                        placeholder="supplier#7"
-                        value={l.partner_type ? `${l.partner_type}#${l.partner_id ?? ''}` : ''}
-                        onChange={(e) => {
-                          const v = e.target.value.trim()
-                          if (!v) {
-                            setLine(i, { partner_type: undefined, partner_id: undefined })
-                            return
-                          }
-                          const [t, id] = v.split('#')
-                          setLine(i, {
-                            partner_type: t ?? undefined,
-                            partner_id: id ? Number(id) : undefined,
-                          })
-                        }}
-                      />
-                    </td>
-                    <td className="px-2 py-2">
-                      <input
-                        className="w-full rounded-md border border-warm-mist bg-parchment px-2 py-1 text-ink"
-                        value={l.description ?? ''}
-                        onChange={(e) => setLine(i, { description: e.target.value })}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-          <div className="flex items-center justify-between gap-3">
-            <Button onClick={() => setLines((p) => [...p, emptyLine()])}>
-              + سطر
-            </Button>
-            <div className="flex items-center gap-3 text-body text-ink">
-              <span>مدين: <span className="font-mono">{totalDebit.toFixed(4)}</span></span>
-              <span>دائن: <span className="font-mono">{totalCredit.toFixed(4)}</span></span>
-              <Badge tone={balanced ? 'neutral' : 'muted'}>
-                {balanced ? 'متوازن' : 'غير متوازن'}
-              </Badge>
-            </div>
+        <div className="flex items-center justify-between">
+          <Button onClick={() => setLines((p) => [...p, emptyLine()])}>+ إضافة طرف قيد</Button>
+          <div className="flex items-center gap-space-md font-mono-body text-mono-body text-on-surface">
+            <span>مدين: <bdi dir="ltr">{totalDebit.toFixed(2)}</bdi></span>
+            <span>دائن: <bdi dir="ltr">{totalCredit.toFixed(2)}</bdi></span>
+            <Pill tone={balanced ? 'signal' : 'error'}>{balanced ? 'متوازن' : 'غير متوازن'}</Pill>
           </div>
+        </div>
 
-          <div className="flex justify-end">
-            <Button variant="filled" type="submit" disabled={busy || !balanced}>
-              {busy ? 'جار الترحيل…' : 'ترحيل القيد'}
-            </Button>
-          </div>
-        </form>
-      </Card>
+        {error && <InlineError message={error} />}
+        <div className="flex justify-end">
+          <Button variant="primary" type="submit" iconRight="check_circle" disabled={busy || !balanced}>
+            {busy ? 'جار الترحيل…' : 'ترحيل واعتماد القيد'}
+          </Button>
+        </div>
+      </form>
 
       {result && (
-        <Card elevated>
-          <p className="text-body text-ink">
-            رقم القيد:{' '}
-            <code className="font-mono text-ink">{result.entry_no}</code> ·
-            المعرّف <code className="font-mono">{result.entry_id}</code>
-          </p>
-        </Card>
+        <p className="mt-space-lg font-body text-body text-on-surface">
+          رقم القيد: <bdi dir="ltr" className="font-mono-medium">{result.entry_no}</bdi>
+        </p>
       )}
-    </div>
+    </Narrow>
   )
 }

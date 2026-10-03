@@ -1,20 +1,19 @@
 import { useState, type FormEvent } from 'react'
-import { Card, CardHeader } from '../../components/Card'
-import { Input } from '../../components/Input'
-import { Button } from '../../components/Button'
+import { QRCodeSVG } from 'qrcode.react'
+import { Narrow } from '../../layouts/AppShell'
+import { Button, Field, InlineError, PageTitle } from '../../components/ui'
+import { Icon } from '../../components/Icon'
 import { totpEnrollFinish, totpEnrollStart, type TotpEnrollStart } from '../../api/auth'
 import { ApiError } from '../../api/client'
-import { useToast } from '../../components/Toast'
 
 export function TotpEnrollPage() {
   const [enrollment, setEnrollment] = useState<TotpEnrollStart | null>(null)
-  const [code, setCode] = useState<string>('')
-  const [busy, setBusy] = useState<boolean>(false)
+  const [code, setCode] = useState('')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState<boolean>(false)
-  const toast = useToast()
+  const [done, setDone] = useState(false)
 
-  async function startEnroll() {
+  async function start() {
     setBusy(true)
     setError(null)
     try {
@@ -26,14 +25,13 @@ export function TotpEnrollPage() {
     }
   }
 
-  async function finishEnroll(e: FormEvent<HTMLFormElement>) {
+  async function finish(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
     setError(null)
     try {
       await totpEnrollFinish(code)
       setDone(true)
-      toast.success('تم تفعيل التحقق الثنائي.')
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'حدث خطأ غير متوقع')
     } finally {
@@ -41,81 +39,86 @@ export function TotpEnrollPage() {
     }
   }
 
+  function downloadBackups() {
+    if (!enrollment) return
+    const blob = new Blob([enrollment.backup_codes.join('\n')], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'white-moon-backup-codes.txt'
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const step = 'font-small-medium text-small-medium text-secondary mb-space-sm'
+
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader
-          title="التحقق الثنائي (2FA)"
-          subtitle="إلزامي لحسابات الإدارة والوكلاء والموظفين."
-        />
+    <Narrow>
+      <PageTitle title="التحقق الثنائي (2FA)" subtitle="إلزامي لحسابات الإدارة والوكلاء والموظفين." />
+
+      <div className="mt-[48px] flex flex-col gap-space-xl">
         {!enrollment && !done && (
-          <div className="flex items-center gap-3">
-            <Button variant="filled" onClick={startEnroll} disabled={busy}>
+          <div className="flex items-center gap-space-md">
+            <Button variant="primary" onClick={start} disabled={busy}>
               {busy ? 'جار البدء…' : 'ابدأ الإعداد'}
             </Button>
-            <p className="text-body-sm text-graphite">
+            <p className="font-body text-body text-secondary">
               سيُنشأ لك سر TOTP + 8 رموز احتياطية تُستخدم مرة واحدة.
             </p>
           </div>
         )}
 
         {enrollment && !done && (
-          <div className="flex flex-col gap-4">
-            <div>
-              <p className="text-body-sm text-graphite">المفتاح السري</p>
-              <code className="mt-1 inline-block rounded-md border border-warm-mist bg-soft-paper px-2 py-1 text-body text-ink">
-                {enrollment.secret}
-              </code>
+          <>
+            <div className="flex flex-col">
+              <p className={step}>١. امسح الرمز بتطبيق مثل Google Authenticator</p>
+              <div className="flex items-start gap-space-xl">
+                <div className="p-space-md border border-surface-container-high rounded-xl bg-surface-container-lowest">
+                  <QRCodeSVG value={enrollment.otpauth_uri} size={132} />
+                </div>
+                <div className="flex flex-col gap-space-xs">
+                  <span className="font-small text-small text-secondary">أو أدخل المفتاح يدويًا:</span>
+                  <bdi dir="ltr" className="font-mono-medium text-mono-medium text-on-surface break-all">
+                    {enrollment.secret}
+                  </bdi>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-body-sm text-graphite">
-                رابط otpauth (اقرأه بتطبيق مثل Google Authenticator)
-              </p>
-              <code className="mt-1 block max-w-full truncate rounded-md border border-warm-mist bg-soft-paper px-2 py-1 text-body-sm text-ink">
-                {enrollment.otpauth_uri}
-              </code>
-            </div>
-            <div>
-              <p className="text-body-sm text-graphite">الرموز الاحتياطية (احفظها الآن)</p>
-              <div className="mt-1 grid grid-cols-2 gap-2 md:grid-cols-4">
+
+            <div className="flex flex-col">
+              <div className="flex items-center justify-between mb-space-sm">
+                <p className={`${step} mb-0`}>٢. احفظ الرموز الاحتياطية</p>
+                <button onClick={downloadBackups} className="font-small text-small text-secondary hover:text-primary underline underline-offset-4">
+                  <Icon name="download" size={16} /> تنزيل كملف
+                </button>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-space-sm">
                 {enrollment.backup_codes.map((c) => (
-                  <code
-                    key={c}
-                    className="rounded-md border border-warm-mist bg-soft-paper px-2 py-1 text-center text-body font-mono text-ink"
-                  >
+                  <bdi key={c} dir="ltr" className="font-mono-body text-mono-body text-on-surface text-center py-space-xs border-b border-surface-container-high">
                     {c}
-                  </code>
+                  </bdi>
                 ))}
               </div>
             </div>
-            <form onSubmit={finishEnroll} className="flex flex-col gap-3">
-              <Input
-                label="أدخل رمز TOTP من تطبيقك لتأكيد الإعداد"
-                dir="ltr"
-                inputMode="numeric"
-                maxLength={10}
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                required
-              />
-              {error && (
-                <div className="rounded-md border border-warm-mist bg-soft-paper px-3 py-2 text-body-sm text-ink">
-                  {error}
-                </div>
-              )}
-              <Button variant="filled" type="submit" disabled={busy}>
+
+            <form onSubmit={finish} className="flex flex-col gap-space-md max-w-[320px]">
+              <p className={step}>٣. أكد الإعداد برمز من تطبيقك</p>
+              <Field label="رمز TOTP" dir="ltr" mono inputMode="numeric" maxLength={10} value={code} onChange={(e) => setCode(e.target.value)} required />
+              {error && <InlineError message={error} />}
+              <Button variant="primary" type="submit" disabled={busy}>
                 {busy ? 'جار التأكيد…' : 'تأكيد وتفعيل'}
               </Button>
             </form>
-          </div>
+          </>
         )}
 
         {done && (
-          <div className="rounded-xl border border-warm-mist bg-soft-paper px-3 py-2 text-body text-ink">
+          <p className="font-body text-body text-on-surface">
             تم التفعيل بنجاح. سيُطلب رمز TOTP في كل مرة تدخل فيها.
-          </div>
+          </p>
         )}
-      </Card>
-    </div>
+        {!enrollment && error && <InlineError message={error} />}
+      </div>
+    </Narrow>
   )
 }

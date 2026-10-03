@@ -1,22 +1,20 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { AuthLayout } from '../../layouts/AuthLayout'
-import { Card, CardHeader } from '../../components/Card'
-import { Input } from '../../components/Input'
-import { Button } from '../../components/Button'
+import { Button, Field, InlineError } from '../../components/ui'
 import { registerCustomer } from '../../api/auth'
 import { ApiError } from '../../api/client'
 
 export function RegisterCustomerPage() {
   const navigate = useNavigate()
-  const [phone, setPhone] = useState<string>('')
-  const [email, setEmail] = useState<string>('')
-  const [password, setPassword] = useState<string>('')
-  const [displayName, setDisplayName] = useState<string>('')
-  const [busy, setBusy] = useState<boolean>(false)
+  const [displayName, setDisplayName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setBusy(true)
@@ -38,63 +36,21 @@ export function RegisterCustomerPage() {
   }
 
   return (
-    <AuthLayout>
-      <Card padding="lg">
-        <CardHeader
-          title="حساب عميل جديد"
-          subtitle="يفعّل حسابك فور التحقق من رقم الهاتف."
-        />
-        <form onSubmit={onSubmit} className="flex flex-col gap-3">
-          <Input
-            label="الاسم الظاهر"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            required
-            maxLength={200}
-          />
-          <Input
-            label="رقم الهاتف"
-            type="tel"
-            dir="ltr"
-            placeholder="+2010XXXXXXXX"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            autoComplete="tel"
-            hint="اكتب الهاتف أو البريد — الأفضل الاثنين."
-          />
-          <Input
-            label="البريد الإلكتروني (اختياري)"
-            type="email"
-            dir="ltr"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-          />
-          <Input
-            label="كلمة المرور"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={8}
-            autoComplete="new-password"
-          />
-          {error && (
-            <div className="rounded-md border border-warm-mist bg-soft-paper px-3 py-2 text-body-sm text-ink">
-              {error}
-            </div>
-          )}
-          <Button variant="filled" type="submit" disabled={busy}>
-            {busy ? 'جار الإنشاء…' : 'إنشاء الحساب'}
-          </Button>
-          <div className="text-body-sm text-graphite">
-            <Link to="/login" className="hover:text-ink">
-              لديك حساب؟ تسجيل الدخول
-            </Link>
-          </div>
-        </form>
-      </Card>
+    <AuthLayout
+      title="حساب عميل جديد"
+      subtitle="يُفعَّل حسابك فور التحقق من رقم الهاتف."
+      footerLinks={<Link to="/login" className="hover:text-on-surface">لديك حساب؟ تسجيل الدخول</Link>}
+    >
+      <form onSubmit={onSubmit} className="w-full flex flex-col gap-5">
+        <Field label="الاسم الظاهر" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={200} />
+        <Field label="رقم الهاتف" dir="ltr" mono type="tel" placeholder="+20 100 000 0000" value={phone} onChange={(e) => setPhone(e.target.value)} hint="اكتب الهاتف أو البريد — الأفضل الاثنين." />
+        <Field label="البريد الإلكتروني (اختياري)" dir="ltr" type="email" placeholder="you@domain.com.eg" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Field label="كلمة المرور" type="password" mono placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={8} />
+        {error && <InlineError message={error} />}
+        <Button variant="primary" type="submit" disabled={busy} className="w-full">
+          {busy ? 'جار الإنشاء…' : 'إنشاء الحساب'}
+        </Button>
+      </form>
     </AuthLayout>
   )
 }

@@ -1,80 +1,114 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Card, CardHeader } from '../components/Card'
+import { Narrow } from '../layouts/AppShell'
+import { Dot, Pill } from '../components/ui'
 import { useAuth } from '../auth/AuthContext'
-import { Badge } from '../components/Badge'
+import { listPendingSuppliers } from '../api/admin'
+
+const QUICK_LINKS_ADMIN = [
+  { to: '/accounting/journal/manual', label: 'إنشاء قيد محاسبي يدوي' },
+  { to: '/admin/suppliers/pending', label: 'مراجعة واعتماد الموردين المعلقين' },
+  { to: '/accounting/chart', label: 'استعراض دليل الحسابات الموحد' },
+  { to: '/accounting/reports', label: 'التقارير المالية' },
+]
+const QUICK_LINKS_SUPPLIER = [
+  { to: '/inventory/offers', label: 'إدارة عروضي التوريدية' },
+  { to: '/inventory/stock', label: 'استعراض مخزوني' },
+]
+
+function cairoToday(): string {
+  try {
+    return new Intl.DateTimeFormat('ar-EG', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    }).format(new Date())
+  } catch {
+    return ''
+  }
+}
 
 export function HomePage() {
   const { user } = useAuth()
+  const [pendingCount, setPendingCount] = useState<number | null>(null)
+  const isAdmin = user?.kind === 'admin' || user?.kind === 'staff'
+
+  useEffect(() => {
+    if (!isAdmin) return
+    listPendingSuppliers()
+      .then((r) => setPendingCount(r.items.length))
+      .catch(() => setPendingCount(null))
+  }, [isAdmin])
+
   if (!user) return null
+  const name = user.email ?? user.phone ?? ''
+  const links = user.kind === 'supplier' ? QUICK_LINKS_SUPPLIER : QUICK_LINKS_ADMIN
 
   return (
-    <div className="flex flex-col gap-8">
-      <section>
-        <h1 className="text-body-lg text-ink">أهلاً بك في وايت مون</h1>
-        <p className="mt-1 text-body text-graphite">
-          لوحة التحكم المتكاملة — إدارة الحسابات والعملاء والموردين والمخزون.
+    <Narrow>
+      <header className="flex flex-col">
+        <h1 className="font-display text-display text-primary font-medium tracking-tight">
+          أهلاً بك في وايت مون
+        </h1>
+        <p className="font-body text-body text-secondary mt-space-xs">
+          ملخص العمليات والروابط المباشرة لنظام وايت مون
         </p>
-      </section>
+      </header>
 
-      <section className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <Link to="/accounting/reports/trial-balance" className="block">
-          <Card elevated>
-            <CardHeader
-              title="ميزان المراجعة"
-              subtitle="عرض أرصدة الحسابات لفترة محددة"
-            />
-            <p className="text-body text-graphite">
-              الدخول السريع لتقرير الـTB بفلاتر زمنية.
-            </p>
-          </Card>
-        </Link>
-        <Link to="/accounting/periods" className="block">
-          <Card elevated>
-            <CardHeader
-              title="الفترات المحاسبية"
-              subtitle="فتح وإقفال الفترات الشهرية"
-            />
-            <p className="text-body text-graphite">
-              إنشاء الفترات، إقفالها، أو إعادة فتحها بصلاحية الإدارة العليا.
-            </p>
-          </Card>
-        </Link>
-        <Link to="/admin/suppliers/pending" className="block">
-          <Card elevated>
-            <CardHeader
-              title="الموردون قيد الاعتماد"
-              subtitle="مراجعة ملفات التأهيل"
-            />
-            <p className="text-body text-graphite">
-              اعتماد أو رفض حسابات الموردين الجديدة.
-            </p>
-          </Card>
-        </Link>
-        <Link to="/accounting/receipts" className="block">
-          <Card elevated>
-            <CardHeader
-              title="إيصالات التحصيل (OCR)"
-              subtitle="مطابقة التحويلات البنكية"
-            />
-            <p className="text-body text-graphite">
-              رفع صور الإيصالات ومتابعة المطابقة التلقائية.
-            </p>
-          </Card>
-        </Link>
-      </section>
-
-      <section>
-        <Card>
-          <CardHeader title="حسابك" />
-          <div className="flex flex-wrap items-center gap-3 text-body text-ink">
-            <Badge tone="neutral">{user.kind}</Badge>
-            <Badge tone="muted">{user.status}</Badge>
-            <span className="text-graphite">
-              {user.email ?? user.phone ?? '—'}
+      {isAdmin && (
+        <section className="mt-[48px] flex flex-col">
+          <div className="flex items-baseline justify-between pb-space-sm border-b border-surface-container-highest">
+            <h2 className="font-headline-1 text-headline-1 text-primary font-medium">اليوم</h2>
+            <span className="font-mono-body text-mono-body text-secondary">
+              <bdi dir="rtl">{cairoToday()}</bdi>
             </span>
           </div>
-        </Card>
+          <div className="flex flex-col divide-y divide-surface-container-highest">
+            {pendingCount === null ? (
+              <p className="py-space-md font-body text-body text-secondary">جار التحميل…</p>
+            ) : pendingCount === 0 ? (
+              <p className="py-space-md font-body text-body text-secondary">لا توجد مهام عاجلة اليوم.</p>
+            ) : (
+              <Link
+                to="/admin/suppliers/pending"
+                className="py-space-md flex items-center justify-between gap-space-sm hover:bg-surface transition-colors px-space-xs -mx-space-xs rounded"
+              >
+                <span className="flex items-center gap-space-md min-w-0">
+                  <Dot tone="warning" />
+                  <span className="font-body-medium text-body-medium text-on-surface truncate">
+                    {pendingCount} طلبات اعتماد موردين تنتظر مراجعة السجل التجاري
+                  </span>
+                </span>
+                <Pill tone="warning">قيد المراجعة</Pill>
+              </Link>
+            )}
+          </div>
+        </section>
+      )}
+
+      <section className="mt-[48px] flex flex-col">
+        <div className="pb-space-sm border-b border-surface-container-highest">
+          <h3 className="font-headline-2 text-headline-2 text-primary font-medium">روابط سريعة</h3>
+        </div>
+        <nav className="flex flex-col divide-y divide-surface-container-highest">
+          {links.map((l) => (
+            <Link
+              key={l.to}
+              to={l.to}
+              className="py-space-md flex items-center justify-between group px-space-xs -mx-space-xs hover:bg-surface rounded transition-colors"
+            >
+              <span className="font-body text-body text-primary group-hover:underline underline-offset-4 decoration-1 decoration-outline">
+                {l.label}
+              </span>
+              <span className="font-mono-body text-mono-body text-secondary group-hover:text-primary">↗</span>
+            </Link>
+          ))}
+        </nav>
       </section>
-    </div>
+
+      <p className="mt-[48px] font-small text-small text-secondary">
+        {name}
+      </p>
+    </Narrow>
   )
 }

@@ -1,144 +1,111 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { AuthLayout } from '../../layouts/AuthLayout'
-import { Card, CardHeader } from '../../components/Card'
-import { Input } from '../../components/Input'
-import { Button } from '../../components/Button'
-import { Chip } from '../../components/Chip'
+import { Button, Field, InlineError } from '../../components/ui'
 import { login } from '../../api/auth'
 import { ApiError } from '../../api/client'
 import { useAuth } from '../../auth/AuthContext'
-import { useToast } from '../../components/Toast'
 
 export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { refresh } = useAuth()
-  const toast = useToast()
-  const [identifier, setIdentifier] = useState<'phone' | 'email'>('phone')
-  const [phone, setPhone] = useState<string>('')
-  const [email, setEmail] = useState<string>('')
-  const [password, setPassword] = useState<string>('')
-  const [totpCode, setTotpCode] = useState<string>('')
-  const [requires2fa, setRequires2fa] = useState<boolean>(false)
-  const [busy, setBusy] = useState<boolean>(false)
+  const [mode, setMode] = useState<'phone' | 'email'>('phone')
+  const [identifier, setIdentifier] = useState('')
+  const [password, setPassword] = useState('')
+  const [totp, setTotp] = useState('')
+  const [requires2fa, setRequires2fa] = useState(false)
+  const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const from = (location.state as { from?: { pathname: string } } | null)?.from?.pathname ?? '/'
 
-  async function onSubmit(e: FormEvent<HTMLFormElement>) {
+  async function onSubmit(e: FormEvent) {
     e.preventDefault()
     setError(null)
     setBusy(true)
     try {
       const resp = await login({
-        ...(identifier === 'phone' ? { phone } : { email }),
+        ...(mode === 'phone' ? { phone: identifier } : { email: identifier }),
         password,
-        ...(requires2fa && totpCode ? { totp_code: totpCode } : {}),
+        ...(requires2fa && totp ? { totp_code: totp } : {}),
       })
       if (resp.requires_2fa) {
         setRequires2fa(true)
-        toast.info('أدخل رمز التحقق الثنائي من تطبيق المصادقة.')
         return
       }
       await refresh()
       navigate(from, { replace: true })
     } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message)
-      } else {
-        setError('حدث خطأ غير متوقع')
-      }
+      setError(err instanceof ApiError ? err.message : 'حدث خطأ غير متوقع')
     } finally {
       setBusy(false)
     }
   }
 
+  const tab = (active: boolean) =>
+    `font-small-medium text-small-medium pb-2 transition-all border-b-2 ${
+      active ? 'text-on-surface border-primary' : 'text-secondary border-transparent hover:text-on-surface'
+    }`
+
   return (
-    <AuthLayout>
-      <Card padding="lg">
-        <CardHeader title="تسجيل الدخول" subtitle="أدخل بياناتك للمتابعة." />
-        <form onSubmit={onSubmit} className="flex flex-col gap-4">
-          <div className="flex gap-2">
-            <Chip
-              active={identifier === 'phone'}
-              onClick={() => setIdentifier('phone')}
-            >
-              رقم الهاتف
-            </Chip>
-            <Chip
-              active={identifier === 'email'}
-              onClick={() => setIdentifier('email')}
-            >
-              البريد الإلكتروني
-            </Chip>
-          </div>
+    <AuthLayout
+      title="تسجيل الدخول للنظام"
+      subtitle="منصة وايت مون للأعمال والتجارة B2B"
+      footerLinks={
+        <>
+          <Link to="/register" className="hover:text-on-surface">حساب عميل جديد</Link>
+          <span className="text-outline-variant">·</span>
+          <Link to="/register/supplier" className="hover:text-on-surface">تسجيل كمورد تجاري</Link>
+        </>
+      }
+    >
+      <div className="w-full flex items-center justify-start gap-6 border-b border-surface-container-high mb-6">
+        <button type="button" className={tab(mode === 'phone')} onClick={() => setMode('phone')}>
+          رقم الهاتف
+        </button>
+        <button type="button" className={tab(mode === 'email')} onClick={() => setMode('email')}>
+          البريد الإلكتروني
+        </button>
+      </div>
 
-          {identifier === 'phone' ? (
-            <Input
-              label="رقم الهاتف"
-              type="tel"
-              dir="ltr"
-              placeholder="+2010XXXXXXXX"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              autoComplete="tel"
-              required
-            />
-          ) : (
-            <Input
-              label="البريد الإلكتروني"
-              type="email"
-              dir="ltr"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              autoComplete="email"
-              required
-            />
-          )}
-
-          <Input
-            label="كلمة المرور"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
+      <form onSubmit={onSubmit} className="w-full flex flex-col gap-5">
+        <Field
+          label={mode === 'phone' ? 'رقم الهاتف المسجل' : 'البريد الإلكتروني التجاري'}
+          dir="ltr"
+          mono={mode === 'phone'}
+          type={mode === 'phone' ? 'tel' : 'email'}
+          placeholder={mode === 'phone' ? '+20 100 000 0000' : 'enterprise@domain.com.eg'}
+          value={identifier}
+          onChange={(e) => setIdentifier(e.target.value)}
+          required
+        />
+        <Field
+          label="كلمة المرور"
+          type="password"
+          placeholder="••••••••"
+          mono
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        {requires2fa && (
+          <Field
+            label="رمز التحقق الثنائي"
+            dir="ltr"
+            mono
+            inputMode="numeric"
+            maxLength={10}
+            value={totp}
+            onChange={(e) => setTotp(e.target.value)}
             required
           />
-
-          {requires2fa && (
-            <Input
-              label="رمز التحقق الثنائي (6 أرقام)"
-              dir="ltr"
-              inputMode="numeric"
-              maxLength={10}
-              value={totpCode}
-              onChange={(e) => setTotpCode(e.target.value)}
-              required
-            />
-          )}
-
-          {error && (
-            <div className="rounded-md border border-warm-mist bg-soft-paper px-3 py-2 text-body-sm text-ink">
-              {error}
-            </div>
-          )}
-
-          <Button variant="filled" type="submit" disabled={busy}>
-            {busy ? 'جار الدخول…' : 'دخول'}
-          </Button>
-
-          <div className="flex items-center justify-between text-body-sm text-graphite">
-            <Link to="/register" className="hover:text-ink">
-              حساب عميل جديد
-            </Link>
-            <Link to="/register/supplier" className="hover:text-ink">
-              تسجيل مورد
-            </Link>
-          </div>
-        </form>
-      </Card>
+        )}
+        {error && <InlineError message={error} />}
+        <Button variant="primary" type="submit" disabled={busy} iconRight="arrow_left_alt" className="w-full">
+          {busy ? 'جار الدخول…' : 'تسجيل الدخول'}
+        </Button>
+      </form>
     </AuthLayout>
   )
 }
