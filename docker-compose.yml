@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wm
+      POSTGRES_PASSWORD: wm
+      POSTGRES_DB: whitemoon
+    ports:
+      # Host 5433 → container 5432 to avoid clashing with a native Postgres
+      # install on 5432. The container listens on its own 5432 internally.
+      - "5433:5432"
+    volumes:
+      - wm_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wm -d whitemoon"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - wm_redis_data:/data
+
+  s3mock:
+    # Drop-in S3-compatible mock for local dev. MinIO's :latest tag was
+    # removed from Docker Hub and Quay in 2024; this image pulls cleanly.
+    # In staging/prod we use real AWS S3, so the swap is dev-only.
+    image: adobe/s3mock:latest
+    environment:
+      initialBuckets: "wm-dev-receipts,wm-dev-chat,wm-dev-kyc,wm-dev-invoices"
+    ports:
+      - "9000:9090"
+    volumes:
+      - wm_s3_data:/s3mockroot
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  wm_pg_data:
+  wm_redis_data:
+  wm_s3_data:

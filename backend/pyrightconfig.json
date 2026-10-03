@@ -1,0 +1,10 @@
+{
+  "include": ["app", "tests", "migrations", "scripts"],
+  "extraPaths": ["."],
+  "exclude": ["**/__pycache__", ".venv"],
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "strict": ["app/accounting"],
+  "reportMissingImports": "warning",
+  "reportMissingTypeStubs": "none"
+}
