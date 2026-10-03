@@ -13,7 +13,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from ...common.errors import BadRequest, Forbidden, NotFound
 from ...common.money import to_money
@@ -38,6 +38,23 @@ YELLOW_SCORE = Decimal("50")
 # Dues are judged against the business calendar day (Egypt), not UTC — a
 # client at UTC+2 sending "today" must not be rejected as a future date.
 BUSINESS_TZ = ZoneInfo("Africa/Cairo")
+
+# Namespace for the per-customer advisory lock that serialises concurrent
+# deferred checkouts (prevents a limit-check TOCTOU). Any stable int works.
+_CREDIT_LOCK_NS = 0x4352  # "CR"
+
+
+def _lock_customer(customer_id: int) -> None:
+    """Take a transaction-scoped advisory lock on this customer's credit.
+
+    Held until the surrounding transaction commits/rolls back, so two
+    concurrent deferred orders for the same customer are serialised: the
+    second blocks until the first's due is committed and visible.
+    """
+    db.session.execute(
+        text("SELECT pg_advisory_xact_lock(:ns, :cid)"),
+        {"ns": _CREDIT_LOCK_NS, "cid": customer_id},
+    )
 
 
 @dataclass(frozen=True)
@@ -169,17 +186,27 @@ def outstanding(customer_id: int) -> Decimal:
 
 
 def check_credit(*, customer_id: int, order_amount: Decimal, deferred: bool) -> None:
-    """Enforce the credit limit on a new order (US-5.2). Red tier cannot defer."""
-    tier = get_tier(customer_id)
-    if deferred and tier.tier == "red":
+    """Enforce the credit limit on a new deferred order (US-5.2). Red tier
+    cannot defer.
+
+    Cash orders consume no credit and skip the check. For a deferred order we
+    first serialise on the customer (advisory lock) and recompute the tier so
+    the decision uses the customer's *current* standing, never a stale cached
+    tier — both the lock and the recompute must happen inside the caller's
+    checkout transaction, which holds the lock through to COMMIT.
+    """
+    if not deferred:
+        return
+    _lock_customer(customer_id)
+    tier = recompute(customer_id)
+    if tier.tier == "red":
         raise Forbidden("التصنيف الأحمر لا يسمح بالبيع الآجل — نقدي فقط", code="deferred_blocked_red")
-    if deferred:
-        new_exposure = outstanding(customer_id) + to_money(order_amount)
-        limit = effective_limit(customer_id)
-        if new_exposure > limit:
-            raise Forbidden(
-                f"تجاوز السقف الائتماني ({limit} ج.م)", code="credit_limit_exceeded"
-            )
+    new_exposure = outstanding(customer_id) + to_money(order_amount)
+    limit = effective_limit(customer_id)
+    if new_exposure > limit:
+        raise Forbidden(
+            f"تجاوز السقف الائتماني ({limit} ج.م)", code="credit_limit_exceeded"
+        )
 
 
 def record_due(*, customer_id: int, order_id: int | None, amount: Decimal, due_date: date) -> CustomerDue:

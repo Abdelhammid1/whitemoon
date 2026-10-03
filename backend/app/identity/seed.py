@@ -59,7 +59,7 @@ ROLE_PERMS: dict[str, tuple[str, ...]] = {
         "inventory.manage",
         "shortage.resolve",
     ),
-    "staff": ("user.read", "credit.manage", "product.manage", "inventory.manage"),
+    "staff": ("user.read", "product.manage", "inventory.manage"),
     "customer": (),
     "supplier": ("offer.manage",),
     "agent": (),

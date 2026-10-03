@@ -84,3 +84,21 @@ and `staff`. Read endpoints keep `user.read`; the financial mutations
 accepting a deferred order and `credit.record_due()` after, so the credit
 limit and red-cannot-defer rules are enforced at the point of sale (lazy
 import to avoid the commerce↔sales cycle).
+
+### Concurrency & freshness guarantees
+
+- **No stale tier at decision time.** `check_credit` recomputes the tier
+  before deciding, so a customer who has defaulted since the last recompute
+  is reclassified and blocked rather than let through on a cached green.
+- **No limit-check TOCTOU.** `check_credit` takes a transaction-scoped
+  Postgres advisory lock (`pg_advisory_xact_lock`) keyed on the customer,
+  held through the whole checkout commit. Two concurrent deferred orders for
+  the same customer are serialised — the second sees the first's committed
+  due before its own limit check, so they can't both slip under the limit.
+- Cash orders consume no credit and skip the check (and the lock) entirely.
+
+## Permission model note
+
+`credit.manage` is granted to `admin` (and `admin.high` via `*`) only — not
+to the generic `staff` role; recording payments, recomputes, and running the
+dunning scan are finance actions.

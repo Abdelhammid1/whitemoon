@@ -92,6 +92,20 @@ def test_credit_check_blocks_over_limit(client) -> None:
         credit_svc.check_credit(customer_id=cust.id, order_amount=Decimal("100000"), deferred=True)
 
 
+def test_check_credit_recomputes_stale_tier(client) -> None:
+    # Customer is cached green, then defaults — a stale tier must not let the
+    # deferred order through; check_credit recomputes and blocks (red).
+    cust = _aged_customer("stale@example.com")
+    tier = credit_svc.recompute(cust.id)
+    tier.tier = "green"  # simulate a stale cached classification
+    db.session.commit()
+    _paid_due(cust.id, due_days_ago=200, late=100)  # default since cache
+    _paid_due(cust.id, due_days_ago=100, late=0)
+    _paid_due(cust.id, due_days_ago=50, late=0)
+    with pytest.raises(Forbidden):
+        credit_svc.check_credit(customer_id=cust.id, order_amount=Decimal("10"), deferred=True)
+
+
 def test_red_cannot_defer(client) -> None:
     cust = _aged_customer("rednodef@example.com")
     _paid_due(cust.id, due_days_ago=200, late=100)
