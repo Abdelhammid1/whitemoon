@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react'
 
+type Align = 'start' | 'center' | 'end'
+
 interface Column<Row> {
   header: ReactNode
   cell: (row: Row) => ReactNode
-  align?: 'start' | 'center' | 'end'
+  align?: Align
   width?: string
 }
 
@@ -12,6 +14,13 @@ interface Props<Row> {
   rows: Row[]
   rowKey: (row: Row) => string | number
   empty?: ReactNode
+}
+
+// Static class map — Tailwind's extractor only sees literal class names.
+const ALIGN_CLASS: Record<Align, string> = {
+  start: 'text-start',
+  center: 'text-center',
+  end: 'text-end',
 }
 
 /**
@@ -34,7 +43,7 @@ export function Table<Row>({ columns, rows, rowKey, empty }: Props<Row>) {
             {columns.map((c, i) => (
               <th
                 key={i}
-                className={`px-3 py-2 text-${c.align ?? 'start'} text-body-sm text-graphite`}
+                className={`px-3 py-2 ${ALIGN_CLASS[c.align ?? 'start']} text-body-sm text-graphite`}
                 style={c.width ? { width: c.width } : undefined}
               >
                 {c.header}
@@ -49,7 +58,7 @@ export function Table<Row>({ columns, rows, rowKey, empty }: Props<Row>) {
               className="border-t border-warm-mist text-ink hover:bg-soft-paper"
             >
               {columns.map((c, i) => (
-                <td key={i} className={`px-3 py-2 text-${c.align ?? 'start'}`}>
+                <td key={i} className={`px-3 py-2 ${ALIGN_CLASS[c.align ?? 'start']}`}>
                   {c.cell(row)}
                 </td>
               ))}
