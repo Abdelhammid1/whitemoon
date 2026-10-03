@@ -36,6 +36,7 @@ def _register_blueprints(app: Flask) -> None:
     from .identity.routes import bp as auth_bp
     from .inventory.routes import bp as inventory_bp
     from .partners.routes import bp as partners_bp
+    from .pos.routes import bp as pos_bp
     from .production.routes import bp as production_bp
     from .sales.routes import bp as credit_bp
 
@@ -47,6 +48,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(credit_bp)
     app.register_blueprint(partners_bp)
     app.register_blueprint(production_bp)
+    app.register_blueprint(pos_bp)
 
 
 def _register_error_handlers(app: Flask) -> None:

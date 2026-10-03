@@ -226,6 +226,19 @@ EVENT_MAP = (
         "تأمين الوكيل",
     ),
 
+    # 14 — pos.sale.batch (EPIC 8 — POS revenue posted in BATCH, not real-time;
+    # one entry per category per settlement run). Cash in, POS revenue out.
+    (
+        "pos.sale.batch", 1, "debit", "1111", None, "amount",
+        "نقدية مبيعات نقطة البيع",
+    ),
+    (
+        "pos.sale.batch", 2, "credit", None,
+        {"by_category": {"food": "4130", "clothing": "4140"}},
+        "amount",
+        "مبيعات نقطة البيع حسب الفئة",
+    ),
+
     # 11b — agent.deposit.refunded (EPIC 6 — reverse the deposit on recovery)
     (
         "agent.deposit.refunded", 1, "debit", "2120", None, "amount",

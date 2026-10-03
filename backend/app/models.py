@@ -56,6 +56,11 @@ from .partners.models import (
     PartnerDeposit,
     PartnerTerms,
 )
+from .pos.models import (
+    PosBatch,
+    PosSale,
+    PosSaleLine,
+)
 from .production.models import (
     ManufacturingOrder,
     MOMaterial,
@@ -99,6 +104,9 @@ __all__ = [
     "PartnerTerms",
     "Period",
     "Permission",
+    "PosBatch",
+    "PosSale",
+    "PosSaleLine",
     "PriceLock",
     "Product",
     "ReorderAlert",
