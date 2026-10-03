@@ -166,7 +166,10 @@ def income_statement(f: ReportFilter) -> dict[str, Any]:
 
 
 def balance_sheet(f: ReportFilter) -> dict[str, Any]:
-    """As-of date = `f.date_to`. `date_from` is ignored (cumulative to date)."""
+    """As-of `f.date_to`. YTD net income is rolled into equity under a
+    synthetic "Current Period P/L" line, so the accounting identity
+    A = L + E holds even before formal period close.
+    """
 
     stmt = (
         select(
@@ -180,7 +183,7 @@ def balance_sheet(f: ReportFilter) -> dict[str, Any]:
         .join(JournalLine, JournalLine.account_id == Account.id)
         .join(JournalEntry, JournalEntry.id == JournalLine.entry_id)
         .where(
-            Account.type.in_(("asset", "liability", "equity")),
+            Account.type.in_(("asset", "liability", "equity", "revenue", "expense", "contra")),
             JournalEntry.entry_date <= f.date_to,
         )
         .group_by(Account.id, Account.type, Account.code, Account.name_ar)
@@ -193,6 +196,8 @@ def balance_sheet(f: ReportFilter) -> dict[str, Any]:
     total_assets = Decimal("0")
     total_liabilities = Decimal("0")
     total_equity = Decimal("0")
+    ytd_revenue = Decimal("0")
+    ytd_expense = Decimal("0")
 
     for row in db.session.execute(stmt):
         bal = to_money(row.balance)
@@ -200,13 +205,32 @@ def balance_sheet(f: ReportFilter) -> dict[str, Any]:
             total_assets += bal
             assets.append({"code": row.code, "name_ar": row.name_ar, "amount": str(bal)})
         elif row.type == "liability":
-            amt = -bal  # liability natural balance is credit
+            amt = -bal
             total_liabilities += amt
             liabilities.append({"code": row.code, "name_ar": row.name_ar, "amount": str(amt)})
-        else:  # equity
+        elif row.type == "equity":
             amt = -bal
             total_equity += amt
             equity.append({"code": row.code, "name_ar": row.name_ar, "amount": str(amt)})
+        elif row.type == "revenue":
+            ytd_revenue += -bal  # natural balance is credit
+        elif row.type == "contra":
+            # Contra-revenue (4300) has natural debit — subtracts from revenue.
+            # Contra-asset (1220, 1240) are already accumulated under assets above
+            # with the opposite sign; keep category check inclusive.
+            if row.code.startswith("4"):
+                ytd_revenue += -bal
+            else:  # contra-asset
+                total_assets += bal
+                assets.append({"code": row.code, "name_ar": row.name_ar, "amount": str(bal)})
+        else:  # expense
+            ytd_expense += bal
+
+    net_income = ytd_revenue - ytd_expense
+    equity.append(
+        {"code": "3400", "name_ar": "أرباح/خسائر الفترة الجارية", "amount": str(net_income)}
+    )
+    total_equity += net_income
 
     return {
         "as_of": f.date_to.isoformat(),

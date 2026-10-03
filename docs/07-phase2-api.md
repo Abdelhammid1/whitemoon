@@ -32,7 +32,7 @@ python scripts\seed_dev.py        # identity + accounting seed
 flask --app app run --port 5055
 ```
 
-The seed prints how many accounts and map rows landed (85 accounts, 24 map
+The seed prints how many accounts and map rows landed (72 accounts, 25 map
 rows in the current CoA/journal revision 2).
 
 ## Endpoints
@@ -194,8 +194,8 @@ Every one carries actor, target, reason (where present), IP, user-agent.
 
 ```powershell
 # A. Seed is right
-docker exec white-moon-postgres-1 psql -U wm -d whitemoon -c "select count(*) from accounting.accounts"      # 85
-docker exec white-moon-postgres-1 psql -U wm -d whitemoon -c "select count(*) from accounting.event_journal_map"  # 24
+docker exec white-moon-postgres-1 psql -U wm -d whitemoon -c "select count(*) from accounting.accounts"      # 72
+docker exec white-moon-postgres-1 psql -U wm -d whitemoon -c "select count(*) from accounting.event_journal_map"  # 25
 docker exec white-moon-postgres-1 psql -U wm -d whitemoon -c "select 1 from accounting.accounts where code='5281'"
 docker exec white-moon-postgres-1 psql -U wm -d whitemoon -c "select 1 from accounting.accounts where code='5290'"
 docker exec white-moon-postgres-1 psql -U wm -d whitemoon -c "select 0 from accounting.accounts where code='2121'"  # 0 rows

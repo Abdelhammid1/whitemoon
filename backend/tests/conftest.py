@@ -70,6 +70,9 @@ def _reset_db(app: Flask) -> Iterator[None]:
         )
         db.session.commit()
         identity_seed.seed_rbac()
+        # Tests reference user id=1 for posted_by / uploaded_by / closed_by.
+        # Seed a bootstrap admin so those FKs resolve.
+        identity_seed.seed_bootstrap_admin()
         accounting_seed.seed_accounts()
         accounting_seed.seed_event_map()
         otp_provider.LAST_CODES.clear()
