@@ -1,0 +1,197 @@
+import { api } from './client'
+
+export interface PeriodRow {
+  id: number
+  year?: number
+  month?: number
+  is_closed?: boolean
+}
+
+export interface ManualJournalLine {
+  account_code: string
+  debit: string
+  credit: string
+  partner_type?: string
+  partner_id?: number
+  description?: string
+}
+
+export interface ReportFilterBody {
+  date_from: string
+  date_to: string
+  account_prefix?: string
+  partner_type?: string
+  partner_id?: number
+}
+
+export async function periodEnsure(year: number, month: number) {
+  return api<PeriodRow>('/accounting/periods/ensure', {
+    method: 'POST',
+    body: { year, month },
+  })
+}
+
+export async function periodClose(year: number, month: number) {
+  return api<PeriodRow>('/accounting/periods/close', {
+    method: 'POST',
+    body: { year, month },
+  })
+}
+
+export async function periodReopen(year: number, month: number) {
+  return api<PeriodRow>('/accounting/periods/reopen', {
+    method: 'POST',
+    body: { year, month },
+  })
+}
+
+export async function postManualJournal(body: {
+  entry_date: string
+  description: string
+  reason: string
+  allow_closed_period: boolean
+  lines: ManualJournalLine[]
+}) {
+  return api<{ entry_id: number; entry_no: string }>('/accounting/journal/manual', {
+    method: 'POST',
+    body,
+  })
+}
+
+export async function uploadReceipt(body: {
+  image_s3_key: string
+  expected_amount?: string
+  expected_reference?: string
+  ocr_stub_amount?: string
+  ocr_stub_reference?: string
+}) {
+  return api<{
+    receipt_id: number
+    status: string
+    ocr_amount: string | null
+    ocr_reference: string | null
+  }>('/accounting/receipts/upload', {
+    method: 'POST',
+    body,
+  })
+}
+
+export async function resolveReceipt(receiptId: number, status: 'matched' | 'rejected') {
+  return api<{ receipt_id: number; status: string }>(
+    `/accounting/receipts/${receiptId}/resolve`,
+    { method: 'POST', body: { status } },
+  )
+}
+
+export async function createDeferredTerms(body: {
+  order_id: number
+  cash_price: string
+  deferred_price: string
+  early_settlement_discount: string
+  early_settlement_before?: string
+}) {
+  return api<{
+    id: number
+    order_id: number
+    cash_price: string
+    deferred_price: string
+    early_settlement_discount: string
+    early_settlement_before: string | null
+  }>('/accounting/deferred-terms', { method: 'POST', body })
+}
+
+export async function applyEarlyDiscount(order_id: number, settled_on: string) {
+  return api<{ id: number; discount_applied: boolean }>(
+    '/accounting/deferred-terms/apply-early-discount',
+    { method: 'POST', body: { order_id, settled_on } },
+  )
+}
+
+// ---------------------------------------------------------------- reports
+
+export interface TrialBalanceRow {
+  code: string
+  name_ar: string
+  name_en: string
+  type: string
+  debit: string
+  credit: string
+  balance: string
+}
+export interface TrialBalanceResponse {
+  rows: TrialBalanceRow[]
+  totals: { debit: string; credit: string; balanced: boolean }
+}
+export async function trialBalance(filter: ReportFilterBody) {
+  return api<TrialBalanceResponse>('/accounting/reports/trial-balance', {
+    method: 'POST',
+    body: filter,
+  })
+}
+
+export interface IncomeStatementResponse {
+  revenues: { code: string; name_ar: string; amount: string }[]
+  expenses: { code: string; name_ar: string; amount: string }[]
+  totals: { revenue: string; expense: string; net_income: string }
+}
+export async function incomeStatement(filter: ReportFilterBody) {
+  return api<IncomeStatementResponse>('/accounting/reports/income-statement', {
+    method: 'POST',
+    body: filter,
+  })
+}
+
+export interface BalanceSheetResponse {
+  as_of: string
+  assets: { code: string; name_ar: string; amount: string }[]
+  liabilities: { code: string; name_ar: string; amount: string }[]
+  equity: { code: string; name_ar: string; amount: string }[]
+  totals: { assets: string; liabilities: string; equity: string; balances: boolean }
+}
+export async function balanceSheet(filter: ReportFilterBody) {
+  return api<BalanceSheetResponse>('/accounting/reports/balance-sheet', {
+    method: 'POST',
+    body: filter,
+  })
+}
+
+export interface CashFlowResponse {
+  sources: { code: string; name_ar: string; amount: string }[]
+  uses: { code: string; name_ar: string; amount: string }[]
+  net_cash_change: string
+}
+export async function cashFlow(filter: ReportFilterBody) {
+  return api<CashFlowResponse>('/accounting/reports/cash-flow', {
+    method: 'POST',
+    body: filter,
+  })
+}
+
+export interface GeneralLedgerRow {
+  entry_no: string
+  entry_date: string
+  description: string
+  debit: string
+  credit: string
+  running_balance: string
+  partner_type: string | null
+  partner_id: number | null
+}
+export interface GeneralLedgerResponse {
+  account: { code: string; name_ar: string; type: string }
+  date_from: string
+  date_to: string
+  rows: GeneralLedgerRow[]
+  closing_balance: string
+}
+export async function generalLedger(
+  account_code: string,
+  date_from: string,
+  date_to: string,
+  limit = 500,
+) {
+  return api<GeneralLedgerResponse>(
+    `/accounting/reports/general-ledger/${account_code}`,
+    { query: { date_from, date_to, limit } },
+  )
+}
