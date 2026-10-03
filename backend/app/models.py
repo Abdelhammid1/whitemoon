@@ -16,6 +16,16 @@ from .accounting.models import (
     Period,
 )
 from .audit.models import AuditEvent
+from .commerce.models import (
+    Cart,
+    CartItem,
+    Order,
+    OrderLine,
+    OrderSubOrder,
+    PriceLock,
+    Rfq,
+    RfqOffer,
+)
 from .identity.models import (
     BackupCode,
     ChannelPartnerProfile,
@@ -48,6 +58,8 @@ __all__ = [
     "BackupCode",
     "BankReceipt",
     "Batch",
+    "Cart",
+    "CartItem",
     "ChannelPartnerProfile",
     "CustomerProfile",
     "DeferredTerm",
@@ -55,11 +67,17 @@ __all__ = [
     "ImpersonationGrant",
     "JournalEntry",
     "JournalLine",
+    "Order",
+    "OrderLine",
+    "OrderSubOrder",
     "OtpRequest",
     "Period",
     "Permission",
+    "PriceLock",
     "Product",
     "ReorderAlert",
+    "Rfq",
+    "RfqOffer",
     "Role",
     "RolePermission",
     "Session",

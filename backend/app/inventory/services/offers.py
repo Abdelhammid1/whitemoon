@@ -47,11 +47,33 @@ def upsert_offer(
         )
         db.session.add(offer)
     else:
+        # Price-lock guard (US-1.6): a raise is rejected while any lock on
+        # this offer is live; a cut is allowed and lowers the live locks.
+        from ...commerce.services import pricelock
+
+        pricelock.enforce_price_change(
+            offer_id=offer.id, current_price=offer.unit_price, new_price=to_money(unit_price)
+        )
         offer.unit_price = to_money(unit_price)
         offer.moq = to_money(moq)
         offer.is_active = is_active
     db.session.commit()
     return offer
+
+
+def lower_price_exists(*, product_id: int, my_price: Decimal) -> bool:
+    """True if any active offer on this product is cheaper than `my_price` —
+    without revealing the competitor's identity or exact price (US-1.5)."""
+    cheaper = db.session.execute(
+        select(SupplierOffer.id)
+        .where(
+            SupplierOffer.product_id == product_id,
+            SupplierOffer.is_active.is_(True),
+            SupplierOffer.unit_price < to_money(my_price),
+        )
+        .limit(1)
+    ).first()
+    return cheaper is not None
 
 
 def list_offers_for_supplier(supplier_id: int) -> list[SupplierOffer]:
@@ -81,7 +103,11 @@ def best_offer(product_id: int) -> dict[str, Any] | None:
 
 
 def serialize_own(offer: SupplierOffer) -> dict[str, Any]:
-    """Full detail — only ever returned to the owning supplier or an admin."""
+    """Full detail — only ever returned to the owning supplier or an admin.
+
+    Includes the `lower_price_exists` hint (US-1.5): a bare signal that a
+    cheaper competing offer exists, with no competitor identity or price.
+    """
     return {
         "id": offer.id,
         "product_id": offer.product_id,
@@ -89,4 +115,7 @@ def serialize_own(offer: SupplierOffer) -> dict[str, Any]:
         "moq": str(offer.moq),
         "is_active": offer.is_active,
         "currency": offer.currency,
+        "lower_price_exists": lower_price_exists(
+            product_id=offer.product_id, my_price=offer.unit_price
+        ),
     }

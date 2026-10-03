@@ -63,6 +63,11 @@ ignore = [
   # Lazy imports inside the app factory prevent circular model loads at
   # import time; this is the documented pattern.
   "PLC0415",
+  # Arabic-first codebase: "ambiguous" Unicode (Arabic comma, etc.) in
+  # strings/docstrings/comments is intentional, not a confusable-char risk.
+  "RUF001",
+  "RUF002",
+  "RUF003",
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -72,5 +77,8 @@ ignore = [
 # The CoA seed is tabular data; Arabic account names push many lines over
 # the width limit but splitting one row across lines would be worse.
 "app/accounting/seed.py" = ["E501"]
-"tests/**/*.py" = ["PLR2004", "S101", "ARG001"]
-"migrations/**/*.py" = ["N999"]
+# Commerce source has dense Arabic-labelled flows; a few lines run long but
+# wrapping them hurts readability more than it helps.
+"app/commerce/**/*.py" = ["E501"]
+"tests/**/*.py" = ["PLR2004", "S101", "ARG001", "E501"]
+"migrations/**/*.py" = ["N999", "E501"]
