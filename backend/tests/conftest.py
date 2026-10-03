@@ -25,8 +25,9 @@ os.environ.setdefault(
 os.environ.setdefault("OTP_PROVIDER", "console")
 
 from app import create_app
+from app.accounting import seed as accounting_seed
 from app.extensions import db
-from app.identity import seed as seed_module
+from app.identity import seed as identity_seed
 from app.identity.providers import otp_provider
 
 
@@ -43,6 +44,13 @@ def _reset_db(app: Flask) -> Iterator[None]:
         db.session.execute(
             text(
                 "TRUNCATE TABLE "
+                "accounting.bank_receipts, "
+                "accounting.deferred_terms, "
+                "accounting.event_journal_map, "
+                "accounting.journal_lines, "
+                "accounting.journal_entries, "
+                "accounting.periods, "
+                "accounting.accounts, "
                 "audit.events, "
                 "identity.impersonation_grants, "
                 "identity.sessions, "
@@ -61,7 +69,9 @@ def _reset_db(app: Flask) -> Iterator[None]:
             )
         )
         db.session.commit()
-        seed_module.seed_rbac()
+        identity_seed.seed_rbac()
+        accounting_seed.seed_accounts()
+        accounting_seed.seed_event_map()
         otp_provider.LAST_CODES.clear()
         yield
 

@@ -30,11 +30,13 @@ def _register_blueprints(app: Flask) -> None:
     # Import inside the factory so test modules can import `create_app`
     # without triggering circular model loads at import time.
     from . import models  # noqa: F401 — attach models to metadata
+    from .accounting.routes import bp as accounting_bp
     from .identity.admin_routes import bp as admin_bp
     from .identity.routes import bp as auth_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(accounting_bp)
 
 
 def _register_error_handlers(app: Flask) -> None:

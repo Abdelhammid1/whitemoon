@@ -6,3 +6,52 @@ schema. Each domain owns its own `models.py`; this file only re-exports.
 
 from __future__ import annotations
 
+from .accounting.models import (
+    Account,
+    BankReceipt,
+    DeferredTerm,
+    EventJournalMap,
+    JournalEntry,
+    JournalLine,
+    Period,
+)
+from .audit.models import AuditEvent
+from .identity.models import (
+    BackupCode,
+    ChannelPartnerProfile,
+    CustomerProfile,
+    ImpersonationGrant,
+    OtpRequest,
+    Permission,
+    Role,
+    RolePermission,
+    Session,
+    SupplierProfile,
+    TotpSecret,
+    User,
+    UserRole,
+)
+
+__all__ = [
+    "Account",
+    "AuditEvent",
+    "BackupCode",
+    "BankReceipt",
+    "ChannelPartnerProfile",
+    "CustomerProfile",
+    "DeferredTerm",
+    "EventJournalMap",
+    "ImpersonationGrant",
+    "JournalEntry",
+    "JournalLine",
+    "OtpRequest",
+    "Period",
+    "Permission",
+    "Role",
+    "RolePermission",
+    "Session",
+    "SupplierProfile",
+    "TotpSecret",
+    "User",
+    "UserRole",
+]

@@ -13,13 +13,15 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 
 from app import create_app  # noqa: E402
-from app.identity import seed  # noqa: E402
+from app.accounting import seed as accounting_seed  # noqa: E402
+from app.identity import seed as identity_seed  # noqa: E402
 
 
 def main() -> None:
     app = create_app()
     with app.app_context():
-        seed.run()
+        identity_seed.run()
+        accounting_seed.run()
 
 
 if __name__ == "__main__":

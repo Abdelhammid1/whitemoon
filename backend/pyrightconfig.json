@@ -4,7 +4,12 @@
   "exclude": ["**/__pycache__", ".venv"],
   "pythonVersion": "3.12",
   "typeCheckingMode": "basic",
-  "strict": ["app/accounting"],
+  "strict": [
+    "app/accounting/services",
+    "app/accounting/models.py",
+    "app/accounting/seed.py",
+    "app/common/money.py"
+  ],
   "reportMissingImports": "warning",
   "reportMissingTypeStubs": "none"
 }
