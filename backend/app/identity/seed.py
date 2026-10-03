@@ -82,12 +82,18 @@ def seed_rbac() -> None:
 
     db.session.flush()
 
+    # Declarative reconcile: grant what ROLE_PERMS declares AND revoke any
+    # grant it no longer declares. Add-only seeding would leave a stale
+    # permission attached to a role after it's removed from the catalog
+    # (privilege-revocation gap), so we prune here for every managed role.
     for role_code, perm_codes in ROLE_PERMS.items():
         role = db.session.execute(select(Role).where(Role.code == role_code)).scalar_one()
+        desired_perm_ids: set[int] = set()
         for p_code in perm_codes:
             perm = db.session.execute(
                 select(Permission).where(Permission.code == p_code)
             ).scalar_one()
+            desired_perm_ids.add(perm.id)
             exists = db.session.execute(
                 select(RolePermission).where(
                     RolePermission.role_id == role.id,
@@ -96,6 +102,12 @@ def seed_rbac() -> None:
             ).first()
             if exists is None:
                 db.session.add(RolePermission(role_id=role.id, permission_id=perm.id))
+        current = db.session.execute(
+            select(RolePermission).where(RolePermission.role_id == role.id)
+        ).scalars().all()
+        for rp in current:
+            if rp.permission_id not in desired_perm_ids:
+                db.session.delete(rp)
 
     db.session.commit()
 

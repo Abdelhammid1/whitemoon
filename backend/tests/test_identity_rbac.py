@@ -36,3 +36,30 @@ def test_wildcard_grants_everything(client: FlaskClient) -> None:
 def test_unauth_request_rejected(client: FlaskClient) -> None:
     r = client.get("/admin/users")
     assert r.status_code == 401
+
+
+def test_seed_rbac_revokes_stale_grant(client: FlaskClient) -> None:
+    # A grant that is no longer declared in ROLE_PERMS must be pruned on the
+    # next seed run (declarative reconcile, not add-only).
+    from sqlalchemy import select
+
+    from app.extensions import db
+    from app.identity import seed as identity_seed
+    from app.identity.models import Permission, Role, RolePermission
+
+    staff = db.session.execute(select(Role).where(Role.code == "staff")).scalar_one()
+    perm = db.session.execute(
+        select(Permission).where(Permission.code == "credit.override")
+    ).scalar_one()
+    db.session.add(RolePermission(role_id=staff.id, permission_id=perm.id))
+    db.session.commit()
+
+    identity_seed.seed_rbac()  # reconcile
+
+    still = db.session.execute(
+        select(RolePermission).where(
+            RolePermission.role_id == staff.id,
+            RolePermission.permission_id == perm.id,
+        )
+    ).first()
+    assert still is None
