@@ -66,6 +66,9 @@ class Product(Base, TimestampMixin):
     category: Mapped[str] = mapped_column(String(20), nullable=False)
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="piece")
     eta_code: Mapped[str | None] = mapped_column(String(60))
+    # ETA e-invoicing readiness at the item level (EPIC 11, US-11.1): the item
+    # is structurally ready to be reported to the Egyptian Tax Authority.
+    eta_ready: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     food_expiry_tracked: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )

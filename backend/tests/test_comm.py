@@ -32,10 +32,20 @@ def _user(kind: str):
         "zero one zero one two three four",   # spelled English
         "راسلني على ahmed@gmail.com",         # email
         "تواصل واتساب wa.me/20100",            # social/link
+        "رقمي 0101،234،5678",                 # Arabic-comma separators
+        "O1O1234567",                          # homoglyph O for 0
+        "zero and one and zero and one and two and three and four",  # spelled + connectives
+        "رقمي صفر 1 صفر 1 two ثلاثة 4 خمسة",   # mixed digits + spelled words
     ],
 )
 def test_filter_blocks_contact_exchange(text) -> None:
     assert filters.scan_text(text) is not None
+
+
+def test_image_fails_closed_when_unscannable() -> None:
+    # Bytes that aren't a readable image → OCR can't scan → block (not allow).
+    assert filters.extract_image_text(b"not-an-image") is None
+    assert filters.scan_message(body="أهلا", image_bytes=b"not-an-image") == "image_unscannable"
 
 
 @pytest.mark.parametrize(
@@ -60,7 +70,7 @@ def test_blocked_message_not_delivered_but_kept(client) -> None:
 
     blocked = svc.send_message(conversation_id=conv.id, sender_id=cust.id, body="رقمي 01012345678")
     assert blocked.status == "blocked"
-    assert blocked.block_reason == "phone_number_digits"
+    assert blocked.block_reason == "phone_number"
 
     ok = svc.send_message(conversation_id=conv.id, sender_id=cust.id, body="أهلاً، متى يصل الطلب؟")
     assert ok.status == "sent"

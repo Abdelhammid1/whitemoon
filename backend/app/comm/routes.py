@@ -88,7 +88,6 @@ def send_message(conversation_id: int):
         is_admin=_is_mod(),
         body=p.body,
         image_bytes=image_bytes,
-        image_url=p.image_url,
     )
     return jsonify(svc.serialize_message(msg, viewer_id=uid, is_admin=_is_mod())), 201
 

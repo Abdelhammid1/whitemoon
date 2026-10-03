@@ -60,17 +60,20 @@ def send_message(
     is_admin: bool = False,
     body: str | None = None,
     image_bytes: bytes | None = None,
-    image_url: str | None = None,
 ) -> Message:
     """Post a message through the mediator. If it carries contact info it is
-    stored as `blocked` and not delivered, but kept for oversight."""
+    stored as `blocked` and not delivered, but kept for oversight.
+
+    An image must be supplied as bytes so it can be OCR-scanned; there is no
+    client-set image URL path (an unscanned image would be a filter bypass).
+    """
     conv = _conversation_or_404(conversation_id)
     role = role_of(conv, sender_id, is_admin=is_admin)
     if role is None:
         raise Forbidden("لست طرفًا في هذه المحادثة", code="not_participant")
     if conv.status != "open":
         raise BadRequest("المحادثة مغلقة", code="conversation_closed")
-    if not body and not image_url and not image_bytes:
+    if not body and not image_bytes:
         raise BadRequest("الرسالة فارغة", code="empty_message")
 
     reason = filters.scan_message(body=body, image_bytes=image_bytes)
@@ -81,7 +84,8 @@ def send_message(
         sender_id=sender_id,
         sender_role=role,
         body=body,
-        image_url=image_url,
+        # Only persist an image reference once the bytes passed the scan.
+        image_url="(image attached)" if (image_bytes and reason is None) else None,
         status=status,
         block_reason=reason,
     )

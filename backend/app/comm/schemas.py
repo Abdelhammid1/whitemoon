@@ -14,6 +14,6 @@ class StartConversationIn(BaseModel):
 
 class SendMessageIn(BaseModel):
     body: str | None = Field(default=None, max_length=4000)
-    image_url: str | None = Field(default=None, max_length=500)
-    # Optional base64 image content, scanned by OCR for hidden phone numbers.
+    # Images are submitted as base64 bytes so they can be OCR-scanned; there
+    # is no client-set image URL (an unscanned image would bypass the filter).
     image_b64: str | None = None

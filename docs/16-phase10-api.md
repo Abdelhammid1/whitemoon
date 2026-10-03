@@ -10,15 +10,21 @@ Backend only. JSON in/out.
 - **Identity isolation** (US-10.1) — a participant's view of the other side
   is by role only (`counterpart_role`, `sender_role`); the counterpart's user
   id is never serialized to a participant. Only a moderator sees ids.
-- **Contact exchange is blocked in any form** (US-10.2) — the filter catches:
-  - digit runs (≥7) with separators/brackets: `01012345678`, `0101-234-5678`,
-    `0 1 0 1 2 …`;
+- **Contact exchange is blocked in any form** (US-10.2) — detection runs on a
+  single "digit signal", so the evasions collapse into one check:
+  - digit runs (≥7) with **any** separators/brackets: `01012345678`,
+    `0101-234-5678`, `0 1 0 1 2 …`, `0101،234،5678`;
   - Arabic-Indic (`٠١٢`) and Persian (`۰۱۲`) numerals;
   - numbers spelled as words, Arabic and English (`صفر واحد …`, `zero one …`);
+  - **mixed** digit + spelled forms, and short filler tokens between digits —
+    homoglyph letters (`O`→0, `l`→1) and connectives (`و`/`and`) are treated as
+    non-breaking so they can't split a run;
   - (bonus) e-mail addresses and social handles / links.
-- **Images are OCR-scanned** (US-10.2) — an uploaded image is run through OCR
-  (`pytesseract`, ara+eng) and the extracted text goes through the same
-  filter, so a number photographed instead of typed is still caught.
+- **Images are OCR-scanned, fail-closed** (US-10.2) — an image is submitted as
+  bytes (`image_b64`), OCR'd (`pytesseract`, ara+eng), and the text run
+  through the same filter. If the image **cannot** be scanned it is blocked
+  (`image_unscannable`), never delivered. There is no client-set image URL —
+  an unscanned image would be a filter bypass.
 - **Blocked ≠ deleted** — a message that fails the filter is stored with
   `status='blocked'` and a `block_reason`, is **not** delivered to the other
   party, but is retained (and audited) for moderator oversight (US-10.3).
