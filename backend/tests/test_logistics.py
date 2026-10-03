@@ -59,7 +59,17 @@ def test_booking_returns_confirmation_code(client) -> None:
     o = _order(c.id)
     shipment = svc.book_slot(order_id=o.id, slot_id=slot.id, actor_user_id=c.id)
     assert shipment.status == "scheduled"
-    assert len(shipment.confirmation_code) == 6
+    assert len(shipment.confirmation_code) == 8  # 8 hex chars, not a 6-digit PIN
+
+
+def test_cannot_book_cancelled_order(client) -> None:
+    slot = _slot(capacity=5)
+    c = _customer()
+    o = _order(c.id)
+    o.status = "cancelled"
+    db.session.commit()
+    with pytest.raises(Conflict):
+        svc.book_slot(order_id=o.id, slot_id=slot.id, actor_user_id=c.id)
 
 
 def test_tracking_status_flow_and_location(client) -> None:

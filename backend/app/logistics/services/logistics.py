@@ -32,7 +32,9 @@ def _now() -> datetime:
 
 
 def _gen_code() -> str:
-    return f"{secrets.randbelow(1_000_000):06d}"
+    # 8 hex chars (~4.3e9 space) — a 6-digit code is brute-forceable and the
+    # code is the delivery proof, so give it real entropy.
+    return secrets.token_hex(4).upper()
 
 
 # ---------------------------------------------------------------- slots (US-9.1)
@@ -78,9 +80,11 @@ def book_slot(
     The slot row is locked (FOR UPDATE) and re-checked, so two concurrent
     bookings can never push a slot over capacity (no double-booking, US-9.1).
     """
-    _order_or_404(order_id)
+    order = _order_or_404(order_id)
     if carrier_type not in ("internal", "external"):
         raise BadRequest("نوع الناقل غير صالح", code="bad_carrier")
+    if order.status == "cancelled":
+        raise Conflict("لا يمكن جدولة تسليم لطلب ملغى", code="order_cancelled")
 
     slot = db.session.execute(
         select(DeliverySlot).where(DeliverySlot.id == slot_id).with_for_update()
@@ -93,6 +97,8 @@ def book_slot(
     shipment = db.session.execute(
         select(Shipment).where(Shipment.order_id == order_id)
     ).scalar_one_or_none()
+    if shipment is not None and shipment.status in ("delivered", "failed"):
+        raise Conflict("الشحنة منتهية — لا يمكن إعادة الجدولة", code="shipment_closed")
 
     # Releasing a previously held slot (re-book) returns its capacity first.
     if shipment is not None and shipment.slot_id is not None and shipment.slot_id != slot_id:
