@@ -56,6 +56,11 @@ from .partners.models import (
     PartnerDeposit,
     PartnerTerms,
 )
+from .production.models import (
+    ManufacturingOrder,
+    MOMaterial,
+    MOStage,
+)
 from .sales.models import (
     CreditOverride,
     CustomerCreditTier,
@@ -82,6 +87,9 @@ __all__ = [
     "ImpersonationGrant",
     "JournalEntry",
     "JournalLine",
+    "MOMaterial",
+    "MOStage",
+    "ManufacturingOrder",
     "Order",
     "OrderLine",
     "OrderSubOrder",
