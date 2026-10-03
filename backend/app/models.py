@@ -51,6 +51,11 @@ from .inventory.models import (
     TransferOrder,
     TransferOrderLine,
 )
+from .logistics.models import (
+    DeliveryShortage,
+    DeliverySlot,
+    Shipment,
+)
 from .partners.models import (
     PartnerAccrual,
     PartnerDeposit,
@@ -87,6 +92,8 @@ __all__ = [
     "CustomerDue",
     "CustomerProfile",
     "DeferredTerm",
+    "DeliveryShortage",
+    "DeliverySlot",
     "EscalationEvent",
     "EventJournalMap",
     "ImpersonationGrant",
@@ -115,6 +122,7 @@ __all__ = [
     "Role",
     "RolePermission",
     "Session",
+    "Shipment",
     "Shortage",
     "StockBalance",
     "SupplierOffer",

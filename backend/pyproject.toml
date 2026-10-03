@@ -87,5 +87,6 @@ ignore = [
 "app/partners/**/*.py" = ["E501", "PLR2004"]
 "app/production/**/*.py" = ["E501", "PLR2004"]
 "app/pos/**/*.py" = ["E501", "PLR2004"]
+"app/logistics/**/*.py" = ["E501", "PLR2004"]
 "tests/**/*.py" = ["PLR2004", "S101", "ARG001", "E501"]
 "migrations/**/*.py" = ["N999", "E501"]
