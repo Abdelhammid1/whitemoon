@@ -33,10 +33,12 @@ def _register_blueprints(app: Flask) -> None:
     from .accounting.routes import bp as accounting_bp
     from .identity.admin_routes import bp as admin_bp
     from .identity.routes import bp as auth_bp
+    from .inventory.routes import bp as inventory_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(accounting_bp)
+    app.register_blueprint(inventory_bp)
 
 
 def _register_error_handlers(app: Flask) -> None:

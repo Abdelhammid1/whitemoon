@@ -39,6 +39,11 @@ PERMISSIONS: tuple[tuple[str, str], ...] = (
     ("high.manual_journal.closed_period", "قيد يدوي على فترة مُقفلة"),
     ("high.map.edit", "تعديل خريطة القيود"),
     ("admin.high", "صلاحية الإدارة العليا (تجميد حساب، تجاوز سقف…)"),
+    # Inventory (EPIC 4)
+    ("product.manage", "إدارة كتالوج المنتجات"),
+    ("inventory.manage", "تعديل أرصدة المخزون وإصدار إذون التحويل"),
+    ("offer.manage", "إدارة عروض المورد (المورد لعروضه فقط)"),
+    ("shortage.resolve", "حسم النواقص وتحديد الطرف المسؤول"),
 )
 
 # role_code -> list of permission codes
@@ -48,10 +53,13 @@ ROLE_PERMS: dict[str, tuple[str, ...]] = {
         "user.read",
         "user.impersonate",
         "supplier.approve",
+        "product.manage",
+        "inventory.manage",
+        "shortage.resolve",
     ),
-    "staff": ("user.read",),
+    "staff": ("user.read", "product.manage", "inventory.manage"),
     "customer": (),
-    "supplier": (),
+    "supplier": ("offer.manage",),
     "agent": (),
     "branch": (),
 }

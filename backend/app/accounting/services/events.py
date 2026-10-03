@@ -279,6 +279,15 @@ def _resolve_account_code(row: EventJournalMap, context: Mapping[str, Any]) -> s
                 code="category_required_for_location",
             )
         return value
+    if "by_partner_type" in rule:
+        mapping = rule["by_partner_type"]
+        key_pt = str(context.get("partner_kind") or "")
+        if key_pt not in mapping:
+            raise BadRequest(
+                f"partner_kind '{key_pt}' has no mapping for event",
+                code="partner_mapping_missing",
+            )
+        return mapping[key_pt]
     raise BadRequest(
         f"map row {row.id} has no account_code and no supported rule",
         code="unresolvable_account",

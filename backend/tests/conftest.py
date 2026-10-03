@@ -44,6 +44,14 @@ def _reset_db(app: Flask) -> Iterator[None]:
         db.session.execute(
             text(
                 "TRUNCATE TABLE "
+                "inventory.reorder_alerts, "
+                "inventory.shortages, "
+                "inventory.batches, "
+                "inventory.transfer_order_lines, "
+                "inventory.transfer_orders, "
+                "inventory.stock_balances, "
+                "inventory.supplier_offers, "
+                "inventory.products, "
                 "accounting.bank_receipts, "
                 "accounting.deferred_terms, "
                 "accounting.event_journal_map, "

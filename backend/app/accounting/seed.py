@@ -260,6 +260,83 @@ EVENT_MAP = (
         "cost",
         "خصم الخامة من المخزون",
     ),
+
+    # 4.أ — inventory.transfer.issued (docs/03 event 4) — stock leaves source
+    (
+        "inventory.transfer.issued", 1, "debit", "9100", None, "cost",
+        "تحويلات بين المواقع — قيد التسوية",
+    ),
+    (
+        "inventory.transfer.issued", 2, "credit", None,
+        {
+            "by_location": {
+                "supplier": "1151_or_1152",
+                "channel_partner": "1153",
+                "in_transit": "1154",
+            }
+        },
+        "cost",
+        "خصم المخزون من موقع المصدر",
+    ),
+
+    # 4.ب — inventory.transfer.received — stock arrives at destination
+    (
+        "inventory.transfer.received", 1, "debit", None,
+        {
+            "by_location": {
+                "supplier": "1151_or_1152",
+                "channel_partner": "1153",
+                "in_transit": "1154",
+                "customer_hold": "1154",
+            }
+        },
+        "cost",
+        "إضافة المخزون في موقع الوجهة",
+    ),
+    (
+        "inventory.transfer.received", 2, "credit", "9100", None, "cost",
+        "إقفال قيد تسوية التحويل",
+    ),
+
+    # 10 — shortage.resolved.supplier — debit supplier payable
+    (
+        "shortage.resolved.supplier", 1, "debit", None,
+        {"by_category": {"food": "2111", "clothing": "2112"}},
+        "cost",
+        "خصم من دائني الموردين — الطرف المسؤول",
+    ),
+    (
+        "shortage.resolved.supplier", 2, "credit", None,
+        {"by_category": {"food": "1151", "clothing": "1152"}},
+        "cost",
+        "خصم المخزون مقابل النقص",
+    ),
+
+    # 10 — shortage.resolved.partner — debit agent/branch receivable
+    (
+        "shortage.resolved.partner", 1, "debit", None,
+        {"by_partner_type": {"agent": "1141", "branch": "1142"}},
+        "cost",
+        "خصم من ذمم الوكيل/الفرع — الطرف المسؤول",
+    ),
+    (
+        "shortage.resolved.partner", 2, "credit", None,
+        {"by_category": {"food": "1151", "clothing": "1152"}},
+        "cost",
+        "خصم المخزون مقابل النقص",
+    ),
+
+    # 10 — shortage.resolved.unallocated — loss to 5310
+    (
+        "shortage.resolved.unallocated", 1, "debit", "5310", None, "cost",
+        "خسائر نواقص غير محمَّلة على طرف",
+    ),
+    (
+        "shortage.resolved.unallocated", 2, "credit", None,
+        {"by_category": {"food": "1151", "clothing": "1152"}},
+        "cost",
+        "خصم المخزون مقابل النقص",
+    ),
 )
 
 

@@ -16,16 +16,6 @@ from .accounting.models import (
     Period,
 )
 from .audit.models import AuditEvent
-from .inventory.models import (
-    Batch,
-    Product,
-    ReorderAlert,
-    Shortage,
-    StockBalance,
-    SupplierOffer,
-    TransferOrder,
-    TransferOrderLine,
-)
 from .identity.models import (
     BackupCode,
     ChannelPartnerProfile,
@@ -40,6 +30,16 @@ from .identity.models import (
     TotpSecret,
     User,
     UserRole,
+)
+from .inventory.models import (
+    Batch,
+    Product,
+    ReorderAlert,
+    Shortage,
+    StockBalance,
+    SupplierOffer,
+    TransferOrder,
+    TransferOrderLine,
 )
 
 __all__ = [

@@ -231,7 +231,7 @@ class TransferOrder(Base, TimestampMixin):
         BigInteger, ForeignKey("accounting.journal_entries.id")
     )
 
-    lines: Mapped[list["TransferOrderLine"]] = relationship(
+    lines: Mapped[list[TransferOrderLine]] = relationship(
         back_populates="transfer_order",
         cascade="all, delete-orphan",
         order_by="TransferOrderLine.id",
