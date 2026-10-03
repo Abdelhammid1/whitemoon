@@ -83,5 +83,7 @@ ignore = [
 # Credit-rule thresholds/weights are the documented business rule (docs/04);
 # extracting each literal to a constant hurts more than it helps.
 "app/sales/**/*.py" = ["E501", "PLR2004"]
+# Partner financial rules (rates/periods) read clearer inline (EPIC 6).
+"app/partners/**/*.py" = ["E501", "PLR2004"]
 "tests/**/*.py" = ["PLR2004", "S101", "ARG001", "E501"]
 "migrations/**/*.py" = ["N999", "E501"]

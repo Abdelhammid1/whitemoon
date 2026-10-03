@@ -226,6 +226,16 @@ EVENT_MAP = (
         "تأمين الوكيل",
     ),
 
+    # 11b — agent.deposit.refunded (EPIC 6 — reverse the deposit on recovery)
+    (
+        "agent.deposit.refunded", 1, "debit", "2120", None, "amount",
+        "رد تأمين الوكيل — إنهاء الالتزام",
+    ),
+    (
+        "agent.deposit.refunded", 2, "credit", "1111", None, "amount",
+        "الصندوق",
+    ),
+
     # 12 — agent.commission.accrued (reviewer round 2 — 5281 instead of 5280)
     (
         "agent.commission.accrued", 1, "debit", "5281", None, "amount",

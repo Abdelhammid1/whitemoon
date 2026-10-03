@@ -51,6 +51,11 @@ from .inventory.models import (
     TransferOrder,
     TransferOrderLine,
 )
+from .partners.models import (
+    PartnerAccrual,
+    PartnerDeposit,
+    PartnerTerms,
+)
 from .sales.models import (
     CreditOverride,
     CustomerCreditTier,
@@ -81,6 +86,9 @@ __all__ = [
     "OrderLine",
     "OrderSubOrder",
     "OtpRequest",
+    "PartnerAccrual",
+    "PartnerDeposit",
+    "PartnerTerms",
     "Period",
     "Permission",
     "PriceLock",

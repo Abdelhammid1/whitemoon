@@ -135,6 +135,7 @@ class Order(Base, TimestampMixin):
         ),
         CheckConstraint("currency = 'EGP'", name="ck_orders_currency_egp"),
         Index("ix_orders_customer", "customer_id"),
+        Index("ix_orders_partner", "partner_user_id"),
         {"schema": "commerce"},
     )
 
@@ -158,6 +159,11 @@ class Order(Base, TimestampMixin):
     credit_check_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     journal_entry_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("accounting.journal_entries.id")
+    )
+    # Attribution to the agent/branch in whose scope the sale falls — the
+    # basis for that partner's commission / investment-return accrual (EPIC 6).
+    partner_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("identity.users.id")
     )
 
     sub_orders: Mapped[list[OrderSubOrder]] = relationship(
