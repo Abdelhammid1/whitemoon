@@ -16,6 +16,7 @@ from .accounting.models import (
     Period,
 )
 from .audit.models import AuditEvent
+from .comm.models import Conversation, Message
 from .commerce.models import (
     Cart,
     CartItem,
@@ -87,6 +88,7 @@ __all__ = [
     "Cart",
     "CartItem",
     "ChannelPartnerProfile",
+    "Conversation",
     "CreditOverride",
     "CustomerCreditTier",
     "CustomerDue",
@@ -102,6 +104,7 @@ __all__ = [
     "MOMaterial",
     "MOStage",
     "ManufacturingOrder",
+    "Message",
     "Order",
     "OrderLine",
     "OrderSubOrder",

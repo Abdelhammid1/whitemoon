@@ -55,6 +55,8 @@ PERMISSIONS: tuple[tuple[str, str], ...] = (
     # Logistics (EPIC 9)
     ("logistics.manage", "إدارة مواعيد التسليم والشحنات"),
     ("logistics.deliver", "مندوب التسليم: تحديث الموقع وتأكيد الاستلام"),
+    # Communication (EPIC 10)
+    ("comm.moderate", "مراقبة المحادثات وإنشاؤها والتدخل عند الحاجة"),
 )
 
 # role_code -> list of permission codes
@@ -74,6 +76,7 @@ ROLE_PERMS: dict[str, tuple[str, ...]] = {
         "pos.settle",
         "logistics.manage",
         "logistics.deliver",
+        "comm.moderate",
     ),
     "staff": (
         "user.read",
