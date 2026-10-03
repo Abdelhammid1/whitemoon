@@ -13,7 +13,7 @@ from datetime import UTC, date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from ...accounting.services import events as journal
 from ...commerce.models import Order
@@ -29,9 +29,22 @@ from ..models import PartnerAccrual, PartnerDeposit, PartnerTerms
 REALIZED_ORDER_STATUSES = ("confirmed", "fulfilled")
 MIN_REASON_LEN = 5
 
+# Namespace for the per-partner advisory lock that serialises accrual
+# computation (so the one-per-period check can't be raced into a double-post).
+_PARTNER_LOCK_NS = 0x5052  # "PR"
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
+
+
+def _lock_partner(partner_id: int) -> None:
+    """Transaction-scoped advisory lock serialising a partner's financial
+    mutations; held until the surrounding transaction commits."""
+    db.session.execute(
+        text("SELECT pg_advisory_xact_lock(:ns, :cid)"),
+        {"ns": _PARTNER_LOCK_NS, "cid": partner_id},
+    )
 
 
 def _require_partner(partner_id: int) -> ChannelPartnerProfile:
@@ -132,7 +145,11 @@ def record_deposit(
 
 
 def refund_deposit(*, deposit_id: int, reason: str, posted_by: int) -> PartnerDeposit:
-    dep = db.session.get(PartnerDeposit, deposit_id)
+    # Lock the row so two concurrent refunds can't both see 'held' and
+    # double-post the reversal (double-spend).
+    dep = db.session.execute(
+        select(PartnerDeposit).where(PartnerDeposit.id == deposit_id).with_for_update()
+    ).scalar_one_or_none()
     if dep is None:
         raise NotFound("التأمين غير موجود", code="deposit_not_found")
     if dep.status != "held":
@@ -217,6 +234,10 @@ def compute_accrual(
     if kind not in ("commission", "investment_return"):
         raise BadRequest("نوع الاستحقاق غير صالح", code="bad_accrual_kind")
     _require_partner(partner_id)
+    # Serialise concurrent computes for this partner so the one-per-period
+    # check below can't be raced into a duplicate post (the unique constraint
+    # is the final backstop).
+    _lock_partner(partner_id)
     terms = get_terms(partner_id)
 
     if kind == "commission":
