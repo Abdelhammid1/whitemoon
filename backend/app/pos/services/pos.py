@@ -21,7 +21,7 @@ from ...common.errors import BadRequest, NotFound
 from ...common.money import to_money
 from ...extensions import db
 from ...identity.services.audit import emit as audit_emit
-from ...inventory.models import Product
+from ...inventory.models import Product, SupplierOffer
 from ...inventory.services import stock
 from ..models import PosBatch, PosSale, PosSaleLine
 
@@ -35,7 +35,8 @@ class SaleLineInput:
     product_id: int
     supplier_id: int
     qty: Decimal
-    unit_price: Decimal
+    # No price here: the POS unit price is derived server-side from the
+    # supplier's active offer, never accepted from the client (anti-tamper).
 
 
 def _now() -> datetime:
@@ -58,22 +59,34 @@ def create_sale(
     if not lines:
         raise BadRequest("لا توجد أصناف في البيع", code="empty_sale")
 
-    resolved: list[tuple[SaleLineInput, str, Decimal]] = []
+    resolved: list[tuple[SaleLineInput, str, Decimal, Decimal]] = []
     total = Decimal("0")
     for li in lines:
         product = db.session.get(Product, li.product_id)
         if product is None:
             raise NotFound(f"الصنف {li.product_id} غير موجود", code="product_not_found")
         qty = to_money(li.qty)
-        unit = to_money(li.unit_price)
         if qty <= 0:
             raise BadRequest("الكمية يجب أن تكون موجبة", code="bad_qty")
+        # Server-derived price: the supplier's active offer for this product.
+        offer = db.session.execute(
+            select(SupplierOffer).where(
+                SupplierOffer.supplier_id == li.supplier_id,
+                SupplierOffer.product_id == li.product_id,
+                SupplierOffer.is_active.is_(True),
+            )
+        ).scalar_one_or_none()
+        if offer is None:
+            raise BadRequest(
+                f"لا يوجد عرض سعر فعّال للصنف {li.product_id}", code="no_active_offer"
+            )
+        unit = to_money(offer.unit_price)
         line_total = qty * unit
-        resolved.append((li, product.category, line_total))
+        resolved.append((li, product.category, unit, line_total))
         total += line_total
 
     # Shared inventory: check availability for every line, then deduct.
-    for li, _cat, _lt in resolved:
+    for li, _cat, _unit, _lt in resolved:
         stock.require_available(
             supplier_id=li.supplier_id,
             product_id=li.product_id,
@@ -81,7 +94,7 @@ def create_sale(
             location_id=location_id,
             qty=to_money(li.qty),
         )
-    for li, _cat, _lt in resolved:
+    for li, _cat, _unit, _lt in resolved:
         stock.adjust(
             supplier_id=li.supplier_id,
             product_id=li.product_id,
@@ -102,7 +115,7 @@ def create_sale(
     db.session.add(sale)
     db.session.flush()
     sale.number = f"{_number()}{sale.id:06d}"
-    for li, cat, line_total in resolved:
+    for li, cat, unit, line_total in resolved:
         db.session.add(
             PosSaleLine(
                 sale_id=sale.id,
@@ -110,7 +123,7 @@ def create_sale(
                 supplier_id=li.supplier_id,
                 category=cat,
                 qty=to_money(li.qty),
-                unit_price=to_money(li.unit_price),
+                unit_price=to_money(unit),
                 line_total=to_money(line_total),
             )
         )
@@ -169,17 +182,24 @@ def settle_batch(*, posted_by: int, entry_date: date | None = None) -> PosBatch:
     return batch
 
 
-def get_sale(sale_id: int) -> PosSale:
+def get_sale(sale_id: int, *, only_cashier_id: int | None = None) -> PosSale:
     s = db.session.get(PosSale, sale_id)
     if s is None:
+        raise NotFound("البيع غير موجود", code="pos_sale_not_found")
+    # A cashier may only read their own sales; a settler (None) sees all.
+    if only_cashier_id is not None and s.cashier_id != only_cashier_id:
         raise NotFound("البيع غير موجود", code="pos_sale_not_found")
     return s
 
 
-def list_sales(*, posted: bool | None = None, limit: int = 100) -> list[PosSale]:
+def list_sales(
+    *, posted: bool | None = None, only_cashier_id: int | None = None, limit: int = 100
+) -> list[PosSale]:
     stmt = select(PosSale).order_by(PosSale.id.desc()).limit(limit)
     if posted is not None:
         stmt = stmt.where(PosSale.posted.is_(posted))
+    if only_cashier_id is not None:
+        stmt = stmt.where(PosSale.cashier_id == only_cashier_id)
     return list(db.session.execute(stmt).scalars())
 
 

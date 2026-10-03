@@ -11,7 +11,8 @@ class SaleLine(BaseModel):
     product_id: int = Field(gt=0)
     supplier_id: int = Field(gt=0)
     qty: float = Field(gt=0)
-    unit_price: float = Field(ge=0)
+    # No unit_price: the price is taken from the supplier's active offer
+    # server-side, never from the client.
 
 
 class CreateSaleIn(BaseModel):
