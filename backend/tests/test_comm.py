@@ -36,6 +36,8 @@ def _user(kind: str):
         "O1O1234567",                          # homoglyph O for 0
         "zero and one and zero and one and two and three and four",  # spelled + connectives
         "رقمي صفر 1 صفر 1 two ثلاثة 4 خمسة",   # mixed digits + spelled words
+        "０１０１２３４５６７８",                    # fullwidth Unicode digits
+        "0\u200b1\u200b0\u200b1\u200b2\u200b3\u200b4\u200b5",  # zero-width between digits
     ],
 )
 def test_filter_blocks_contact_exchange(text) -> None:

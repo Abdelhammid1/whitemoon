@@ -21,6 +21,7 @@ scanned the caller fails **closed** (blocks), never open.
 from __future__ import annotations
 
 import re
+import unicodedata
 
 # A run of this many digit-equivalents looks like a phone number (Egypt
 # landline is 7–8 local digits, mobile 11). Deliberately low: over-blocking a
@@ -30,11 +31,16 @@ MIN_PHONE_DIGITS = 7
 # treated as filler and do not break a digit run.
 MAX_FILLER_LEN = 3
 
-_ARABIC_INDIC = "٠١٢٣٤٥٦٧٨٩"
-_PERSIAN = "۰۱۲۳۴۵۶۷۸۹"
-_DIGIT_TRANSLATION = {ord(c): str(i) for i, c in enumerate(_ARABIC_INDIC)}
-_DIGIT_TRANSLATION.update({ord(c): str(i) for i, c in enumerate(_PERSIAN)})
-_TATWEEL = "ـ"
+# Zero-width / bidi / join controls (and tatweel) an attacker could sprinkle
+# between digits to split a run — dropped before tokenizing. Listed as
+# codepoints so the source file itself stays free of invisible characters.
+_INVISIBLE_CODEPOINTS = (
+    0x200B, 0x200C, 0x200D, 0x200E, 0x200F,  # ZWSP, ZWNJ, ZWJ, LRM, RLM
+    0x202A, 0x202B, 0x202C, 0x202D, 0x202E,  # bidi embedding/override
+    0x2066, 0x2067, 0x2068, 0x2069,          # bidi isolates
+    0xFEFF, 0x00AD, 0x0640,                   # BOM, soft hyphen, tatweel
+)
+_INVISIBLES: dict[int, str | int | None] = dict.fromkeys(_INVISIBLE_CODEPOINTS, None)
 
 _EMAIL = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 _URL = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)
@@ -59,7 +65,15 @@ _SPELLED_DIGITS: dict[str, str] = {
 
 
 def _normalize(text: str) -> str:
-    return text.translate(_DIGIT_TRANSLATION).replace(_TATWEEL, "")
+    """Drop invisibles, then map every Unicode decimal digit (Arabic-Indic,
+    Persian, fullwidth, Devanagari, …) to its ASCII digit, so no numeral
+    variant slips past the ASCII tokenizer."""
+    text = text.translate(_INVISIBLES)
+    out: list[str] = []
+    for ch in text:
+        d = unicodedata.decimal(ch, None)
+        out.append(str(d) if d is not None else ch)
+    return "".join(out)
 
 
 def _max_digit_run(text: str) -> int:
