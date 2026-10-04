@@ -23,6 +23,12 @@ import { IncomeStatementPage } from './pages/accounting/reports/IncomeStatementP
 import { BalanceSheetPage } from './pages/accounting/reports/BalanceSheetPage'
 import { CashFlowPage } from './pages/accounting/reports/CashFlowPage'
 import { GeneralLedgerPage } from './pages/accounting/reports/GeneralLedgerPage'
+import { CatalogPage } from './pages/commerce/CatalogPage'
+import { CartPage } from './pages/commerce/CartPage'
+import { OrdersPage } from './pages/commerce/OrdersPage'
+import { OrderDetailPage } from './pages/commerce/OrderDetailPage'
+import { RfqPage } from './pages/commerce/RfqPage'
+import { RfqDetailPage } from './pages/commerce/RfqDetailPage'
 import { ProductsPage } from './pages/inventory/ProductsPage'
 import { OffersPage } from './pages/inventory/OffersPage'
 import { StockPage } from './pages/inventory/StockPage'
@@ -42,6 +48,13 @@ export function App() {
       <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
         <Route path="/" element={<HomePage />} />
         <Route path="/2fa" element={<TotpEnrollPage />} />
+
+        <Route path="/catalog" element={<CatalogPage />} />
+        <Route path="/cart" element={<CartPage />} />
+        <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/orders/:id" element={<OrderDetailPage />} />
+        <Route path="/rfq" element={<RfqPage />} />
+        <Route path="/rfq/:id" element={<RfqDetailPage />} />
 
         <Route path="/admin/users" element={<ProtectedRoute roles={FINANCE}><UsersPage /></ProtectedRoute>} />
         <Route path="/admin/users/:id" element={<ProtectedRoute roles={FINANCE}><UserDetailPage /></ProtectedRoute>} />

@@ -60,6 +60,16 @@ const GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'السوق',
+    roles: ['customer'],
+    items: [
+      { to: '/catalog', label: 'الكتالوج' },
+      { to: '/cart', label: 'سلتي' },
+      { to: '/orders', label: 'طلباتي' },
+      { to: '/rfq', label: 'طلب عرض سعر' },
+    ],
+  },
+  {
     label: 'حسابي',
     roles: ['customer', 'agent', 'branch'],
     items: [{ to: '/', label: 'لوحة التحكم', end: true }],

@@ -9,25 +9,32 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from ...extensions import db
 from ...inventory.models import Product, SupplierOffer
 
 
-def browse(*, q: str | None = None, category: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
-    # Best (lowest) active price per product.
-    best = (
+def _best_offer_subq():
+    """Lowest active offer per product — carries its opaque offer id and price.
+    The id lets a customer add to cart without ever seeing the supplier."""
+    return (
         select(
             SupplierOffer.product_id.label("pid"),
-            func.min(SupplierOffer.unit_price).label("best_price"),
+            SupplierOffer.id.label("offer_id"),
+            SupplierOffer.unit_price.label("best_price"),
         )
         .where(SupplierOffer.is_active.is_(True))
-        .group_by(SupplierOffer.product_id)
+        .distinct(SupplierOffer.product_id)
+        .order_by(SupplierOffer.product_id, SupplierOffer.unit_price.asc(), SupplierOffer.id.asc())
         .subquery()
     )
+
+
+def browse(*, q: str | None = None, category: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+    best = _best_offer_subq()
     stmt = (
-        select(Product, best.c.best_price)
+        select(Product, best.c.best_price, best.c.offer_id)
         .join(best, best.c.pid == Product.id)
         .where(Product.is_active.is_(True))
         .order_by(Product.id.desc())
@@ -47,10 +54,11 @@ def browse(*, q: str | None = None, category: str | None = None, limit: int = 10
             "name_ar": product.name_ar,
             "category": product.category,
             "unit": product.unit,
+            "image_url": product.image_url,
             "best_price": str(best_price),
-            # deliberately no supplier_id / supplier_name
+            "best_offer_id": offer_id,  # opaque — no supplier revealed
         }
-        for (product, best_price) in rows
+        for (product, best_price, offer_id) in rows
     ]
 
 
@@ -60,17 +68,9 @@ def related_products(product_id: int, *, limit: int = 8) -> list[dict[str, Any]]
     product = db.session.get(Product, product_id)
     if product is None:
         return []
-    best = (
-        select(
-            SupplierOffer.product_id.label("pid"),
-            func.min(SupplierOffer.unit_price).label("best_price"),
-        )
-        .where(SupplierOffer.is_active.is_(True))
-        .group_by(SupplierOffer.product_id)
-        .subquery()
-    )
+    best = _best_offer_subq()
     stmt = (
-        select(Product, best.c.best_price)
+        select(Product, best.c.best_price, best.c.offer_id)
         .join(best, best.c.pid == Product.id)
         .where(
             Product.is_active.is_(True),
@@ -88,6 +88,7 @@ def related_products(product_id: int, *, limit: int = 8) -> list[dict[str, Any]]
             "name_ar": p.name_ar,
             "category": p.category,
             "best_price": str(bp),
+            "best_offer_id": offer_id,
         }
-        for (p, bp) in rows
+        for (p, bp, offer_id) in rows
     ]
