@@ -29,6 +29,10 @@ import { OrdersPage } from './pages/commerce/OrdersPage'
 import { OrderDetailPage } from './pages/commerce/OrderDetailPage'
 import { RfqPage } from './pages/commerce/RfqPage'
 import { RfqDetailPage } from './pages/commerce/RfqDetailPage'
+import { CreditPage } from './pages/credit/CreditPage'
+import { TierSettingsPage } from './pages/credit/TierSettingsPage'
+import { PaymentsPage } from './pages/credit/PaymentsPage'
+import { CompliancePage } from './pages/compliance/CompliancePage'
 import { ProductsPage } from './pages/inventory/ProductsPage'
 import { OffersPage } from './pages/inventory/OffersPage'
 import { StockPage } from './pages/inventory/StockPage'
@@ -79,6 +83,11 @@ export function App() {
         <Route path="/inventory/stock" element={<StockPage />} />
         <Route path="/inventory/transfers" element={<ProtectedRoute roles={FINANCE}><TransfersPage /></ProtectedRoute>} />
         <Route path="/inventory/shortages" element={<ProtectedRoute roles={FINANCE}><ShortagesPage /></ProtectedRoute>} />
+
+        <Route path="/credit" element={<ProtectedRoute roles={FINANCE}><CreditPage /></ProtectedRoute>} />
+        <Route path="/credit/tiers" element={<ProtectedRoute roles={FINANCE}><TierSettingsPage /></ProtectedRoute>} />
+        <Route path="/credit/payments" element={<ProtectedRoute roles={FINANCE}><PaymentsPage /></ProtectedRoute>} />
+        <Route path="/compliance" element={<ProtectedRoute roles={FINANCE}><CompliancePage /></ProtectedRoute>} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

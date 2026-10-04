@@ -41,6 +41,16 @@ const GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'الائتمان والعملاء',
+    roles: ['admin', 'staff'],
+    items: [
+      { to: '/credit', label: 'التصنيف الائتماني' },
+      { to: '/credit/payments', label: 'اعتماد السداد' },
+      { to: '/credit/tiers', label: 'سقوف التصنيف' },
+      { to: '/compliance', label: 'جاهزية ETA' },
+    ],
+  },
+  {
     label: 'المستودع',
     roles: ['admin', 'staff'],
     items: [
