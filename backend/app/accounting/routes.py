@@ -349,16 +349,24 @@ def journal_manual():
 
 
 @bp.post("/receipts/file")
-@jwt_required()
+@require_permission("period.close")
 def receipt_file():
     """Upload the actual receipt image (multipart). The server stores the file
     in object storage, runs OCR, and records the receipt — the client never
-    passes a storage key."""
+    passes a storage key.
+
+    Finance-gated: uploading *and* matching a bank receipt is an accounting
+    action (the OCR/expected-value path decides auto-match), so it is not open
+    to arbitrary authenticated users.
+    """
     user_id = _current_user_id()
+    # Reject an oversized body before reading it all into memory.
+    if request.content_length and request.content_length > storage.MAX_UPLOAD_BYTES + 1024 * 1024:
+        raise BadRequest("حجم الملف كبير جدًا (الحد ١٠ ميجابايت)", code="file_too_large")
     f = request.files.get("image")
     if f is None or not f.filename:
         raise BadRequest("مطلوب ملف صورة الإيصال", code="file_required")
-    data = f.read()
+    data = f.read(storage.MAX_UPLOAD_BYTES + 1)
     if not data:
         raise BadRequest("الملف فارغ", code="empty_file")
     if len(data) > storage.MAX_UPLOAD_BYTES:

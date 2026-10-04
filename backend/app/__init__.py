@@ -10,6 +10,9 @@ from .extensions import db, jwt, migrate
 def create_app(config: Config | None = None) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config or get_config())
+    # Hard cap on request bodies (uploads) — Flask returns 413 before the
+    # handler reads anything. 12 MB leaves room over the 10 MB file limit.
+    app.config.setdefault("MAX_CONTENT_LENGTH", 12 * 1024 * 1024)
 
     db.init_app(app)
     migrate.init_app(app, db)
