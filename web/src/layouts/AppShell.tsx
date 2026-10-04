@@ -61,6 +61,14 @@ const GROUPS: NavGroup[] = [
     ],
   },
   {
+    label: 'العمليات',
+    roles: ['admin', 'staff'],
+    items: [
+      { to: '/partners', label: 'الوكلاء والفروع' },
+      { to: '/production', label: 'أوامر التصنيع' },
+    ],
+  },
+  {
     label: 'المورد',
     roles: ['supplier'],
     items: [

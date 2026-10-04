@@ -33,6 +33,10 @@ import { CreditPage } from './pages/credit/CreditPage'
 import { TierSettingsPage } from './pages/credit/TierSettingsPage'
 import { PaymentsPage } from './pages/credit/PaymentsPage'
 import { CompliancePage } from './pages/compliance/CompliancePage'
+import { PartnersPage } from './pages/partners/PartnersPage'
+import { PartnerDetailPage } from './pages/partners/PartnerDetailPage'
+import { ProductionPage } from './pages/production/ProductionPage'
+import { ProductionDetailPage } from './pages/production/ProductionDetailPage'
 import { ProductsPage } from './pages/inventory/ProductsPage'
 import { OffersPage } from './pages/inventory/OffersPage'
 import { StockPage } from './pages/inventory/StockPage'
@@ -88,6 +92,11 @@ export function App() {
         <Route path="/credit/tiers" element={<ProtectedRoute roles={FINANCE}><TierSettingsPage /></ProtectedRoute>} />
         <Route path="/credit/payments" element={<ProtectedRoute roles={FINANCE}><PaymentsPage /></ProtectedRoute>} />
         <Route path="/compliance" element={<ProtectedRoute roles={FINANCE}><CompliancePage /></ProtectedRoute>} />
+
+        <Route path="/partners" element={<ProtectedRoute roles={FINANCE}><PartnersPage /></ProtectedRoute>} />
+        <Route path="/partners/:id" element={<ProtectedRoute roles={FINANCE}><PartnerDetailPage /></ProtectedRoute>} />
+        <Route path="/production" element={<ProtectedRoute roles={FINANCE}><ProductionPage /></ProtectedRoute>} />
+        <Route path="/production/:id" element={<ProtectedRoute roles={FINANCE}><ProductionDetailPage /></ProtectedRoute>} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
