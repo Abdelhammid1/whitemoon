@@ -1,4 +1,42 @@
-import { api } from './client'
+import { API_BASE, ApiError, tokenStore, api } from './client'
+
+export interface ReceiptFileResult {
+  receipt_id: number
+  status: string
+  image_s3_key: string
+  ocr_amount: string | null
+  ocr_reference: string | null
+}
+
+/** Upload the actual receipt image (multipart) — the server stores it and
+ *  runs OCR. The browser sets the multipart boundary, so we don't set
+ *  Content-Type ourselves. */
+export async function uploadReceiptFile(
+  file: File,
+  opts: { expectedAmount?: string; expectedReference?: string; stubAmount?: string; stubReference?: string } = {},
+): Promise<ReceiptFileResult> {
+  const form = new FormData()
+  form.append('image', file)
+  if (opts.expectedAmount) form.append('expected_amount', opts.expectedAmount)
+  if (opts.expectedReference) form.append('expected_reference', opts.expectedReference)
+  if (opts.stubAmount) form.append('ocr_stub_amount', opts.stubAmount)
+  if (opts.stubReference) form.append('ocr_stub_reference', opts.stubReference)
+
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  const token = tokenStore.getAccess()
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const resp = await fetch(`${API_BASE}/accounting/receipts/file`, {
+    method: 'POST',
+    headers,
+    body: form,
+  })
+  const data = await resp.json().catch(() => null)
+  if (!resp.ok) {
+    throw new ApiError(resp.status, data?.error ?? 'error', data?.message ?? 'تعذّر الرفع')
+  }
+  return data as ReceiptFileResult
+}
 
 export interface PeriodRow {
   id: number

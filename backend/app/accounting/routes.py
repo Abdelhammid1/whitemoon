@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -16,6 +16,7 @@ from ..extensions import db
 from ..identity.services.audit import emit as audit_emit
 from ..identity.services.rbac import require_permission
 from .models import Account, BankReceipt, DeferredTerm, Period
+from .providers import storage
 from .schemas import (
     AccountCreateIn,
     AccountUpdateIn,
@@ -35,6 +36,14 @@ from .services.events import LineInput, post_manual
 from .services.reports import ReportFilter
 
 bp = Blueprint("accounting", __name__, url_prefix="/accounting")
+
+_IMAGE_MIME = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".pdf": "application/pdf",
+}
 
 
 def _parse(model_cls: Any) -> Any:
@@ -337,6 +346,80 @@ def journal_manual():
 
 
 # ================================================================ receipts (US-3.3)
+
+
+@bp.post("/receipts/file")
+@jwt_required()
+def receipt_file():
+    """Upload the actual receipt image (multipart). The server stores the file
+    in object storage, runs OCR, and records the receipt — the client never
+    passes a storage key."""
+    user_id = _current_user_id()
+    f = request.files.get("image")
+    if f is None or not f.filename:
+        raise BadRequest("مطلوب ملف صورة الإيصال", code="file_required")
+    data = f.read()
+    if not data:
+        raise BadRequest("الملف فارغ", code="empty_file")
+    if len(data) > storage.MAX_UPLOAD_BYTES:
+        raise BadRequest("حجم الملف كبير جدًا (الحد ١٠ ميجابايت)", code="file_too_large")
+    try:
+        ext = storage.safe_extension(f.filename)
+    except ValueError as e:
+        raise BadRequest("نوع الملف غير مدعوم", code="bad_file_type") from e
+
+    key = storage.store(data, prefix="receipts", ext=ext)
+
+    # Dev convenience: stub OCR values may come as form fields.
+    stub_amount = request.form.get("ocr_stub_amount")
+    stub_reference = request.form.get("ocr_stub_reference")
+    if stub_amount or stub_reference:
+        from .providers.ocr_provider import get_stub
+        get_stub().prime(
+            amount=Decimal(stub_amount) if stub_amount else None,
+            reference=stub_reference or None,
+        )
+
+    expected_amount = request.form.get("expected_amount")
+    expected_reference = request.form.get("expected_reference")
+    result = receipts_svc.upload_and_match(
+        uploaded_by=user_id,
+        image_s3_key=key,
+        image_bytes=data,
+        expected_amount=Decimal(expected_amount) if expected_amount else None,
+        expected_reference=expected_reference or None,
+    )
+    audit_emit(
+        "accounting.receipt.upload",
+        actor_user_id=user_id,
+        target_type="receipt",
+        target_id=result.receipt_id,
+    )
+    return jsonify(
+        {
+            "receipt_id": result.receipt_id,
+            "status": result.status,
+            "image_s3_key": key,
+            "ocr_amount": str(result.ocr_amount) if result.ocr_amount else None,
+            "ocr_reference": result.ocr_reference,
+        }
+    ), 201
+
+
+@bp.get("/receipts/<int:receipt_id>/image")
+@require_permission("period.close")
+def receipt_image(receipt_id: int):
+    """Stream a stored receipt image, looked up by receipt id (never by a
+    client-supplied key) and gated to finance."""
+    receipt = db.session.get(BankReceipt, receipt_id)
+    if receipt is None:
+        raise BadRequest("الإيصال غير موجود", code="receipt_not_found")
+    data = storage.load(receipt.image_s3_key)
+    if data is None:
+        raise BadRequest("الصورة غير متاحة", code="image_unavailable")
+    key = receipt.image_s3_key
+    ext = "." + key.rsplit(".", 1)[-1].lower() if "." in key else ""
+    return Response(data, mimetype=_IMAGE_MIME.get(ext, "application/octet-stream"))
 
 
 @bp.post("/receipts/upload")

@@ -3,7 +3,7 @@ import { Narrow } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
-import { listReceipts, resolveReceipt, uploadReceipt, type ReceiptRow } from '../../api/accounting'
+import { listReceipts, resolveReceipt, uploadReceiptFile, type ReceiptRow } from '../../api/accounting'
 import { ApiError } from '../../api/client'
 import { formatDate, formatMoney } from '../../lib/format'
 
@@ -17,7 +17,7 @@ const STATUS_TONE: Record<string, 'signal' | 'warning' | 'error' | 'neutral'> = 
 
 export function ReceiptsPage() {
   const toast = useToast()
-  const [s3Key, setS3Key] = useState('')
+  const [file, setFile] = useState<File | null>(null)
   const [expectedAmount, setExpectedAmount] = useState('')
   const [expectedRef, setExpectedRef] = useState('')
   const [stubAmount, setStubAmount] = useState('')
@@ -45,18 +45,27 @@ export function ReceiptsPage() {
 
   async function onUpload(e: FormEvent) {
     e.preventDefault()
+    if (!file) {
+      toast.error('اختر صورة الإيصال أولًا.')
+      return
+    }
     setBusy(true)
     try {
-      const resp = await uploadReceipt({
-        image_s3_key: s3Key,
-        expected_amount: expectedAmount || undefined,
-        expected_reference: expectedRef || undefined,
-        ocr_stub_amount: stubAmount || undefined,
-        ocr_stub_reference: stubRef || undefined,
+      const resp = await uploadReceiptFile(file, {
+        expectedAmount: expectedAmount || undefined,
+        expectedReference: expectedRef || undefined,
+        stubAmount: stubAmount || undefined,
+        stubReference: stubRef || undefined,
       })
-      setResult(resp)
+      setResult({
+        receipt_id: resp.receipt_id,
+        status: resp.status,
+        ocr_amount: resp.ocr_amount,
+        ocr_reference: resp.ocr_reference,
+      })
       if (resp.status === 'matched') toast.success('تمت المطابقة التلقائية.')
       else toast.info('تم الرفع وتحويله للمراجعة اليدوية.')
+      setFile(null)
       await load()
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'فشل الرفع')
@@ -86,9 +95,20 @@ export function ReceiptsPage() {
 
       <form onSubmit={onUpload} className="mt-space-xl flex flex-col gap-space-md">
         <div className="border border-dashed border-surface-container-high rounded-xl p-space-xl text-center">
-          <p className="font-body text-body text-secondary">أدخل مسار صورة الإيصال في المخزن (S3)</p>
+          <p className="font-body text-body text-secondary">ارفع صورة الإيصال (تُخزَّن على الخادم)</p>
           <div className="max-w-[420px] mx-auto mt-space-md">
-            <Field dir="ltr" mono placeholder="receipts/customer-42/2026-10-10.jpg" value={s3Key} onChange={(e) => setS3Key(e.target.value)} required />
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-body text-on-surface file:me-space-md file:rounded-lg file:border-0 file:bg-primary file:text-on-primary file:px-space-md file:py-space-xs file:font-body-medium hover:file:opacity-90 cursor-pointer"
+              required
+            />
+            {file && (
+              <p className="mt-space-sm font-small text-small text-secondary">
+                <bdi dir="ltr">{file.name}</bdi> — {(file.size / 1024).toFixed(0)} KB
+              </p>
+            )}
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md">
