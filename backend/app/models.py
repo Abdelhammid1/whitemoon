@@ -59,6 +59,7 @@ from .logistics.models import (
     Shipment,
     ShipmentLeg,
 )
+from .notifications.models import Notification
 from .partners.models import (
     PartnerAccrual,
     PartnerDeposit,
@@ -109,6 +110,7 @@ __all__ = [
     "MOMaterial",
     "MOStage",
     "ManufacturingOrder",
+    "Notification",
     "Message",
     "Order",
     "OrderLine",

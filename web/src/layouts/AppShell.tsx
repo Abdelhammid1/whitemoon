@@ -22,6 +22,7 @@ const GROUPS: NavGroup[] = [
     roles: ['admin', 'staff'],
     items: [
       { to: '/', label: 'لوحة التحكم', end: true },
+      { to: '/dashboard', label: 'التحليلات التنفيذية' },
       { to: '/admin/users', label: 'المستخدمون' },
       { to: '/admin/suppliers/pending', label: 'الموردون المعلقون' },
       { to: '/admin/audit', label: 'سجل التدقيق' },
@@ -82,6 +83,11 @@ const GROUPS: NavGroup[] = [
     label: 'المحادثات',
     roles: ['customer', 'supplier', 'admin', 'staff'],
     items: [{ to: '/chat', label: 'المحادثات' }],
+  },
+  {
+    label: 'الإشعارات',
+    roles: ['customer', 'supplier', 'agent', 'branch', 'admin', 'staff'],
+    items: [{ to: '/notifications', label: 'مركز الإشعارات' }],
   },
   {
     label: 'المورد',

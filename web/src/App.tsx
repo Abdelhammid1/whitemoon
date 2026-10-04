@@ -44,6 +44,8 @@ import { LogisticsPage } from './pages/logistics/LogisticsPage'
 import { TrackingPage } from './pages/logistics/TrackingPage'
 import { ChatPage } from './pages/comm/ChatPage'
 import { ChatThreadPage } from './pages/comm/ChatThreadPage'
+import { BiDashboardPage } from './pages/bi/BiDashboardPage'
+import { NotificationsPage } from './pages/notifications/NotificationsPage'
 import { ProductsPage } from './pages/inventory/ProductsPage'
 import { OffersPage } from './pages/inventory/OffersPage'
 import { StockPage } from './pages/inventory/StockPage'
@@ -114,6 +116,9 @@ export function App() {
 
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/chat/:id" element={<ChatThreadPage />} />
+
+        <Route path="/dashboard" element={<ProtectedRoute roles={FINANCE}><BiDashboardPage /></ProtectedRoute>} />
+        <Route path="/notifications" element={<NotificationsPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

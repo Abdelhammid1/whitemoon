@@ -90,5 +90,7 @@ ignore = [
 "app/logistics/**/*.py" = ["E501", "PLR2004"]
 "app/comm/**/*.py" = ["E501", "PLR2004"]
 "app/compliance/**/*.py" = ["E501", "PLR2004"]
+"app/bi/**/*.py" = ["E501", "PLR2004"]
+"app/notifications/**/*.py" = ["E501", "PLR2004"]
 "tests/**/*.py" = ["PLR2004", "S101", "ARG001", "E501"]
 "migrations/**/*.py" = ["N999", "E501"]

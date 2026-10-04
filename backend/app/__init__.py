@@ -34,6 +34,7 @@ def _register_blueprints(app: Flask) -> None:
     # without triggering circular model loads at import time.
     from . import models  # noqa: F401 — attach models to metadata
     from .accounting.routes import bp as accounting_bp
+    from .bi.routes import bp as bi_bp
     from .comm.routes import bp as comm_bp
     from .commerce.routes import bp as commerce_bp
     from .compliance.routes import bp as compliance_bp
@@ -41,6 +42,7 @@ def _register_blueprints(app: Flask) -> None:
     from .identity.routes import bp as auth_bp
     from .inventory.routes import bp as inventory_bp
     from .logistics.routes import bp as logistics_bp
+    from .notifications.routes import bp as notifications_bp
     from .partners.routes import bp as partners_bp
     from .pos.routes import bp as pos_bp
     from .production.routes import bp as production_bp
@@ -49,6 +51,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(accounting_bp)
+    app.register_blueprint(bi_bp)
     app.register_blueprint(comm_bp)
     app.register_blueprint(compliance_bp)
     app.register_blueprint(inventory_bp)
@@ -58,6 +61,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(production_bp)
     app.register_blueprint(pos_bp)
     app.register_blueprint(logistics_bp)
+    app.register_blueprint(notifications_bp)
 
 
 def _register_error_handlers(app: Flask) -> None:

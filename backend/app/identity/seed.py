@@ -59,6 +59,9 @@ PERMISSIONS: tuple[tuple[str, str], ...] = (
     ("logistics.deliver", "مندوب التسليم: تحديث الموقع وتأكيد الاستلام"),
     # Communication (EPIC 10)
     ("comm.moderate", "مراقبة المحادثات وإنشاؤها والتدخل عند الحاجة"),
+    # Cross-cutting
+    ("bi.view", "عرض لوحة التحليلات التنفيذية"),
+    ("notify.send", "إرسال إشعار لمستخدم"),
 )
 
 # role_code -> list of permission codes
@@ -81,6 +84,8 @@ ROLE_PERMS: dict[str, tuple[str, ...]] = {
         "comm.moderate",
         "payment.collect",
         "payment.approve",
+        "bi.view",
+        "notify.send",
     ),
     "staff": (
         "user.read",
