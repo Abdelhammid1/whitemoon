@@ -25,13 +25,20 @@ export function UserDetailPage() {
   useEffect(() => {
     let active = true
     setLoading(true)
-    Promise.all([getUser(uid), listAudit({ limit: 300 })])
-      .then(([u, audit]) => {
+    getUser(uid)
+      .then((u) => {
         if (!active) return
         setUser(u)
-        setActivity(
-          audit.items.filter((e) => e.actor_user_id === uid || e.target_id === String(uid)),
-        )
+        // Activity needs the governance (admin.high) audit read; best-effort
+        // so a non-senior viewer still sees the user detail without it.
+        return listAudit({ limit: 300 })
+          .then((audit) => {
+            if (!active) return
+            setActivity(
+              audit.items.filter((e) => e.actor_user_id === uid || e.target_id === String(uid)),
+            )
+          })
+          .catch(() => { /* no audit access — leave activity empty */ })
       })
       .catch((err) => active && setError(err instanceof ApiError ? err.message : 'تعذّر التحميل'))
       .finally(() => active && setLoading(false))

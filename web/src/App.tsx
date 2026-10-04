@@ -47,7 +47,7 @@ export function App() {
         <Route path="/admin/users/:id" element={<ProtectedRoute roles={FINANCE}><UserDetailPage /></ProtectedRoute>} />
         <Route path="/admin/suppliers/pending" element={<ProtectedRoute roles={FINANCE}><PendingSuppliersPage /></ProtectedRoute>} />
         <Route path="/admin/impersonation" element={<ProtectedRoute roles={FINANCE}><ImpersonationPage /></ProtectedRoute>} />
-        <Route path="/admin/audit" element={<ProtectedRoute roles={FINANCE}><AuditLogPage /></ProtectedRoute>} />
+        <Route path="/admin/audit" element={<ProtectedRoute roles={['admin']}><AuditLogPage /></ProtectedRoute>} />
 
         <Route path="/accounting/chart" element={<ProtectedRoute roles={FINANCE}><ChartOfAccountsPage /></ProtectedRoute>} />
         <Route path="/accounting/periods" element={<ProtectedRoute roles={FINANCE}><PeriodsPage /></ProtectedRoute>} />

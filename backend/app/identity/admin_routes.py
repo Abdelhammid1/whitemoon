@@ -88,7 +88,7 @@ def get_user(user_id: int):
 
 
 @bp.get("/audit")
-@require_permission("user.read")
+@require_permission("admin.high")
 def list_audit():
     action = request.args.get("action")
     limit = min(int(request.args.get("limit", "100")), 500)
