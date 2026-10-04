@@ -16,8 +16,9 @@ class SaleLine(BaseModel):
 
 
 class CreateSaleIn(BaseModel):
-    location_type: str = "channel_partner"
-    location_id: int | None = None
+    # No location here: the sale draws from the authenticated cashier's own
+    # channel-partner location, derived server-side (a client-supplied
+    # location would let a cashier sell from another location's stock).
     lines: list[SaleLine] = Field(min_length=1)
 
 

@@ -40,10 +40,13 @@ def _uid() -> int:
 @require_permission("pos.sell")
 def create_sale():
     p = _parse(CreateSaleIn)
+    uid = _uid()
+    # The cashier sells only from their own channel-partner location — the
+    # location is never taken from the request (IDOR on stock otherwise).
     sale = svc.create_sale(
-        cashier_id=_uid(),
-        location_type=p.location_type,
-        location_id=p.location_id,
+        cashier_id=uid,
+        location_type="channel_partner",
+        location_id=uid,
         lines=[
             SaleLineInput(product_id=li.product_id, supplier_id=li.supplier_id, qty=Decimal(str(li.qty)))
             for li in p.lines
