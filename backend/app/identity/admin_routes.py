@@ -7,13 +7,22 @@ from flask_jwt_extended import get_jwt_identity
 from sqlalchemy import or_, select
 
 from ..audit.models import AuditEvent
-from ..common.errors import BadRequest, NotFound, Unauthorized
+from ..common.errors import BadRequest, Conflict, NotFound, Unauthorized
 from ..extensions import db
-from .models import Role, SupplierProfile, User, UserRole
-from .schemas import ImpersonateStartIn, RejectSupplierIn
+from ..identity.services.audit import emit as audit_emit
+from .models import (
+    ChannelPartnerProfile,
+    CustomerProfile,
+    Role,
+    SupplierProfile,
+    User,
+    UserRole,
+)
+from .schemas import AdminCreateUserIn, ImpersonateStartIn, RejectSupplierIn
 from .services import impersonation as imp_svc
+from .services import passwords
 from .services import supplier_approval as supplier_svc
-from .services.rbac import require_permission
+from .services.rbac import assign_role, require_permission
 
 bp = Blueprint("admin", __name__, url_prefix="/admin")
 
@@ -23,6 +32,80 @@ def _current_admin_id() -> int:
     if raw is None:
         raise Unauthorized("No identity", code="no_identity")
     return int(raw)
+
+
+@bp.post("/users")
+@require_permission("admin.high")
+def create_user():
+    """Provision a user with any role from the admin console (T-07)."""
+    body = request.get_json(silent=True) or {}
+    try:
+        payload = AdminCreateUserIn.model_validate(body)
+    except Exception as e:
+        raise BadRequest("Invalid payload", code="validation_error") from e
+    if not payload.phone and not payload.email:
+        raise BadRequest("مطلوب هاتف أو بريد", code="identifier_required")
+
+    # Reject duplicate identifiers up front for a clean error.
+    if payload.email and db.session.execute(
+        select(User).where(User.email == payload.email)
+    ).scalar_one_or_none():
+        raise Conflict("البريد مستخدم بالفعل", code="email_taken")
+    if payload.phone and db.session.execute(
+        select(User).where(User.phone == payload.phone)
+    ).scalar_one_or_none():
+        raise Conflict("الهاتف مستخدم بالفعل", code="phone_taken")
+
+    # Every requested role must exist.
+    for code in payload.roles:
+        if db.session.execute(select(Role).where(Role.code == code)).scalar_one_or_none() is None:
+            raise BadRequest(f"دور غير معروف: {code}", code="unknown_role")
+
+    user = User(
+        phone=payload.phone,
+        email=payload.email,
+        password_hash=passwords.hash_password(payload.password),
+        kind=payload.kind,
+        status=payload.status,
+    )
+    db.session.add(user)
+    db.session.flush()
+
+    # Minimal matching profile so downstream joins resolve.
+    if payload.kind == "customer":
+        db.session.add(CustomerProfile(user_id=user.id, display_name=payload.display_name))
+    elif payload.kind == "supplier":
+        db.session.add(
+            SupplierProfile(
+                user_id=user.id,
+                legal_name=payload.display_name,
+                commercial_register_no="",
+                tax_card_no="",
+                national_id="",
+                approval_status="approved",
+            )
+        )
+    elif payload.kind in ("agent", "branch"):
+        db.session.add(
+            ChannelPartnerProfile(
+                user_id=user.id, type=payload.kind, display_name=payload.display_name
+            )
+        )
+
+    for code in payload.roles:
+        assign_role(user.id, code)
+
+    audit_emit(
+        "admin.user.created",
+        actor_user_id=_current_admin_id(),
+        target_type="user",
+        target_id=user.id,
+        after={"kind": payload.kind, "roles": payload.roles, "status": payload.status},
+    )
+    db.session.commit()
+    return jsonify(
+        {"id": user.id, "kind": user.kind, "status": user.status, "roles": payload.roles}
+    ), 201
 
 
 @bp.get("/users")

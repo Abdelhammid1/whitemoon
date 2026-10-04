@@ -52,3 +52,42 @@ def browse(*, q: str | None = None, category: str | None = None, limit: int = 10
         }
         for (product, best_price) in rows
     ]
+
+
+def related_products(product_id: int, *, limit: int = 8) -> list[dict[str, Any]]:
+    """Cross-sell suggestions (US-4.5, T-03): other active products in the same
+    category, with a best price and no supplier identity."""
+    product = db.session.get(Product, product_id)
+    if product is None:
+        return []
+    best = (
+        select(
+            SupplierOffer.product_id.label("pid"),
+            func.min(SupplierOffer.unit_price).label("best_price"),
+        )
+        .where(SupplierOffer.is_active.is_(True))
+        .group_by(SupplierOffer.product_id)
+        .subquery()
+    )
+    stmt = (
+        select(Product, best.c.best_price)
+        .join(best, best.c.pid == Product.id)
+        .where(
+            Product.is_active.is_(True),
+            Product.category == product.category,
+            Product.id != product_id,
+        )
+        .order_by(Product.id.desc())
+        .limit(limit)
+    )
+    rows = db.session.execute(stmt).all()
+    return [
+        {
+            "product_id": p.id,
+            "sku": p.sku,
+            "name_ar": p.name_ar,
+            "category": p.category,
+            "best_price": str(bp),
+        }
+        for (p, bp) in rows
+    ]

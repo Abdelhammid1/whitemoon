@@ -22,6 +22,7 @@ from .schemas import (
     ShortageResolveIn,
     StockAdjustIn,
     TransferOrderIn,
+    VariantIn,
 )
 from .services import offers as offers_svc
 from .services import products as products_svc
@@ -66,6 +67,11 @@ def create_product():
         eta_code=payload.eta_code,
         food_expiry_tracked=payload.food_expiry_tracked,
         created_by=_uid(),
+        subcategory=payload.subcategory,
+        brand=payload.brand,
+        barcode=payload.barcode,
+        description=payload.description,
+        image_url=payload.image_url,
     )
     audit_emit(
         "inventory.product.create",
@@ -74,6 +80,26 @@ def create_product():
         target_id=product.id,
     )
     return jsonify(products_svc.serialize(product)), 201
+
+
+@bp.post("/products/<int:product_id>/variants")
+@require_permission("product.manage")
+def add_variant(product_id: int):
+    payload = _parse(VariantIn)
+    v = products_svc.add_variant(
+        product_id=product_id,
+        sku=payload.sku,
+        barcode=payload.barcode,
+        size=payload.size,
+        color=payload.color,
+    )
+    audit_emit(
+        "inventory.variant.create",
+        actor_user_id=_uid(),
+        target_type="product_variant",
+        target_id=v.id,
+    )
+    return jsonify({"id": v.id, "product_id": v.product_id, "sku": v.sku}), 201
 
 
 @bp.get("/products")

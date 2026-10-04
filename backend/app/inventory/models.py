@@ -76,6 +76,41 @@ class Product(Base, TimestampMixin):
     created_by: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("identity.users.id")
     )
+    # Richer catalog fields (T-10). Category stays food/clothing; subcategory
+    # is free text for finer classification.
+    subcategory: Mapped[str | None] = mapped_column(String(120))
+    brand: Mapped[str | None] = mapped_column(String(120))
+    barcode: Mapped[str | None] = mapped_column(String(60))
+    description: Mapped[str | None] = mapped_column(String(2000))
+    image_url: Mapped[str | None] = mapped_column(String(500))
+
+    variants: Mapped[list[ProductVariant]] = relationship(
+        back_populates="product", cascade="all, delete-orphan", order_by="ProductVariant.id"
+    )
+
+
+class ProductVariant(Base, TimestampMixin):
+    """A sellable variant of a product — size/color with its own SKU/barcode
+    (T-10). Stock/pricing still key off the parent product in this version."""
+
+    __tablename__ = "product_variants"
+    __table_args__ = (
+        UniqueConstraint("sku", name="uq_product_variants_sku"),
+        Index("ix_product_variants_product", "product_id"),
+        {"schema": "inventory"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    product_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("inventory.products.id"), nullable=False
+    )
+    sku: Mapped[str] = mapped_column(String(60), nullable=False)
+    barcode: Mapped[str | None] = mapped_column(String(60))
+    size: Mapped[str | None] = mapped_column(String(60))
+    color: Mapped[str | None] = mapped_column(String(60))
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
+    product: Mapped[Product] = relationship(back_populates="variants")
 
 
 # ---------------------------------------------------------------- Supplier offers

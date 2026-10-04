@@ -17,6 +17,8 @@ from ..identity.services.audit import emit as audit_emit
 from ..identity.services.rbac import require_permission
 from .models import Account, BankReceipt, DeferredTerm, Period
 from .schemas import (
+    AccountCreateIn,
+    AccountUpdateIn,
     ApplyEarlyDiscountIn,
     DeferredTermsIn,
     ManualJournalIn,
@@ -84,6 +86,77 @@ def list_accounts():
             ]
         }
     )
+
+
+@bp.post("/accounts")
+@require_permission("admin.high")
+def create_account():
+    """Open a new account under an existing parent (T-09). The parent must
+    exist (no account outside the approved tree); the child inherits the
+    parent's type."""
+    payload = _parse(AccountCreateIn)
+    if db.session.execute(
+        select(Account).where(Account.code == payload.code)
+    ).scalar_one_or_none():
+        raise BadRequest("الكود مستخدم بالفعل", code="account_code_taken")
+    parent = db.session.execute(
+        select(Account).where(Account.code == payload.parent_code)
+    ).scalar_one_or_none()
+    if parent is None:
+        raise BadRequest(
+            "الحساب الأب غير موجود — لا حساب خارج الشجرة المعتمدة",
+            code="parent_not_found",
+        )
+    acc = Account(
+        code=payload.code,
+        name_ar=payload.name_ar,
+        name_en=payload.name_en or payload.name_ar,
+        type=parent.type,  # inherit — a child of assets is an asset
+        parent_id=parent.id,
+        is_postable=payload.is_postable,
+        category=payload.category,
+        eta_code=payload.eta_code,
+    )
+    db.session.add(acc)
+    db.session.flush()
+    audit_emit(
+        "accounting.account.created",
+        actor_user_id=_current_user_id(),
+        target_type="account",
+        target_id=acc.id,
+        after={"code": acc.code, "type": acc.type, "parent": parent.code},
+    )
+    db.session.commit()
+    return jsonify({"id": acc.id, "code": acc.code, "type": acc.type}), 201
+
+
+@bp.put("/accounts/<code>")
+@require_permission("admin.high")
+def update_account(code: str):
+    payload = _parse(AccountUpdateIn)
+    acc = db.session.execute(
+        select(Account).where(Account.code == code)
+    ).scalar_one_or_none()
+    if acc is None:
+        raise BadRequest("الحساب غير موجود", code="account_not_found")
+    if payload.name_ar is not None:
+        acc.name_ar = payload.name_ar
+    if payload.name_en is not None:
+        acc.name_en = payload.name_en
+    if payload.is_postable is not None:
+        acc.is_postable = payload.is_postable
+    if payload.category is not None:
+        acc.category = payload.category
+    if payload.eta_code is not None:
+        acc.eta_code = payload.eta_code
+    audit_emit(
+        "accounting.account.updated",
+        actor_user_id=_current_user_id(),
+        target_type="account",
+        target_id=acc.id,
+    )
+    db.session.commit()
+    return jsonify({"id": acc.id, "code": acc.code})
 
 
 @bp.get("/periods")

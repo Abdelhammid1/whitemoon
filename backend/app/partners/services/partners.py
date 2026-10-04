@@ -20,8 +20,10 @@ from ...commerce.models import Order
 from ...common.errors import BadRequest, Conflict, NotFound
 from ...common.money import to_money
 from ...extensions import db
-from ...identity.models import ChannelPartnerProfile
+from ...identity.models import ChannelPartnerProfile, CustomerProfile, User
+from ...identity.services import passwords
 from ...identity.services.audit import emit as audit_emit
+from ...identity.services.rbac import assign_role
 from ..models import PartnerAccrual, PartnerDeposit, PartnerTerms
 
 # A sale counts toward a partner's accrual basis once it is realized —
@@ -51,6 +53,70 @@ def _require_partner(partner_id: int) -> ChannelPartnerProfile:
     prof = db.session.get(ChannelPartnerProfile, partner_id)
     if prof is None:
         raise NotFound("ليس شريك قناة (وكيل/فرع)", code="not_a_partner")
+    return prof
+
+
+# ---------------------------------------------------------------- creation
+
+
+def create_partner(
+    *,
+    type_: str,
+    display_name: str,
+    geo_scope: str | None,
+    phone: str | None,
+    email: str | None,
+    password: str,
+    earns_commission: bool,
+    commission_rate_pct: Decimal,
+    earns_investment_return: bool,
+    investment_return_rate_pct: Decimal,
+    actor_user_id: int,
+) -> ChannelPartnerProfile:
+    """Provision a new agent/branch: login user + profile + terms (T-08)."""
+    if type_ not in ("agent", "branch"):
+        raise BadRequest("النوع يجب أن يكون وكيل أو فرع", code="bad_partner_type")
+    if not phone and not email:
+        raise BadRequest("مطلوب هاتف أو بريد", code="identifier_required")
+    if email and db.session.execute(select(User).where(User.email == email)).scalar_one_or_none():
+        raise Conflict("البريد مستخدم بالفعل", code="email_taken")
+    if phone and db.session.execute(select(User).where(User.phone == phone)).scalar_one_or_none():
+        raise Conflict("الهاتف مستخدم بالفعل", code="phone_taken")
+
+    user = User(
+        phone=phone,
+        email=email,
+        password_hash=passwords.hash_password(password),
+        kind=type_,
+        status="active",
+    )
+    db.session.add(user)
+    db.session.flush()
+    prof = ChannelPartnerProfile(
+        user_id=user.id, type=type_, display_name=display_name, geo_scope=geo_scope
+    )
+    db.session.add(prof)
+    assign_role(user.id, type_)
+
+    # A branch earns neither; an agent gets the terms as given.
+    terms = PartnerTerms(partner_user_id=user.id)
+    if type_ == "agent":
+        terms.earns_commission = earns_commission
+        terms.commission_rate_pct = commission_rate_pct if earns_commission else Decimal("0")
+        terms.earns_investment_return = earns_investment_return
+        terms.investment_return_rate_pct = (
+            investment_return_rate_pct if earns_investment_return else Decimal("0")
+        )
+    db.session.add(terms)
+
+    audit_emit(
+        "partner.created",
+        actor_user_id=actor_user_id,
+        target_type="partner",
+        target_id=user.id,
+        after={"type": type_, "geo_scope": geo_scope},
+    )
+    db.session.commit()
     return prof
 
 
@@ -361,6 +427,22 @@ def attribute_order(*, order_id: int, partner_id: int, actor_user_id: int) -> Or
 # ---------------------------------------------------------------- serializers
 
 
+def serialize_partner(p: ChannelPartnerProfile) -> dict[str, Any]:
+    return {
+        "partner_id": p.user_id,
+        "type": p.type,
+        "display_name": p.display_name,
+        "geo_scope": p.geo_scope,
+    }
+
+
+def list_partners(type_: str | None = None) -> list[ChannelPartnerProfile]:
+    stmt = select(ChannelPartnerProfile).order_by(ChannelPartnerProfile.user_id)
+    if type_:
+        stmt = stmt.where(ChannelPartnerProfile.type == type_)
+    return list(db.session.execute(stmt).scalars())
+
+
 def serialize_terms(t: PartnerTerms) -> dict[str, Any]:
     return {
         "partner_id": t.partner_user_id,
@@ -394,6 +476,23 @@ def serialize_accrual(a: PartnerAccrual) -> dict[str, Any]:
         "amount": str(a.amount),
         "computed_at": a.computed_at.isoformat(),
     }
+
+
+def is_partner(user_id: int) -> bool:
+    return db.session.get(ChannelPartnerProfile, user_id) is not None
+
+
+def customer_in_scope(partner_user_id: int, customer_id: int) -> bool:
+    """True when the customer's geo_area matches the partner's geo_scope
+    (T-01). A partner with no scope, or a customer with no area, is out of
+    scope — access is denied rather than leaked."""
+    prof = db.session.get(ChannelPartnerProfile, partner_user_id)
+    if prof is None or not prof.geo_scope:
+        return False
+    cp = db.session.get(CustomerProfile, customer_id)
+    if cp is None or not cp.geo_area:
+        return False
+    return cp.geo_area.strip() == prof.geo_scope.strip()
 
 
 def is_partner_self(user_id: int, partner_id: int) -> bool:

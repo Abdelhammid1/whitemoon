@@ -14,6 +14,7 @@ Design rules enforced here:
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
@@ -106,6 +107,11 @@ class SupplierProfile(Base, TimestampMixin):
     commercial_register_no: Mapped[str] = mapped_column(String(60), nullable=False)
     tax_card_no: Mapped[str] = mapped_column(String(60), nullable=False)
     national_id: Mapped[str] = mapped_column(String(60), nullable=False)
+    # Minimum order value per supplier (T-03, US-4.5): a sub-order below this
+    # is blocked at checkout. 0 = no minimum.
+    min_order_value: Mapped[Decimal] = mapped_column(
+        Numeric(18, 4), nullable=False, default=0, server_default="0"
+    )
     approval_status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
     approved_by: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("identity.users.id")
@@ -127,6 +133,9 @@ class CustomerProfile(Base, TimestampMixin):
     )
     display_name: Mapped[str] = mapped_column(String(200), nullable=False)
     default_shipping_address_id: Mapped[int | None] = mapped_column(BigInteger)
+    # Geographic area (governorate/region) used to scope agent/branch access
+    # to their assigned territory (T-01, US-1.8).
+    geo_area: Mapped[str | None] = mapped_column(String(200))
 
     user: Mapped[User] = relationship(back_populates="customer_profile")
 

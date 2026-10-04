@@ -7,6 +7,20 @@ from datetime import date
 from pydantic import BaseModel, Field
 
 
+class CreatePartnerIn(BaseModel):
+    type: str = Field(pattern="^(agent|branch)$")
+    display_name: str = Field(min_length=1, max_length=200)
+    geo_scope: str | None = Field(default=None, max_length=200)
+    phone: str | None = None
+    email: str | None = None
+    password: str = Field(min_length=8, max_length=128)
+    # Terms (agents only; ignored/zeroed for a branch).
+    earns_commission: bool = False
+    commission_rate_pct: float = Field(default=0, ge=0, le=100)
+    earns_investment_return: bool = False
+    investment_return_rate_pct: float = Field(default=0, ge=0, le=100)
+
+
 class TermsIn(BaseModel):
     earns_commission: bool = False
     commission_rate_pct: float = Field(default=0, ge=0, le=100)

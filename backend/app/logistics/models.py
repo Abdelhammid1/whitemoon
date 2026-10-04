@@ -90,6 +90,37 @@ class Shipment(Base, TimestampMixin):
     shortages: Mapped[list[DeliveryShortage]] = relationship(
         back_populates="shipment", cascade="all, delete-orphan", order_by="DeliveryShortage.id"
     )
+    legs: Mapped[list[ShipmentLeg]] = relationship(
+        cascade="all, delete-orphan", order_by="ShipmentLeg.seq"
+    )
+
+
+class ShipmentLeg(Base):
+    """One leg of a shipment's journey, each with its own carrier (T-05,
+    US-9.4). A shipment can mix an internal leg and an external leg; the
+    shipment's own status stays the single unified status the customer sees."""
+
+    __tablename__ = "shipment_legs"
+    __table_args__ = (
+        UniqueConstraint("shipment_id", "seq", name="uq_shipment_legs_seq"),
+        CheckConstraint("carrier_type in ('internal','external')", name="ck_shipment_legs_carrier"),
+        CheckConstraint(
+            "status in ('pending','in_transit','done')", name="ck_shipment_legs_status"
+        ),
+        Index("ix_shipment_legs_shipment", "shipment_id"),
+        {"schema": "logistics"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    shipment_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("logistics.shipments.id"), nullable=False
+    )
+    seq: Mapped[int] = mapped_column(Integer, nullable=False)
+    carrier_type: Mapped[str] = mapped_column(String(10), nullable=False)
+    carrier_ref: Mapped[str | None] = mapped_column(String(120))
+    from_label: Mapped[str | None] = mapped_column(String(200))
+    to_label: Mapped[str | None] = mapped_column(String(200))
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="pending")
 
 
 class DeliveryShortage(Base):

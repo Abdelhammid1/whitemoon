@@ -28,6 +28,13 @@ class LocationIn(BaseModel):
     lng: float = Field(ge=-180, le=180)
 
 
+class AddLegIn(BaseModel):
+    carrier_type: str = Field(pattern="^(internal|external)$")
+    carrier_ref: str | None = Field(default=None, max_length=120)
+    from_label: str | None = Field(default=None, max_length=200)
+    to_label: str | None = Field(default=None, max_length=200)
+
+
 class ShortageLine(BaseModel):
     product_id: int = Field(gt=0)
     qty: float = Field(gt=0)

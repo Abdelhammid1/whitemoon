@@ -57,6 +57,12 @@ def catalog_products():
     return jsonify({"items": items})
 
 
+@bp.get("/catalog/products/<int:product_id>/related")
+@jwt_required()
+def catalog_related(product_id: int):
+    return jsonify({"items": catalog_svc.related_products(product_id)})
+
+
 # ================================================================ cart
 
 
@@ -107,6 +113,67 @@ def checkout():
 def list_orders():
     orders = orders_svc.list_orders(_uid())
     return jsonify({"items": [orders_svc.serialize_order(o, for_customer=True) for o in orders]})
+
+
+@bp.get("/commerce/supplier/orders")
+@jwt_required()
+def supplier_orders():
+    """The signed-in supplier's sub-orders with live status (T-06)."""
+    uid = _uid()
+    if not has_permission(uid, "offer.manage"):
+        raise Forbidden("للموردين فقط", code="suppliers_only")
+    return jsonify({"items": orders_svc.supplier_dashboard(uid)})
+
+
+@bp.get("/commerce/customers/<int:customer_id>/statement")
+@jwt_required()
+def customer_statement(customer_id: int):
+    """Unified customer file: profile + order history + dues (T-04).
+
+    Access: the customer themselves, finance/admin (user.read), or an
+    agent/branch **only** for a customer inside their geo territory (T-01)."""
+    from ..identity.models import CustomerProfile
+    from ..partners.services import partners as partners_svc
+    from ..sales.models import CustomerDue
+
+    uid = _uid()
+    allowed = (
+        uid == customer_id
+        or has_permission(uid, "user.read")
+        or (partners_svc.is_partner(uid) and partners_svc.customer_in_scope(uid, customer_id))
+    )
+    if not allowed:
+        raise Forbidden("خارج النطاق المصرح", code="out_of_scope")
+
+    profile = db.session.get(CustomerProfile, customer_id)
+    orders = orders_svc.list_orders(customer_id)
+    dues = db.session.execute(
+        db.select(CustomerDue).where(CustomerDue.customer_id == customer_id).order_by(CustomerDue.id.desc())
+    ).scalars().all()
+    outstanding = sum(
+        (Decimal(str(d.amount)) for d in dues if d.status == "open"), start=Decimal("0")
+    )
+    return jsonify(
+        {
+            "customer_id": customer_id,
+            "profile": {
+                "display_name": profile.display_name if profile else None,
+                "geo_area": profile.geo_area if profile else None,
+            },
+            "orders": [orders_svc.serialize_order(o, for_customer=True) for o in orders],
+            "dues": [
+                {
+                    "id": d.id,
+                    "amount": str(d.amount),
+                    "due_date": d.due_date.isoformat(),
+                    "status": d.status,
+                    "days_late": d.days_late,
+                }
+                for d in dues
+            ],
+            "outstanding": str(outstanding),
+        }
+    )
 
 
 @bp.get("/commerce/orders/<int:order_id>")

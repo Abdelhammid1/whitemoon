@@ -17,7 +17,7 @@ from pydantic import ValidationError
 
 from ..common.errors import ApiError, BadRequest, Forbidden, Unauthorized
 from ..identity.services.rbac import has_permission, require_permission
-from .schemas import BookSlotIn, ConfirmDeliveryIn, CreateSlotIn, LocationIn, StatusIn
+from .schemas import AddLegIn, BookSlotIn, ConfirmDeliveryIn, CreateSlotIn, LocationIn, StatusIn
 from .services import logistics as svc
 from .services.logistics import ShortageInput
 
@@ -98,6 +98,20 @@ def set_status(shipment_id: int):
     p = _parse(StatusIn)
     s = svc.update_status(shipment_id=shipment_id, status=p.status, actor_user_id=_uid())
     return jsonify({"id": s.id, "status": s.status})
+
+
+@bp.post("/shipments/<int:shipment_id>/legs")
+@require_permission("logistics.manage")
+def add_leg(shipment_id: int):
+    p = _parse(AddLegIn)
+    leg = svc.add_leg(
+        shipment_id=shipment_id,
+        carrier_type=p.carrier_type,
+        carrier_ref=p.carrier_ref,
+        from_label=p.from_label,
+        to_label=p.to_label,
+    )
+    return jsonify({"id": leg.id, "seq": leg.seq, "carrier_type": leg.carrier_type})
 
 
 @bp.post("/shipments/<int:shipment_id>/location")

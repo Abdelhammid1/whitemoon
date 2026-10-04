@@ -21,6 +21,18 @@ class ProductIn(BaseModel):
     unit: str = "piece"
     eta_code: str | None = None
     food_expiry_tracked: bool = False
+    subcategory: str | None = Field(default=None, max_length=120)
+    brand: str | None = Field(default=None, max_length=120)
+    barcode: str | None = Field(default=None, max_length=60)
+    description: str | None = Field(default=None, max_length=2000)
+    image_url: str | None = Field(default=None, max_length=500)
+
+
+class VariantIn(BaseModel):
+    sku: str = Field(min_length=1, max_length=60)
+    barcode: str | None = Field(default=None, max_length=60)
+    size: str | None = Field(default=None, max_length=60)
+    color: str | None = Field(default=None, max_length=60)
 
 
 class OfferIn(BaseModel):

@@ -45,6 +45,7 @@ from .identity.models import (
 from .inventory.models import (
     Batch,
     Product,
+    ProductVariant,
     ReorderAlert,
     Shortage,
     StockBalance,
@@ -56,6 +57,7 @@ from .logistics.models import (
     DeliveryShortage,
     DeliverySlot,
     Shipment,
+    ShipmentLeg,
 )
 from .partners.models import (
     PartnerAccrual,
@@ -74,9 +76,11 @@ from .production.models import (
 )
 from .sales.models import (
     CreditOverride,
+    CreditTierSetting,
     CustomerCreditTier,
     CustomerDue,
     EscalationEvent,
+    PaymentApproval,
 )
 
 __all__ = [
@@ -90,6 +94,7 @@ __all__ = [
     "ChannelPartnerProfile",
     "Conversation",
     "CreditOverride",
+    "CreditTierSetting",
     "CustomerCreditTier",
     "CustomerDue",
     "CustomerProfile",
@@ -112,6 +117,7 @@ __all__ = [
     "PartnerAccrual",
     "PartnerDeposit",
     "PartnerTerms",
+    "PaymentApproval",
     "Period",
     "Permission",
     "PosBatch",
@@ -119,6 +125,7 @@ __all__ = [
     "PosSaleLine",
     "PriceLock",
     "Product",
+    "ProductVariant",
     "ReorderAlert",
     "Rfq",
     "RfqOffer",
@@ -126,6 +133,7 @@ __all__ = [
     "RolePermission",
     "Session",
     "Shipment",
+    "ShipmentLeg",
     "Shortage",
     "StockBalance",
     "SupplierOffer",

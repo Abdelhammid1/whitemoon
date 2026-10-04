@@ -58,6 +58,28 @@ class CustomerCreditTier(Base, TimestampMixin):
     last_recomputed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class CreditTierSetting(Base, TimestampMixin):
+    """Admin-configurable default limit + deferred % per colour tier (T-11).
+
+    Seeded from the signed defaults; editable from the UI so a limit change
+    doesn't need a code deploy. `credit.py` reads this, falling back to the
+    coded defaults when a row is missing."""
+
+    __tablename__ = "credit_tier_settings"
+    __table_args__ = (
+        CheckConstraint("tier in ('white','green','yellow','red')", name="ck_tier_settings_tier"),
+        CheckConstraint("currency = 'EGP'", name="ck_tier_settings_currency_egp"),
+        {"schema": "sales"},
+    )
+
+    tier: Mapped[str] = mapped_column(String(10), primary_key=True)
+    credit_limit: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
+    deferred_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(
+        String(3), nullable=False, default="EGP", server_default="EGP"
+    )
+
+
 class CreditOverride(Base, TimestampMixin):
     """Manual credit-limit exception (US-5.2) — reason + actor always logged."""
 
@@ -109,6 +131,43 @@ class CustomerDue(Base, TimestampMixin):
     paid_date: Mapped[date | None] = mapped_column(Date)
     days_late: Mapped[int | None] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(10), nullable=False, default="open")
+
+
+class PaymentApproval(Base, TimestampMixin):
+    """A customer payment collected by an agent/branch that needs exactly one
+    approval (the branch/agent manager) before it is applied — no intermediate
+    level (US-3.2b, T-02). The collector may not approve their own."""
+
+    __tablename__ = "payment_approvals"
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_payment_approvals_amount_positive"),
+        CheckConstraint(
+            "status in ('pending','approved','rejected')", name="ck_payment_approvals_status"
+        ),
+        CheckConstraint("currency = 'EGP'", name="ck_payment_approvals_currency_egp"),
+        Index("ix_payment_approvals_status", "status"),
+        {"schema": "sales"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("identity.users.id"), nullable=False
+    )
+    due_id: Mapped[int | None] = mapped_column(BigInteger)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
+    currency: Mapped[str] = mapped_column(
+        String(3), nullable=False, default="EGP", server_default="EGP"
+    )
+    paid_on: Mapped[date] = mapped_column(Date, nullable=False)
+    collected_by: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("identity.users.id"), nullable=False
+    )
+    status: Mapped[str] = mapped_column(String(10), nullable=False, default="pending")
+    approved_by: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("identity.users.id")
+    )
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    note: Mapped[str | None] = mapped_column(String(1000))
 
 
 class EscalationEvent(Base):

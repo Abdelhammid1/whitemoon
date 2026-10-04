@@ -19,15 +19,56 @@ from ...common.errors import BadRequest, Forbidden, NotFound
 from ...common.money import to_money
 from ...extensions import db
 from ...identity.models import User
-from ..models import CreditOverride, CustomerCreditTier, CustomerDue
+from ..models import CreditOverride, CreditTierSetting, CustomerCreditTier, CustomerDue
 
-# tier -> (default credit limit EGP, deferred % allowed)
+# tier -> (default credit limit EGP, deferred % allowed). These are the coded
+# fallback; the live values come from `sales.credit_tier_settings` (T-11) and
+# are editable from the admin UI without a deploy.
 TIER_LIMITS: dict[str, tuple[Decimal, Decimal]] = {
     "green": (Decimal("500000"), Decimal("100")),
     "white": (Decimal("250000"), Decimal("60")),
     "yellow": (Decimal("100000"), Decimal("40")),
     "red": (Decimal("0"), Decimal("0")),
 }
+
+
+def tier_defaults(tier: str) -> tuple[Decimal, Decimal]:
+    """Live limit + deferred % for a tier: the DB setting if present, else the
+    coded fallback (so a fresh DB / tests still work)."""
+    row = db.session.get(CreditTierSetting, tier)
+    if row is not None:
+        return to_money(row.credit_limit), to_money(row.deferred_pct)
+    return TIER_LIMITS[tier]
+
+
+def seed_tier_settings() -> None:
+    """Insert the signed defaults for any tier not yet configured."""
+    for tier, (limit, pct) in TIER_LIMITS.items():
+        if db.session.get(CreditTierSetting, tier) is None:
+            db.session.add(CreditTierSetting(tier=tier, credit_limit=limit, deferred_pct=pct))
+    db.session.flush()
+
+
+def set_tier_setting(*, tier: str, credit_limit: Decimal, deferred_pct: Decimal) -> CreditTierSetting:
+    if tier not in TIER_LIMITS:
+        raise BadRequest("تصنيف غير صالح", code="bad_tier")
+    row = db.session.get(CreditTierSetting, tier)
+    if row is None:
+        row = CreditTierSetting(tier=tier, credit_limit=to_money(credit_limit), deferred_pct=to_money(deferred_pct))
+        db.session.add(row)
+    else:
+        row.credit_limit = to_money(credit_limit)
+        row.deferred_pct = to_money(deferred_pct)
+    db.session.commit()
+    return row
+
+
+def all_tier_settings() -> list[dict[str, Any]]:
+    out = []
+    for tier in ("green", "white", "yellow", "red"):
+        limit, pct = tier_defaults(tier)
+        out.append({"tier": tier, "credit_limit": str(limit), "deferred_pct": str(pct)})
+    return out
 
 WINDOW_DAYS = 365
 MIN_HISTORY = 3
@@ -130,7 +171,7 @@ def classify(customer_id: int) -> Classification:
 
 def recompute(customer_id: int) -> CustomerCreditTier:
     c = classify(customer_id)
-    limit, pct = TIER_LIMITS[c.tier]
+    limit, pct = tier_defaults(c.tier)
     row = db.session.execute(
         select(CustomerCreditTier).where(CustomerCreditTier.customer_id == customer_id)
     ).scalar_one_or_none()

@@ -34,6 +34,8 @@ PERMISSIONS: tuple[tuple[str, str], ...] = (
     ("supplier.approve", "اعتماد أو رفض حساب مورد"),
     ("credit.override", "استثناء على السقف الائتماني"),
     ("credit.manage", "تسجيل سداد الذمم وإعادة احتساب التصنيف وتشغيل التصعيد"),
+    ("payment.collect", "تحصيل سداد من عميل (وكيل/فرع/موظف)"),
+    ("payment.approve", "اعتماد تحصيل السداد (مستوى واحد قبل الشركة)"),
     ("period.close", "إقفال فترة محاسبية"),
     ("period.reopen", "إعادة فتح فترة مُقفلة"),
     ("high.manual_journal", "قيد يدوي استثنائي"),
@@ -77,6 +79,8 @@ ROLE_PERMS: dict[str, tuple[str, ...]] = {
         "logistics.manage",
         "logistics.deliver",
         "comm.moderate",
+        "payment.collect",
+        "payment.approve",
     ),
     "staff": (
         "user.read",
@@ -86,11 +90,12 @@ ROLE_PERMS: dict[str, tuple[str, ...]] = {
         "pos.sell",
         "logistics.manage",
         "logistics.deliver",
+        "payment.collect",
     ),
     "customer": (),
     "supplier": ("offer.manage",),
-    "agent": ("pos.sell",),
-    "branch": ("pos.sell",),
+    "agent": ("pos.sell", "payment.collect", "payment.approve"),
+    "branch": ("pos.sell", "payment.collect", "payment.approve"),
 }
 
 

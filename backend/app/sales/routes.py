@@ -13,13 +13,37 @@ from sqlalchemy import select
 from ..common.errors import ApiError, BadRequest, Unauthorized
 from ..extensions import db
 from ..identity.services.audit import emit as audit_emit
-from ..identity.services.rbac import require_permission
+from ..identity.services.rbac import has_permission, require_permission
 from .models import EscalationEvent
-from .schemas import FreezeIn, OverrideIn, PaymentIn
+from .schemas import (
+    CollectPaymentIn,
+    FreezeIn,
+    OverrideIn,
+    PaymentIn,
+    RejectPaymentIn,
+    TierSettingIn,
+)
 from .services import credit as credit_svc
 from .services import escalation as esc_svc
+from .services import payments as pay_svc
 
 bp = Blueprint("credit", __name__, url_prefix="/credit")
+
+
+@bp.get("/tier-settings")
+@require_permission("user.read")
+def get_tier_settings():
+    return jsonify({"items": credit_svc.all_tier_settings()})
+
+
+@bp.put("/tier-settings/<tier>")
+@require_permission("admin.high")
+def put_tier_setting(tier: str):
+    p = TierSettingIn.model_validate(request.get_json(silent=True) or {})
+    row = credit_svc.set_tier_setting(tier=tier, credit_limit=p.credit_limit, deferred_pct=p.deferred_pct)
+    audit_emit("credit.tier_setting.updated", actor_user_id=_uid(), target_type="credit_tier", target_id=row.tier)
+    db.session.commit()
+    return jsonify({"tier": row.tier, "credit_limit": str(row.credit_limit), "deferred_pct": str(row.deferred_pct)})
 
 
 def _parse(model_cls: Any) -> Any:
@@ -98,6 +122,49 @@ def list_escalations(customer_id: int):
         select(EscalationEvent).where(EscalationEvent.customer_id == customer_id).order_by(EscalationEvent.id.desc())
     ).scalars().all()
     return jsonify({"items": [esc_svc.serialize_event(e) for e in rows]})
+
+
+# ---------------------------------------------------------------- payments (T-02)
+
+
+@bp.post("/payments/collect")
+@require_permission("payment.collect")
+def collect_payment():
+    p = _parse(CollectPaymentIn)
+    row = pay_svc.collect_payment(
+        customer_id=p.customer_id,
+        due_id=p.due_id,
+        amount=p.amount,
+        paid_on=p.paid_on,
+        collected_by=_uid(),
+    )
+    return jsonify(pay_svc.serialize(row)), 201
+
+
+@bp.get("/payments")
+@require_permission("payment.collect")
+def list_payments():
+    uid = _uid()
+    status = request.args.get("status")
+    # Finance/admin see all; a partner/collector sees only what they collected.
+    scope = None if has_permission(uid, "user.read") else uid
+    rows = pay_svc.list_approvals(status=status, collected_by=scope)
+    return jsonify({"items": [pay_svc.serialize(r) for r in rows]})
+
+
+@bp.post("/payments/<int:approval_id>/approve")
+@require_permission("payment.approve")
+def approve_payment(approval_id: int):
+    row = pay_svc.approve_payment(approval_id=approval_id, approver_id=_uid())
+    return jsonify(pay_svc.serialize(row))
+
+
+@bp.post("/payments/<int:approval_id>/reject")
+@require_permission("payment.approve")
+def reject_payment(approval_id: int):
+    p = _parse(RejectPaymentIn)
+    row = pay_svc.reject_payment(approval_id=approval_id, approver_id=_uid(), reason=p.reason)
+    return jsonify(pay_svc.serialize(row))
 
 
 @bp.app_errorhandler(ApiError)

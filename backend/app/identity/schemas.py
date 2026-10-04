@@ -17,6 +17,23 @@ class RegisterCustomerIn(BaseModel):
         return v.strip() if v else v
 
 
+class AdminCreateUserIn(BaseModel):
+    """Admin-provisioned user (T-07) — any role, created active by default."""
+
+    kind: str = Field(pattern="^(customer|supplier|agent|branch|staff|admin)$")
+    roles: list[str] = Field(min_length=1)
+    phone: str | None = None
+    email: EmailStr | None = None
+    password: str = Field(min_length=8, max_length=128)
+    display_name: str = Field(min_length=1, max_length=200)
+    status: str = Field(default="active", pattern="^(active|pending|suspended)$")
+
+    @field_validator("phone")
+    @classmethod
+    def _trim_phone(cls, v: str | None) -> str | None:
+        return v.strip() if v else v
+
+
 class RegisterSupplierIn(BaseModel):
     phone: str | None = None
     email: EmailStr | None = None

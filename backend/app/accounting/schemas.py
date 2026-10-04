@@ -8,6 +8,26 @@ from decimal import Decimal
 from pydantic import BaseModel, Field, field_validator
 
 
+class AccountCreateIn(BaseModel):
+    """Open a new account under an existing one (T-09)."""
+
+    code: str = Field(min_length=1, max_length=10)
+    name_ar: str = Field(min_length=1, max_length=200)
+    name_en: str = Field(default="", max_length=200)
+    parent_code: str = Field(min_length=1, max_length=10)
+    is_postable: bool = True
+    category: str | None = Field(default=None, max_length=40)
+    eta_code: str | None = Field(default=None, max_length=60)
+
+
+class AccountUpdateIn(BaseModel):
+    name_ar: str | None = Field(default=None, max_length=200)
+    name_en: str | None = Field(default=None, max_length=200)
+    is_postable: bool | None = None
+    category: str | None = Field(default=None, max_length=40)
+    eta_code: str | None = Field(default=None, max_length=60)
+
+
 class ManualJournalLineIn(BaseModel):
     account_code: str = Field(min_length=1, max_length=10)
     debit: Decimal = Decimal("0")

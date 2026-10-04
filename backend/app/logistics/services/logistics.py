@@ -16,7 +16,7 @@ from ...common.money import to_money
 from ...extensions import db
 from ...identity.services.audit import emit as audit_emit
 from ...inventory.models import Product
-from ..models import DeliveryShortage, DeliverySlot, Shipment
+from ..models import DeliveryShortage, DeliverySlot, Shipment, ShipmentLeg
 
 
 @dataclass(frozen=True)
@@ -190,6 +190,32 @@ def update_location(*, shipment_id: int, lat: Decimal, lng: Decimal) -> Shipment
 # ---------------------------------------------------------------- delivery (US-9.3)
 
 
+def add_leg(
+    *,
+    shipment_id: int,
+    carrier_type: str,
+    carrier_ref: str | None,
+    from_label: str | None,
+    to_label: str | None,
+) -> ShipmentLeg:
+    """Append a journey leg with its own carrier (US-9.4, T-05)."""
+    s = _shipment_or_404(shipment_id)
+    if carrier_type not in ("internal", "external"):
+        raise BadRequest("نوع الناقل غير صالح", code="bad_carrier")
+    next_seq = (max((leg.seq for leg in s.legs), default=0)) + 1
+    leg = ShipmentLeg(
+        shipment_id=s.id,
+        seq=next_seq,
+        carrier_type=carrier_type,
+        carrier_ref=carrier_ref,
+        from_label=from_label,
+        to_label=to_label,
+    )
+    db.session.add(leg)
+    db.session.commit()
+    return leg
+
+
 def confirm_delivery(
     *,
     shipment_id: int,
@@ -267,6 +293,17 @@ def serialize_shipment(s: Shipment, *, include_code: bool = False) -> dict[str, 
         "shortages": [
             {"product_id": sh.product_id, "qty": str(sh.qty), "photo_url": sh.photo_url, "note": sh.note}
             for sh in s.shortages
+        ],
+        "legs": [
+            {
+                "seq": lg.seq,
+                "carrier_type": lg.carrier_type,
+                "carrier_ref": lg.carrier_ref,
+                "from_label": lg.from_label,
+                "to_label": lg.to_label,
+                "status": lg.status,
+            }
+            for lg in s.legs
         ],
     }
     if include_code:

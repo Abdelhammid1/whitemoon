@@ -47,6 +47,7 @@ def _reset_db(app: Flask) -> Iterator[None]:
                 "comm.messages, "
                 "comm.conversations, "
                 "logistics.delivery_shortages, "
+                "logistics.shipment_legs, "
                 "logistics.shipments, "
                 "logistics.delivery_slots, "
                 "pos.pos_sale_lines, "
@@ -61,6 +62,8 @@ def _reset_db(app: Flask) -> Iterator[None]:
                 "sales.escalation_events, "
                 "sales.customer_dues, "
                 "sales.credit_overrides, "
+                "sales.payment_approvals, "
+                "sales.credit_tier_settings, "
                 "sales.customer_credit_tiers, "
                 "commerce.rfq_offers, "
                 "commerce.rfqs, "
@@ -70,6 +73,7 @@ def _reset_db(app: Flask) -> Iterator[None]:
                 "commerce.price_locks, "
                 "commerce.cart_items, "
                 "commerce.carts, "
+                "inventory.product_variants, "
                 "inventory.reorder_alerts, "
                 "inventory.shortages, "
                 "inventory.batches, "
@@ -109,6 +113,9 @@ def _reset_db(app: Flask) -> Iterator[None]:
         identity_seed.seed_bootstrap_admin()
         accounting_seed.seed_accounts()
         accounting_seed.seed_event_map()
+        from app.sales.services import credit as _credit
+        _credit.seed_tier_settings()
+        db.session.commit()
         otp_provider.LAST_CODES.clear()
         yield
 

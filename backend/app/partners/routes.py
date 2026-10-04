@@ -15,10 +15,37 @@ from pydantic import ValidationError
 
 from ..common.errors import ApiError, BadRequest, Forbidden, Unauthorized
 from ..identity.services.rbac import has_permission, require_permission
-from .schemas import AccrualIn, AttributeIn, DepositIn, RefundIn, TermsIn
+from .schemas import AccrualIn, AttributeIn, CreatePartnerIn, DepositIn, RefundIn, TermsIn
 from .services import partners as svc
 
 bp = Blueprint("partners", __name__, url_prefix="/partners")
+
+
+@bp.post("")
+@require_permission("admin.high")
+def create_partner():
+    p = _parse(CreatePartnerIn)
+    prof = svc.create_partner(
+        type_=p.type,
+        display_name=p.display_name,
+        geo_scope=p.geo_scope,
+        phone=p.phone,
+        email=p.email,
+        password=p.password,
+        earns_commission=p.earns_commission,
+        commission_rate_pct=Decimal(str(p.commission_rate_pct)),
+        earns_investment_return=p.earns_investment_return,
+        investment_return_rate_pct=Decimal(str(p.investment_return_rate_pct)),
+        actor_user_id=_uid(),
+    )
+    return jsonify(svc.serialize_partner(prof)), 201
+
+
+@bp.get("")
+@require_permission("partner.manage")
+def list_partners():
+    type_ = request.args.get("type")
+    return jsonify({"items": [svc.serialize_partner(p) for p in svc.list_partners(type_)]})
 
 
 def _parse(model_cls: Any) -> Any:

@@ -79,6 +79,21 @@ def checkout(  # noqa: PLR0912, PLR0915 — cash/deferred × per-category × per
         cash_by_category[product.category] += line_total
         total_cash += line_total
 
+    # Per-supplier minimum order value (US-4.5, T-03): block the checkout if
+    # any supplier's sub-order total is below that supplier's minimum. The
+    # supplier is never named (customer-supplier isolation).
+    from ...identity.models import SupplierProfile
+
+    for supplier_id, rows in by_supplier.items():
+        sub_total = sum((lt for (_i, _u, lt) in rows), start=Decimal("0"))
+        prof = db.session.get(SupplierProfile, supplier_id)
+        minimum = to_money(prof.min_order_value) if prof is not None else Decimal("0")
+        if minimum > 0 and sub_total < minimum:
+            raise BadRequest(
+                f"قيمة الطلب من أحد الموردين أقل من الحد الأدنى ({minimum} ج.م)",
+                code="below_supplier_minimum",
+            )
+
     # Deferred terms are SERVER-COMPUTED from the approved schedule.
     if payment_mode == "deferred":
         d_total = to_money(total_cash * (Decimal("1") + DEFERRED_MARKUP_PCT))
@@ -195,6 +210,41 @@ def list_orders(customer_id: int, limit: int = 50) -> list[Order]:
         .limit(limit)
     )
     return list(db.session.execute(stmt).scalars().all())
+
+
+def supplier_dashboard(supplier_id: int, limit: int = 100) -> list[dict[str, Any]]:
+    """A supplier's own sub-orders with the parent order's live status (T-06).
+    No customer PII — the supplier sees order number, status, their lines."""
+    stmt = (
+        select(OrderSubOrder, Order)
+        .join(Order, Order.id == OrderSubOrder.order_id)
+        .where(OrderSubOrder.supplier_id == supplier_id)
+        .order_by(OrderSubOrder.id.desc())
+        .limit(limit)
+    )
+    rows = db.session.execute(stmt).all()
+    out: list[dict[str, Any]] = []
+    for sub, order in rows:
+        out.append(
+            {
+                "sub_order_id": sub.id,
+                "order_number": order.number,
+                "order_status": order.status,
+                "sub_order_status": sub.status,
+                "subtotal": str(sub.subtotal),
+                "placed_at": order.placed_at.isoformat(),
+                "lines": [
+                    {
+                        "product_id": ln.product_id,
+                        "qty": str(ln.qty),
+                        "unit_price": str(ln.unit_price),
+                        "line_total": str(ln.line_total),
+                    }
+                    for ln in sub.lines
+                ],
+            }
+        )
+    return out
 
 
 def serialize_order(order: Order, *, for_customer: bool) -> dict[str, Any]:
