@@ -37,6 +37,13 @@ import { PartnersPage } from './pages/partners/PartnersPage'
 import { PartnerDetailPage } from './pages/partners/PartnerDetailPage'
 import { ProductionPage } from './pages/production/ProductionPage'
 import { ProductionDetailPage } from './pages/production/ProductionDetailPage'
+import { PosPage } from './pages/pos/PosPage'
+import { PosSalesPage } from './pages/pos/PosSalesPage'
+import { PosSettlePage } from './pages/pos/PosSettlePage'
+import { LogisticsPage } from './pages/logistics/LogisticsPage'
+import { TrackingPage } from './pages/logistics/TrackingPage'
+import { ChatPage } from './pages/comm/ChatPage'
+import { ChatThreadPage } from './pages/comm/ChatThreadPage'
 import { ProductsPage } from './pages/inventory/ProductsPage'
 import { OffersPage } from './pages/inventory/OffersPage'
 import { StockPage } from './pages/inventory/StockPage'
@@ -97,6 +104,16 @@ export function App() {
         <Route path="/partners/:id" element={<ProtectedRoute roles={FINANCE}><PartnerDetailPage /></ProtectedRoute>} />
         <Route path="/production" element={<ProtectedRoute roles={FINANCE}><ProductionPage /></ProtectedRoute>} />
         <Route path="/production/:id" element={<ProtectedRoute roles={FINANCE}><ProductionDetailPage /></ProtectedRoute>} />
+
+        <Route path="/pos" element={<ProtectedRoute roles={['agent', 'branch', 'staff', 'admin']}><PosPage /></ProtectedRoute>} />
+        <Route path="/pos/sales" element={<ProtectedRoute roles={['agent', 'branch', 'staff', 'admin']}><PosSalesPage /></ProtectedRoute>} />
+        <Route path="/pos/settle" element={<ProtectedRoute roles={FINANCE}><PosSettlePage /></ProtectedRoute>} />
+
+        <Route path="/logistics" element={<ProtectedRoute roles={FINANCE}><LogisticsPage /></ProtectedRoute>} />
+        <Route path="/orders/:id/shipment" element={<TrackingPage />} />
+
+        <Route path="/chat" element={<ChatPage />} />
+        <Route path="/chat/:id" element={<ChatThreadPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
