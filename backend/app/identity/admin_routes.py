@@ -6,9 +6,10 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity
 from sqlalchemy import or_, select
 
-from ..common.errors import BadRequest, Unauthorized
+from ..audit.models import AuditEvent
+from ..common.errors import BadRequest, NotFound, Unauthorized
 from ..extensions import db
-from .models import SupplierProfile, User
+from .models import Role, SupplierProfile, User, UserRole
 from .schemas import ImpersonateStartIn, RejectSupplierIn
 from .services import impersonation as imp_svc
 from .services import supplier_approval as supplier_svc
@@ -55,6 +56,60 @@ def list_users():
                 }
                 for u in users
             ],
+        }
+    )
+
+
+@bp.get("/users/<int:user_id>")
+@require_permission("user.read")
+def get_user(user_id: int):
+    user = db.session.get(User, user_id)
+    if user is None:
+        raise NotFound("المستخدم غير موجود", code="user_not_found")
+    role_codes = list(
+        db.session.execute(
+            select(Role.code)
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == user_id)
+        ).scalars()
+    )
+    return jsonify(
+        {
+            "id": user.id,
+            "phone": user.phone,
+            "email": user.email,
+            "kind": user.kind,
+            "status": user.status,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "activated_at": user.activated_at.isoformat() if user.activated_at else None,
+            "roles": role_codes,
+        }
+    )
+
+
+@bp.get("/audit")
+@require_permission("user.read")
+def list_audit():
+    action = request.args.get("action")
+    limit = min(int(request.args.get("limit", "100")), 500)
+    stmt = select(AuditEvent).order_by(AuditEvent.id.desc()).limit(limit)
+    if action:
+        stmt = stmt.where(AuditEvent.action == action)
+    rows = db.session.execute(stmt).scalars().all()
+    return jsonify(
+        {
+            "items": [
+                {
+                    "id": e.id,
+                    "at": e.at.isoformat(),
+                    "actor_user_id": e.actor_user_id,
+                    "action": e.action,
+                    "target_type": e.target_type,
+                    "target_id": e.target_id,
+                    "reason": e.reason,
+                }
+                for e in rows
+            ]
         }
     )
 

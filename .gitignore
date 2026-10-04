@@ -47,4 +47,5 @@ infra/*.tfvars
 
 # Design export (local reference, not tracked)
 design-export/
-stitch_white_moon_design_system.zip
+stitch_white_moon_design_system*.zip
+*.docx

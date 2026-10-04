@@ -9,10 +9,13 @@ from typing import Any
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from pydantic import ValidationError
+from sqlalchemy import select
 
 from ..common.errors import ApiError, BadRequest, Unauthorized
+from ..extensions import db
 from ..identity.services.audit import emit as audit_emit
 from ..identity.services.rbac import require_permission
+from .models import Account, BankReceipt, DeferredTerm, Period
 from .schemas import (
     ApplyEarlyDiscountIn,
     DeferredTermsIn,
@@ -47,6 +50,121 @@ def _current_user_id() -> int:
     if raw is None:
         raise Unauthorized("No identity", code="no_identity")
     return int(raw)
+
+
+# ================================================================ read views
+# Connect the frontend's accounting screens (chart, periods, receipts queue,
+# deferred terms). All finance-gated reads.
+
+
+@bp.get("/accounts")
+@require_permission("period.close")
+def list_accounts():
+    rows = db.session.execute(select(Account).order_by(Account.code)).scalars().all()
+    by_id = {a.id: a for a in rows}
+
+    def parent_code(a: Account) -> str | None:
+        parent = by_id.get(a.parent_id) if a.parent_id is not None else None
+        return parent.code if parent is not None else None
+
+    return jsonify(
+        {
+            "items": [
+                {
+                    "code": a.code,
+                    "name_ar": a.name_ar,
+                    "name_en": a.name_en,
+                    "type": a.type,
+                    "parent_code": parent_code(a),
+                    "is_postable": a.is_postable,
+                    "category": a.category,
+                    "eta_code": a.eta_code,
+                }
+                for a in rows
+            ]
+        }
+    )
+
+
+@bp.get("/periods")
+@require_permission("period.close")
+def list_periods():
+    year = request.args.get("year", type=int)
+    stmt = select(Period).order_by(Period.year.desc(), Period.month.desc())
+    if year:
+        stmt = stmt.where(Period.year == year)
+    rows = db.session.execute(stmt).scalars().all()
+    return jsonify(
+        {
+            "items": [
+                {
+                    "id": p.id,
+                    "year": p.year,
+                    "month": p.month,
+                    "starts_on": p.starts_on.isoformat(),
+                    "ends_on": p.ends_on.isoformat(),
+                    "is_closed": p.is_closed,
+                    "closed_at": p.closed_at.isoformat() if p.closed_at else None,
+                }
+                for p in rows
+            ]
+        }
+    )
+
+
+@bp.get("/receipts")
+@require_permission("period.close")
+def list_receipts():
+    status = request.args.get("status")
+    stmt = select(BankReceipt).order_by(BankReceipt.id.desc()).limit(200)
+    if status:
+        stmt = stmt.where(BankReceipt.status == status)
+    rows = db.session.execute(stmt).scalars().all()
+    return jsonify(
+        {
+            "items": [
+                {
+                    "id": r.id,
+                    "status": r.status,
+                    "ocr_amount": str(r.ocr_amount) if r.ocr_amount is not None else None,
+                    "ocr_reference": r.ocr_reference,
+                    "matched_order_id": r.matched_order_id,
+                    "manual_review_reason": r.manual_review_reason,
+                    "uploaded_at": (
+                        r.created_at.isoformat() if getattr(r, "created_at", None) else None
+                    ),
+                }
+                for r in rows
+            ]
+        }
+    )
+
+
+@bp.get("/deferred-terms")
+@require_permission("period.close")
+def list_deferred_terms():
+    rows = db.session.execute(
+        select(DeferredTerm).order_by(DeferredTerm.id.desc()).limit(200)
+    ).scalars().all()
+    return jsonify(
+        {
+            "items": [
+                {
+                    "id": t.id,
+                    "order_id": t.order_id,
+                    "cash_price": str(t.cash_price),
+                    "deferred_price": str(t.deferred_price),
+                    "early_settlement_discount": str(t.early_settlement_discount),
+                    "early_settlement_before": (
+                        t.early_settlement_before.isoformat() if t.early_settlement_before else None
+                    ),
+                    "discount_applied": t.discount_applied,
+                    "settled_at": t.settled_at.isoformat() if t.settled_at else None,
+                }
+                for t in rows
+            ]
+        }
+    )
 
 
 # ================================================================ periods

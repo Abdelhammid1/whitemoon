@@ -1,28 +1,20 @@
 import { useEffect, useState } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Spinner, EmptyState } from '../../components/ui'
-import { listOrPending, EndpointPending } from '../../api/pending'
-
-interface AuditRow {
-  id: number
-  at: string
-  actor_user_id: number | null
-  action: string
-  target_type: string | null
-  target_id: string | null
-}
+import { PageTitle, Spinner, InlineError, Pill } from '../../components/ui'
+import { DataTable, Mono } from '../../components/DataTable'
+import { listAudit, type AuditRow } from '../../api/admin'
+import { ApiError } from '../../api/client'
+import { formatDate } from '../../lib/format'
 
 export function AuditLogPage() {
   const [loading, setLoading] = useState(true)
-  const [pending, setPending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [rows, setRows] = useState<AuditRow[]>([])
 
   useEffect(() => {
-    listOrPending<AuditRow>('/admin/audit')
-      .then(setRows)
-      .catch((err) => {
-        if (err instanceof EndpointPending) setPending(true)
-      })
+    listAudit({ limit: 200 })
+      .then((r) => setRows(r.items))
+      .catch((err) => setError(err instanceof ApiError ? err.message : 'تعذّر التحميل'))
       .finally(() => setLoading(false))
   }, [])
 
@@ -32,12 +24,39 @@ export function AuditLogPage() {
       <div className="mt-space-xl">
         {loading ? (
           <Spinner />
-        ) : pending || rows.length === 0 ? (
-          <EmptyState
-            title="واجهة قراءة سجل التدقيق قيد الإنشاء"
-            description="الأحداث تُكتب فعليًا في قاعدة البيانات (audit.events)؛ واجهة العرض لم تُفعَّل بعد على الخادم."
+        ) : error ? (
+          <InlineError message={error} />
+        ) : (
+          <DataTable
+            rows={rows}
+            rowKey={(e) => e.id}
+            empty="لا توجد أحداث مسجّلة بعد."
+            columns={[
+              { header: 'الوقت', cell: (e) => <Mono>{formatDate(e.at)}</Mono> },
+              { header: 'الإجراء', cell: (e) => <Pill tone="neutral">{e.action}</Pill> },
+              {
+                header: 'المنفِّذ',
+                align: 'center',
+                cell: (e) => <Mono>{e.actor_user_id ?? '—'}</Mono>,
+              },
+              {
+                header: 'الهدف',
+                cell: (e) => (
+                  <span className="font-body text-body text-secondary">
+                    {e.target_type ? `${e.target_type} ` : ''}
+                    {e.target_id ? <Mono>#{e.target_id}</Mono> : '—'}
+                  </span>
+                ),
+              },
+              {
+                header: 'السبب',
+                cell: (e) => (
+                  <span className="font-body text-body text-secondary">{e.reason ?? '—'}</span>
+                ),
+              },
+            ]}
           />
-        ) : null}
+        )}
       </div>
     </Wide>
   )

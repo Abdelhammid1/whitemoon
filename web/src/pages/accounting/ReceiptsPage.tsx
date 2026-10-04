@@ -1,11 +1,19 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, SectionHeader, EmptyState } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError } from '../../components/ui'
+import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
-import { resolveReceipt, uploadReceipt } from '../../api/accounting'
+import { listReceipts, resolveReceipt, uploadReceipt, type ReceiptRow } from '../../api/accounting'
 import { ApiError } from '../../api/client'
+import { formatDate, formatMoney } from '../../lib/format'
 
 interface Result { receipt_id: number; status: string; ocr_amount: string | null; ocr_reference: string | null }
+
+const STATUS_TONE: Record<string, 'signal' | 'warning' | 'error' | 'neutral'> = {
+  matched: 'signal',
+  manual_review: 'warning',
+  rejected: 'error',
+}
 
 export function ReceiptsPage() {
   const toast = useToast()
@@ -16,6 +24,24 @@ export function ReceiptsPage() {
   const [stubRef, setStubRef] = useState('')
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<Result | null>(null)
+  const [rows, setRows] = useState<ReceiptRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const r = await listReceipts()
+      setRows(r.items)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'تعذّر تحميل الطابور')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void load() }, [load])
 
   async function onUpload(e: FormEvent) {
     e.preventDefault()
@@ -31,6 +57,7 @@ export function ReceiptsPage() {
       setResult(resp)
       if (resp.status === 'matched') toast.success('تمت المطابقة التلقائية.')
       else toast.info('تم الرفع وتحويله للمراجعة اليدوية.')
+      await load()
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'فشل الرفع')
     } finally {
@@ -45,6 +72,7 @@ export function ReceiptsPage() {
       const r = await resolveReceipt(result.receipt_id, status)
       setResult({ ...result, status: r.status })
       toast.success(`تم تحديث الحالة إلى ${r.status}.`)
+      await load()
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'فشل الحسم')
     } finally {
@@ -81,7 +109,7 @@ export function ReceiptsPage() {
         <div className="mt-space-lg flex flex-col gap-space-sm border-t border-surface-container-high pt-space-lg">
           <div className="flex items-center justify-between">
             <span className="font-body text-body text-on-surface">إيصال <bdi dir="ltr" className="font-mono-medium">#{result.receipt_id}</bdi></span>
-            <Pill tone={result.status === 'matched' ? 'signal' : result.status === 'rejected' ? 'error' : 'warning'}>{result.status}</Pill>
+            <Pill tone={STATUS_TONE[result.status] ?? 'warning'}>{result.status}</Pill>
           </div>
           <span className="font-mono-body text-mono-body text-secondary">
             OCR: <bdi dir="ltr">{result.ocr_amount ?? '—'}</bdi> / <bdi dir="ltr">{result.ocr_reference ?? '—'}</bdi>
@@ -97,7 +125,25 @@ export function ReceiptsPage() {
 
       <section className="mt-[48px]">
         <SectionHeader title="طابور الإيصالات" />
-        <EmptyState title="عرض قائمة الإيصالات قيد الإنشاء" description="الرفع والمطابقة يعملان الآن؛ واجهة سرد الطابور لم تُفعَّل بعد على الخادم." />
+        {loading ? (
+          <Spinner />
+        ) : error ? (
+          <InlineError message={error} />
+        ) : (
+          <DataTable
+            rows={rows}
+            rowKey={(r) => r.id}
+            empty="لا توجد إيصالات بعد."
+            columns={[
+              { header: 'المعرف', width: '70px', cell: (r) => <Mono>#{r.id}</Mono> },
+              { header: 'الحالة', cell: (r) => <Pill tone={STATUS_TONE[r.status] ?? 'neutral'}>{r.status}</Pill> },
+              { header: 'مبلغ OCR', align: 'end', cell: (r) => <Mono>{r.ocr_amount ? formatMoney(r.ocr_amount) : '—'}</Mono> },
+              { header: 'مرجع OCR', cell: (r) => <Mono>{r.ocr_reference ?? '—'}</Mono> },
+              { header: 'طلب مطابق', align: 'center', cell: (r) => <Mono>{r.matched_order_id ?? '—'}</Mono> },
+              { header: 'رُفع', align: 'end', cell: (r) => <Mono>{r.uploaded_at ? formatDate(r.uploaded_at) : '—'}</Mono> },
+            ]}
+          />
+        )}
       </section>
     </Narrow>
   )

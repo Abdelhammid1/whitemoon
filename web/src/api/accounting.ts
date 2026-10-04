@@ -24,6 +24,66 @@ export interface ReportFilterBody {
   partner_id?: number
 }
 
+// ---------------------------------------------------------------- read views
+
+export interface AccountRow {
+  code: string
+  name_ar: string
+  name_en: string
+  type: string
+  parent_code: string | null
+  is_postable: boolean
+  category: string | null
+  eta_code: string | null
+}
+export async function listAccounts() {
+  return api<{ items: AccountRow[] }>('/accounting/accounts')
+}
+
+export interface PeriodListRow {
+  id: number
+  year: number
+  month: number
+  starts_on: string
+  ends_on: string
+  is_closed: boolean
+  closed_at: string | null
+}
+export async function listPeriods(year?: number) {
+  return api<{ items: PeriodListRow[] }>('/accounting/periods', {
+    query: year ? { year } : undefined,
+  })
+}
+
+export interface ReceiptRow {
+  id: number
+  status: string
+  ocr_amount: string | null
+  ocr_reference: string | null
+  matched_order_id: number | null
+  manual_review_reason: string | null
+  uploaded_at: string | null
+}
+export async function listReceipts(status?: string) {
+  return api<{ items: ReceiptRow[] }>('/accounting/receipts', {
+    query: status ? { status } : undefined,
+  })
+}
+
+export interface DeferredTermRow {
+  id: number
+  order_id: number
+  cash_price: string
+  deferred_price: string
+  early_settlement_discount: string
+  early_settlement_before: string | null
+  discount_applied: boolean
+  settled_at: string | null
+}
+export async function listDeferredTerms() {
+  return api<{ items: DeferredTermRow[] }>('/accounting/deferred-terms')
+}
+
 export async function periodEnsure(year: number, month: number) {
   return api<PeriodRow>('/accounting/periods/ensure', {
     method: 'POST',

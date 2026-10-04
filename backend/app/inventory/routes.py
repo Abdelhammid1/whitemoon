@@ -8,6 +8,7 @@ from typing import Any
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from pydantic import ValidationError
+from sqlalchemy import select
 
 from ..common.errors import ApiError, BadRequest, Forbidden, Unauthorized
 from ..extensions import db
@@ -224,6 +225,18 @@ def receive_transfer(order_id: int):
         target_id=order.id,
     )
     return jsonify(transfers_svc.serialize(order))
+
+
+@bp.get("/transfers")
+@jwt_required()
+def list_transfers():
+    uid = _uid()
+    stmt = select(TransferOrder).order_by(TransferOrder.id.desc()).limit(200)
+    # Suppliers see only their own transfers; finance/ops see all.
+    if not has_permission(uid, "inventory.manage"):
+        stmt = stmt.where(TransferOrder.supplier_id == uid)
+    rows = db.session.execute(stmt).scalars().all()
+    return jsonify({"items": [transfers_svc.serialize(o) for o in rows]})
 
 
 @bp.get("/transfers/<int:order_id>")

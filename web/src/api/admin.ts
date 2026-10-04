@@ -29,6 +29,27 @@ export async function listUsers(params: {
   })
 }
 
+export interface UserDetail extends AdminUser {
+  activated_at: string | null
+  roles: string[]
+}
+export async function getUser(userId: number) {
+  return api<UserDetail>(`/admin/users/${userId}`)
+}
+
+export interface AuditRow {
+  id: number
+  at: string
+  actor_user_id: number | null
+  action: string
+  target_type: string | null
+  target_id: string | null
+  reason: string | null
+}
+export async function listAudit(params: { action?: string; limit?: number } = {}) {
+  return api<{ items: AuditRow[] }>('/admin/audit', { query: params })
+}
+
 export async function listPendingSuppliers() {
   return api<{ items: PendingSupplier[] }>('/admin/suppliers/pending')
 }

@@ -1,9 +1,15 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, SectionHeader, EmptyState } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
-import { getTransfer, issueTransfer, receiveTransfer, type TransferOrder } from '../../api/inventory'
+import {
+  getTransfer,
+  issueTransfer,
+  listTransfersPlanned,
+  receiveTransfer,
+  type TransferOrder,
+} from '../../api/inventory'
 import { ApiError } from '../../api/client'
 
 const LOC_AR: Record<string, string> = {
@@ -21,19 +27,37 @@ export function TransfersPage() {
   const [lookupId, setLookupId] = useState('')
   const [order, setOrder] = useState<TransferOrder | null>(null)
   const [busy, setBusy] = useState(false)
+  const [rows, setRows] = useState<TransferOrder[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const r = await listTransfersPlanned()
+      setRows(r.items)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'تعذّر تحميل الإذون')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void load() }, [load])
 
   async function onLookup(e: FormEvent) {
     e.preventDefault()
     setBusy(true)
     try { setOrder(await getTransfer(Number(lookupId))) }
-    catch (err) { toast.error(err instanceof ApiError ? err.message : 'لم يُعثر على الإذن') ; setOrder(null) }
+    catch (err) { toast.error(err instanceof ApiError ? err.message : 'لم يُعثر على الإذن'); setOrder(null) }
     finally { setBusy(false) }
   }
 
   async function act(fn: (id: number) => Promise<TransferOrder>, msg: string) {
     if (!order) return
     setBusy(true)
-    try { setOrder(await fn(order.id)); toast.success(msg) }
+    try { setOrder(await fn(order.id)); toast.success(msg); await load() }
     catch (err) { toast.error(err instanceof ApiError ? err.message : 'فشلت العملية') }
     finally { setBusy(false) }
   }
@@ -80,7 +104,24 @@ export function TransfersPage() {
 
       <section className="mt-[48px]">
         <SectionHeader title="قائمة الإذون" />
-        <EmptyState title="عرض قائمة الإذون قيد الإنشاء" description="الإنشاء والإصدار والاستلام تعمل الآن؛ واجهة سرد كل الإذون لم تُفعَّل بعد على الخادم." />
+        {loading ? (
+          <Spinner />
+        ) : error ? (
+          <InlineError message={error} />
+        ) : (
+          <DataTable
+            rows={rows}
+            rowKey={(o) => o.id}
+            onRowClick={(o) => { setOrder(o); setLookupId(String(o.id)) }}
+            empty="لا توجد إذون تحويل بعد."
+            columns={[
+              { header: 'رقم الإذن', cell: (o) => <Mono>{o.number}</Mono> },
+              { header: 'المسار', cell: (o) => <span className="font-body text-body text-secondary">{LOC_AR[o.from_location_type]} ← {LOC_AR[o.to_location_type]}</span> },
+              { header: 'عدد الأصناف', align: 'center', cell: (o) => <Mono>{o.lines.length}</Mono> },
+              { header: 'الحالة', align: 'center', cell: (o) => <Pill tone={STATUS[o.status]?.tone ?? 'neutral'}>{STATUS[o.status]?.ar ?? o.status}</Pill> },
+            ]}
+          />
+        )}
       </section>
     </Wide>
   )
