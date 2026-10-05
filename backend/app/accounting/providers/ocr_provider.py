@@ -8,9 +8,53 @@ Document AI, Textract-compatible) plug in behind the same protocol.
 
 from __future__ import annotations
 
+import io
+import os
+import re
 from dataclasses import dataclass
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Protocol
+
+# Map Arabic-Indic and Persian digits to ASCII so parsing is uniform.
+_AR_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
+
+
+def parse_amount(text: str) -> Decimal | None:
+    """Best-effort transfer amount from OCR text. Prefers money-formatted
+    numbers (decimals / thousands grouping) so a long reference id is not
+    mistaken for the amount; falls back to short integers."""
+    t = text.translate(_AR_DIGITS)
+    money = re.findall(r"\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?|\d+\.\d{1,2}", t)
+    vals: list[Decimal] = []
+    for c in money:
+        try:
+            v = Decimal(c.replace(",", ""))
+        except InvalidOperation:
+            continue
+        if v > 0:
+            vals.append(v)
+    if vals:
+        return max(vals)
+    ints = [Decimal(c) for c in re.findall(r"\b\d{1,6}\b", t)]
+    ints = [v for v in ints if v > 0]
+    return max(ints) if ints else None
+
+
+def parse_reference(text: str) -> str | None:
+    """Transaction/reference number: the longest digit run of ≥6 digits."""
+    refs = re.findall(r"\d{6,}", text.translate(_AR_DIGITS))
+    return max(refs, key=len) if refs else None
+
+
+def _ocr_text(image_bytes: bytes) -> str:
+    import pytesseract
+    from PIL import Image
+
+    cmd = os.getenv("TESSERACT_CMD")
+    if cmd:
+        pytesseract.pytesseract.tesseract_cmd = cmd
+    img = Image.open(io.BytesIO(image_bytes))
+    return pytesseract.image_to_string(img, lang=os.getenv("OCR_LANG", "ara+eng"))
 
 
 @dataclass(frozen=True)
@@ -40,11 +84,24 @@ class StubProvider:
 
 
 class TesseractProvider:
-    """Phase 2 ops task — real pytesseract wiring lands here."""
+    """Real OCR via pytesseract (same engine as chat image scanning). Extracts
+    the transfer amount + reference. If OCR can't run (missing binary/bad
+    image), it returns an empty result so the caller routes the receipt to
+    manual review rather than failing the upload (US-3.3)."""
 
-    def extract(self, image_bytes: bytes) -> OcrResult:  # pragma: no cover
-        _ = image_bytes
-        raise NotImplementedError("TesseractProvider is a Phase 2 ops task")
+    def extract(self, image_bytes: bytes) -> OcrResult:
+        try:
+            text = _ocr_text(image_bytes)
+        except Exception as e:
+            return OcrResult(
+                amount=None, reference=None,
+                raw={"engine": "tesseract", "error": type(e).__name__},
+            )
+        return OcrResult(
+            amount=parse_amount(text),
+            reference=parse_reference(text),
+            raw={"engine": "tesseract", "text_len": len(text)},
+        )
 
 
 _singleton_stub = StubProvider()
