@@ -377,6 +377,28 @@ def set_override(*, customer_id: int, credit_limit: Decimal, reason: str, set_by
     return ov
 
 
+def list_dues(customer_id: int) -> list[CustomerDue]:
+    return list(
+        db.session.execute(
+            select(CustomerDue)
+            .where(CustomerDue.customer_id == customer_id)
+            .order_by(CustomerDue.due_date.desc(), CustomerDue.id.desc())
+        ).scalars().all()
+    )
+
+
+def serialize_due(d: CustomerDue) -> dict[str, Any]:
+    return {
+        "id": d.id,
+        "order_id": d.order_id,
+        "amount": str(to_money(d.amount)),
+        "due_date": d.due_date.isoformat(),
+        "status": d.status,
+        "paid_date": d.paid_date.isoformat() if d.paid_date else None,
+        "days_late": d.days_late,
+    }
+
+
 def serialize_tier(customer_id: int) -> dict[str, Any]:
     tier = get_tier(customer_id)
     return {

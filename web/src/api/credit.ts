@@ -55,6 +55,18 @@ export async function runEscalation() {
 export async function freezeCustomer(id: number, reason: string) {
   return api<Escalation>(`/credit/customers/${id}/freeze`, { method: 'POST', body: { reason } })
 }
+export interface Due {
+  id: number
+  order_id: number | null
+  amount: string
+  due_date: string
+  status: string
+  paid_date: string | null
+  days_late: number | null
+}
+export async function listDues(customerId: number) {
+  return api<{ items: Due[] }>(`/credit/customers/${customerId}/dues`)
+}
 export async function payDue(dueId: number, paid_on: string) {
   return api<{ id: number; status: string; days_late: number }>(`/credit/dues/${dueId}/pay`, { method: 'POST', body: { paid_on } })
 }

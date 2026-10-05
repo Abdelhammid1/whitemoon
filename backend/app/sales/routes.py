@@ -89,6 +89,12 @@ def create_override():
     return jsonify({"id": ov.id, "customer_id": ov.customer_id, "credit_limit": str(ov.credit_limit)}), 201
 
 
+@bp.get("/customers/<int:customer_id>/dues")
+@require_permission("user.read")
+def list_dues(customer_id: int):
+    return jsonify({"items": [credit_svc.serialize_due(d) for d in credit_svc.list_dues(customer_id)]})
+
+
 @bp.post("/dues/<int:due_id>/pay")
 @require_permission("credit.manage")
 def pay_due(due_id: int):

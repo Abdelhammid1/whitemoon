@@ -153,4 +153,16 @@ def test_record_payment_computes_days_late(client) -> None:
     assert paid.status == "paid"
 
 
+def test_list_dues_returns_customer_dues(client) -> None:
+    cust = create_user(kind="customer", email="dueslist@example.com", roles=("customer",))
+    db.session.commit()
+    credit_svc.record_due(customer_id=cust.id, order_id=None, amount=Decimal("500"), due_date=date.today() - timedelta(days=5))
+    credit_svc.record_due(customer_id=cust.id, order_id=None, amount=Decimal("300"), due_date=date.today() + timedelta(days=10))
+    db.session.commit()
+    rows = credit_svc.list_dues(cust.id)
+    assert len(rows) == 2
+    s = credit_svc.serialize_due(rows[0])
+    assert set(s.keys()) >= {"id", "amount", "due_date", "status", "days_late", "order_id", "paid_date"}
+
+
 _ = CustomerDue

@@ -67,6 +67,26 @@ export async function listAccruals(id: number) {
 export async function computeAccrual(id: number, kind: string, year: number, month: number) {
   return api<Accrual>(`/partners/${id}/accruals`, { method: 'POST', body: { kind, year, month } })
 }
+export interface AccrualStatement {
+  partner_id: number
+  kind: string
+  period: string
+  rate_pct: string
+  basis_amount: string
+  accrual_amount: string
+  orders: { id: number; number: string; total_cash: string }[]
+}
+export async function getAccrualStatement(id: number, kind: string, year: number, month: number) {
+  return api<AccrualStatement>(`/partners/${id}/accruals/statement`, {
+    query: { kind, year: String(year), month: String(month) },
+  })
+}
+export async function attributeOrder(orderId: number, partnerId: number) {
+  return api<{ order_id: number; partner_id: number }>(`/partners/orders/${orderId}/attribute`, {
+    method: 'POST',
+    body: { partner_id: partnerId },
+  })
+}
 
 /* ---------------------------------------------------- current account (الحساب الجاري) */
 

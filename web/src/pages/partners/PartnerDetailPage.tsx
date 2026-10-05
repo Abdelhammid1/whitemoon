@@ -3,11 +3,12 @@ import { useParams } from 'react-router-dom'
 import { Narrow } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
+import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import {
-  computeAccrual, getLedger, getTerms, listAccruals, listDeposits, recordDeposit,
-  recordLedgerEntry, refundDeposit, setTerms,
-  type Accrual, type Deposit, type LedgerEntry, type LedgerSummary, type PartnerTerms,
+  attributeOrder, computeAccrual, getAccrualStatement, getLedger, getTerms, listAccruals,
+  listDeposits, recordDeposit, recordLedgerEntry, refundDeposit, setTerms,
+  type Accrual, type AccrualStatement, type Deposit, type LedgerEntry, type LedgerSummary, type PartnerTerms,
 } from '../../api/partners'
 import { ApiError } from '../../api/client'
 import { formatMoney, formatDate, todayIso } from '../../lib/format'
@@ -35,6 +36,8 @@ export function PartnerDetailPage() {
   const [pay, setPay] = useState({ amount: '', note: '' })
   const [recv, setRecv] = useState({ amount: '', note: '' })
   const [adj, setAdj] = useState({ amount: '', note: '', direction: -1 }) // -1 = زوّده له
+  const [attrOrderId, setAttrOrderId] = useState('')
+  const [stmt, setStmt] = useState<{ open: boolean; loading: boolean; data: AccrualStatement | null }>({ open: false, loading: false, data: null })
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -64,6 +67,27 @@ export function PartnerDetailPage() {
       setLedger(r); toast.success(msg); reset()
     } catch (err) { toast.error(err instanceof ApiError ? err.message : 'فشلت العملية') }
     finally { setBusy(false) }
+  }
+
+  async function attribute() {
+    setBusy(true)
+    try {
+      await attributeOrder(Number(attrOrderId), pid)
+      toast.success('تم نسب الطلب.'); setAttrOrderId(''); await load()
+    } catch (err) { toast.error(err instanceof ApiError ? err.message : 'فشلت العملية') }
+    finally { setBusy(false) }
+  }
+
+  async function openStatement(a: Accrual) {
+    const [y, m] = a.period.split('/')
+    setStmt({ open: true, loading: true, data: null })
+    try {
+      const data = await getAccrualStatement(pid, a.kind, Number(y), Number(m))
+      setStmt({ open: true, loading: false, data })
+    } catch (err) {
+      setStmt({ open: false, loading: false, data: null })
+      toast.error(err instanceof ApiError ? err.message : 'تعذّر تحميل الأساس')
+    }
   }
 
   if (loading) return <Narrow><Spinner /></Narrow>
@@ -182,6 +206,14 @@ export function PartnerDetailPage() {
 
       <section className="mt-[48px]">
         <SectionHeader title="الاستحقاقات" />
+
+        {/* Attribute a realized order to this partner (feeds the accrual basis) */}
+        <div className="flex flex-wrap items-end gap-space-md mb-space-md">
+          <div className="w-36"><Field label="رقم الطلب" dir="ltr" mono value={attrOrderId} onChange={(e) => setAttrOrderId(e.target.value)} /></div>
+          <Button disabled={busy || !attrOrderId} onClick={() => void attribute()}>نسب طلبًا لهذا الشريك</Button>
+          <span className="font-small text-small text-secondary">يُسنِد طلبًا مُنفَّذًا لهذا الشريك ليدخل ضمن أساس احتساب العمولة والعائد.</span>
+        </div>
+
         <div className="flex flex-wrap items-end gap-space-md mb-space-md">
           <div className="flex gap-space-xs pb-2">
             {(['commission', 'investment_return'] as const).map((k) => (
@@ -201,8 +233,42 @@ export function PartnerDetailPage() {
           { header: 'الأساس', align: 'end', cell: (a) => <Mono>{formatMoney(a.basis_amount)}</Mono> },
           { header: 'النسبة %', align: 'end', cell: (a) => <Mono>{a.rate_pct}</Mono> },
           { header: 'المبلغ', align: 'end', cell: (a) => <Mono>{formatMoney(a.amount)}</Mono> },
+          { header: '', align: 'end', cell: (a) => (
+            <button className="font-small text-small text-primary hover:underline" onClick={() => void openStatement(a)}>عرض الأساس</button>
+          ) },
         ]} />
       </section>
+
+      {/* Accrual basis statement (US-6.2) */}
+      <Modal open={stmt.open} onClose={() => setStmt({ open: false, loading: false, data: null })} title="أساس احتساب الاستحقاق">
+        {stmt.loading || !stmt.data ? <Spinner /> : (
+          <div className="flex flex-col gap-space-md">
+            <div className="flex flex-wrap gap-space-lg">
+              <div className="flex flex-col">
+                <span className="font-small text-small text-secondary">النوع والفترة</span>
+                <span className="font-body text-body">{stmt.data.kind === 'commission' ? 'عمولة' : 'عائد'} — <Mono>{stmt.data.period}</Mono></span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-small text-small text-secondary">النسبة %</span>
+                <Mono>{stmt.data.rate_pct}</Mono>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-small text-small text-secondary">الأساس</span>
+                <span className="font-body text-body"><Mono>{formatMoney(stmt.data.basis_amount)}</Mono> ج.م</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="font-small text-small text-secondary">المبلغ المستحق</span>
+                <span className="font-body text-body"><Mono>{formatMoney(stmt.data.accrual_amount)}</Mono> ج.م</span>
+              </div>
+            </div>
+            <DataTable rows={stmt.data.orders} rowKey={(o) => o.id} empty="لا توجد طلبات مساهمة في هذه الفترة." columns={[
+              { header: 'رقم الطلب', cell: (o) => o.number },
+              { header: 'المعرف', cell: (o) => <Mono>#{o.id}</Mono> },
+              { header: 'القيمة', align: 'end', cell: (o) => <span><Mono>{formatMoney(o.total_cash)}</Mono> ج.م</span> },
+            ]} />
+          </div>
+        )}
+      </Modal>
     </Narrow>
   )
 }

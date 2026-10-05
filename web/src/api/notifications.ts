@@ -21,3 +21,12 @@ export async function markRead(id: number) {
 export async function markAllRead() {
   return api<{ marked: number }>('/notifications/read-all', { method: 'POST' })
 }
+export async function sendNotification(body: {
+  user_id: number
+  title: string
+  body?: string
+  type?: string
+  channel?: string
+}) {
+  return api<Notification>('/notifications', { method: 'POST', body })
+}

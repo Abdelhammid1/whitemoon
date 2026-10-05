@@ -1,16 +1,24 @@
 import { useState, type FormEvent } from 'react'
 import { Narrow } from '../../layouts/AppShell'
-import { Button, Field, Spinner, EmptyState } from '../../components/ui'
+import { Button, Field, Pill, Spinner, EmptyState } from '../../components/ui'
 import { Icon } from '../../components/Icon'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import {
   getCustomerCredit, recomputeCredit, setOverride, listEscalations, freezeCustomer,
-  type CreditTier, type Escalation,
+  listDues, payDue,
+  type CreditTier, type Escalation, type Due,
 } from '../../api/credit'
 import { ApiError } from '../../api/client'
-import { formatDate, formatMoney } from '../../lib/format'
+import { formatDate, formatMoney, todayIso } from '../../lib/format'
+
+/* due status → Arabic label + pill tone */
+const DUE_STATUS: Record<string, { ar: string; tone: 'signal' | 'warning' | 'error' | 'neutral' }> = {
+  open: { ar: 'مفتوحة', tone: 'warning' },
+  paid: { ar: 'مسدّدة', tone: 'signal' },
+  defaulted: { ar: 'متعثّرة', tone: 'error' },
+}
 
 /* four-colour tier system → Arabic label + dot/tint classes (signals only) */
 const TIER: Record<string, { ar: string; dot: string; tint: string }> = {
@@ -41,17 +49,20 @@ export function CreditPage() {
   const [cid, setCid] = useState('')
   const [tier, setTier] = useState<CreditTier | null>(null)
   const [escs, setEscs] = useState<Escalation[]>([])
+  const [dues, setDues] = useState<Due[]>([])
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [modal, setModal] = useState<null | 'override' | 'freeze'>(null)
+  const [modal, setModal] = useState<null | 'override' | 'freeze' | 'pay'>(null)
   const [limit, setLimit] = useState('')
   const [reason, setReason] = useState('')
+  const [payDueId, setPayDueId] = useState<number | null>(null)
+  const [paidOn, setPaidOn] = useState(todayIso())
 
   async function load(id: number) {
     setLoading(true)
     try {
-      const [t, e] = await Promise.all([getCustomerCredit(id), listEscalations(id)])
-      setTier(t); setEscs(e.items)
+      const [t, e, d] = await Promise.all([getCustomerCredit(id), listEscalations(id), listDues(id)])
+      setTier(t); setEscs(e.items); setDues(d.items)
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'تعذّر التحميل'); setTier(null)
     } finally { setLoading(false) }
@@ -164,6 +175,38 @@ export function CreditPage() {
             <Button variant="destructive" onClick={() => setModal('freeze')} disabled={busy}>تجميد (مستوى ٥)</Button>
           </section>
 
+          {/* Dues ledger */}
+          <section className="mb-[48px]">
+            <div className="flex items-center justify-between pb-space-sm mb-space-xs">
+              <div className="flex flex-col">
+                <span className="font-headline-2 text-headline-2 text-primary">الذمم</span>
+                <span className="font-small text-small text-secondary">أرصدة البيع الآجل القائمة والمسوّاة لهذا العميل</span>
+              </div>
+            </div>
+            {dues.length === 0 ? <EmptyState title="لا توجد ذمم." /> : (
+              <DataTable rows={dues} rowKey={(d) => d.id} columns={[
+                { header: 'التاريخ', cell: (d) => <Mono>{formatDate(d.due_date)}</Mono> },
+                { header: 'الطلب', cell: (d) => (d.order_id != null ? <Mono>#{d.order_id}</Mono> : <span className="text-secondary">—</span>) },
+                { header: 'المبلغ', align: 'end', cell: (d) => <span dir="ltr"><Mono>{formatMoney(d.amount)}</Mono> ج.م</span> },
+                {
+                  header: 'الحالة',
+                  align: 'center',
+                  cell: (d) => {
+                    const s = DUE_STATUS[d.status] ?? { ar: d.status, tone: 'neutral' as const }
+                    return <Pill tone={s.tone}>{s.ar}</Pill>
+                  },
+                },
+                {
+                  header: '',
+                  align: 'end',
+                  cell: (d) => (d.status === 'open'
+                    ? <Button disabled={busy} onClick={() => { setPayDueId(d.id); setPaidOn(todayIso()); setModal('pay') }}>تسجيل سداد</Button>
+                    : null),
+                },
+              ]} />
+            )}
+          </section>
+
           {/* Escalation / exception log */}
           <section>
             <div className="flex items-center justify-between pb-space-sm mb-space-xs">
@@ -207,6 +250,13 @@ export function CreditPage() {
           <Button variant="destructive" disabled={busy || reason.trim().length < 5}
             onClick={() => tier && act(() => freezeCustomer(tier.customer_id, reason), 'تم التجميد.')}>تأكيد التجميد</Button></>}>
         <Field label="سبب التجميد (إلزامي)" value={reason} onChange={(e) => setReason(e.target.value)} />
+      </Modal>
+
+      <Modal open={modal === 'pay'} onClose={() => setModal(null)} title="تسجيل سداد ذمّة"
+        footer={<><Button onClick={() => setModal(null)}>إلغاء</Button>
+          <Button variant="primary" disabled={busy || !paidOn || payDueId == null}
+            onClick={() => payDueId != null && act(() => payDue(payDueId, paidOn), 'سُجِّل السداد.')}>تأكيد السداد</Button></>}>
+        <Field label="تاريخ السداد" type="date" dir="ltr" mono value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
       </Modal>
     </Narrow>
   )
