@@ -455,6 +455,38 @@ def dunning_list(*, min_days: int = 0, tier: str | None = None) -> list[dict[str
     return out
 
 
+REMINDER_DAYS_BEFORE = 3
+
+
+def due_reminders() -> int:
+    """Proactive reminder (docs/04 §2): notify customers of open dues coming due
+    in REMINDER_DAYS_BEFORE days. In-app by default (switch the channel once the
+    SMS/WhatsApp provider is configured). Returns the count sent. Driven by Beat
+    daily, so each due is reminded once."""
+    from ...notifications.services import notify as notify_svc
+
+    target_date = _today() + timedelta(days=REMINDER_DAYS_BEFORE)
+    dues = list(
+        db.session.execute(
+            select(CustomerDue).where(
+                CustomerDue.status == "open", CustomerDue.due_date == target_date
+            )
+        ).scalars()
+    )
+    for d in dues:
+        notify_svc.notify(
+            user_id=d.customer_id,
+            title="تذكير باستحقاق قادم",
+            body=(
+                f"لديك ذمة بمبلغ {to_money(d.amount)} ج.م تستحق في "
+                f"{d.due_date.isoformat()}. السداد المبكر قد يمنحك خصمًا."
+            ),
+            type_="due_reminder",
+            channel="in_app",
+        )
+    return len(dues)
+
+
 def serialize_due(d: CustomerDue) -> dict[str, Any]:
     return {
         "id": d.id,

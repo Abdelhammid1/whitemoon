@@ -32,22 +32,34 @@ the worker and Beat run as separate `systemd` services.
 
 | job (task name) | schedule | what it does |
 |---|---|---|
-| `credit.nightly_scan` | daily 02:00 Africa/Cairo | `sales.services.escalation.nightly_scan`: recompute every active customer's credit tier, then open any due dunning/escalation events (docs/04 §1). Idempotent. |
+| `credit.nightly_scan` | daily 02:00 Africa/Cairo | `escalation.nightly_scan`: recompute every active customer's tier, then open due dunning/escalation events (docs/04 §1). Idempotent. |
+| `credit.due_reminders` | daily 08:00 Africa/Cairo | `credit.due_reminders`: notify customers of open dues coming due in 3 days (docs/04 §2). In-app today; flip the channel to sms/whatsapp once a provider is configured. |
 
-Trigger it manually (eager, for a smoke test) from a Flask shell:
+Also available (not scheduled): `notifications.dispatch(notification_id)` —
+async delivery of one notification on its external channel.
+
+Trigger a job manually (for a smoke test) from a Flask shell:
 
 ```python
-from app.sales.services import escalation
+from app.sales.services import escalation, credit
 escalation.nightly_scan()   # {'recomputed': N, 'escalations_opened': M}
+credit.due_reminders()      # count of reminders sent
 ```
 
-## Still to layer on Celery (follow-ups)
+## Notification delivery providers
+
+`app/notifications/providers/delivery.py` sends SMS/WhatsApp (Twilio) and
+e-mail (SMTP) **for real when configured**, and gracefully no-ops otherwise —
+so nothing breaks before credentials exist, and delivery starts with no code
+change once the env vars are set (see `.env.example`: `TWILIO_*`, `SMTP_*`).
+`notify._dispatch` routes external channels through it; in-app is the stored
+row. Delivery never raises — a provider failure cannot roll back a notification.
+
+## Still to layer on (follow-ups)
 
 - **Forced L3 colour downgrade + graduated de-escalation** (docs/04 §2) — a
-  change to the *signed* credit classification; needs finance sign-off before
-  implementation.
-- **Real notification/OTP dispatch** — route `notifications.notify._dispatch`
-  and OTP sending through Celery tasks once the SMS/WhatsApp/e-mail providers
-  are wired (Twilio/SMTP credentials required).
-- **Proactive 3-days-before-due reminders** (docs/04 §2) — a Beat task once the
-  reminder channel is live.
+  change to the *signed* credit classification; needs finance sign-off first.
+- **Real OTP delivery** — point `identity.providers.otp_provider.TwilioProvider`
+  at the same Twilio path (currently console-only in dev); needs credentials.
+- Switch the due-reminder channel from in-app to SMS/WhatsApp once Twilio is
+  live.

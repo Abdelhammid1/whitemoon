@@ -1,24 +1,46 @@
-"""Notification creation, delivery (stub channels), and reads."""
+"""Notification creation, external delivery, and reads."""
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from sqlalchemy import select, update
 
 from ...common.errors import BadRequest, NotFound
 from ...extensions import db
+from ...identity.models import User
 from ..models import CHANNELS, Notification
+from ..providers.delivery import deliver
+
+log = logging.getLogger(__name__)
 
 
 def _dispatch(n: Notification) -> None:
-    """Deliver a notification on its channel. in_app is the stored row itself;
-    the external channels are no-op stubs in this version (ready for a real
-    SMS/WhatsApp/e-mail provider without an API change)."""
+    """Deliver a notification on its channel. `in_app` is the stored row itself;
+    the external channels (sms/whatsapp/email) go through the delivery provider,
+    which sends for real when configured and otherwise no-ops. Delivery failures
+    are swallowed so they never roll back the notification."""
     if n.channel == "in_app":
         return
-    # Placeholder: a real provider (Twilio, WhatsApp Cloud, SMTP) hooks here.
-    return
+    user = db.session.get(User, n.user_id)
+    if user is None:
+        return
+    target = user.phone if n.channel in ("sms", "whatsapp") else user.email
+    try:
+        deliver(channel=n.channel, target=target, title=n.title, body=n.body)
+    except Exception:  # pragma: no cover - deliver already guards, belt & suspenders
+        log.exception("notification dispatch failed (id=%s, channel=%s)", n.id, n.channel)
+
+
+def redispatch(notification_id: int) -> bool:
+    """Re-attempt delivery of an existing notification (the async Celery path).
+    Returns True if the notification exists."""
+    n = db.session.get(Notification, notification_id)
+    if n is None:
+        return False
+    _dispatch(n)
+    return True
 
 
 def notify(

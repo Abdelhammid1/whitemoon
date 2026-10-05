@@ -7,6 +7,7 @@ calling the service function directly, with no worker or broker.
 from __future__ import annotations
 
 from .celery_app import celery_app
+from .sales.services import credit as credit_svc
 from .sales.services import escalation as esc_svc
 
 
@@ -15,3 +16,17 @@ def nightly_credit_scan() -> dict[str, int]:
     """Daily: recompute every active customer's credit tier and open any due
     escalation events. Scheduled by Celery Beat (see celery_app.beat_schedule)."""
     return esc_svc.nightly_scan()
+
+
+@celery_app.task(name="credit.due_reminders")
+def due_reminders() -> int:
+    """Daily: remind customers of dues coming due in a few days (docs/04 §2)."""
+    return credit_svc.due_reminders()
+
+
+@celery_app.task(name="notifications.dispatch")
+def dispatch_notification(notification_id: int) -> bool:
+    """Async delivery of a single notification on its external channel."""
+    from .notifications.services import notify as notify_svc
+
+    return notify_svc.redispatch(notification_id)

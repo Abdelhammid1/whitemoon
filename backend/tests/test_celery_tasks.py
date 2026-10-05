@@ -36,9 +36,39 @@ def test_nightly_scan_recomputes_and_escalates(client) -> None:
     assert result["escalations_opened"] >= 1  # 20 days overdue opens an event
 
 
-def test_celery_task_registered(client) -> None:
-    import app.tasks  # noqa: F401 — importing registers the task
+def test_due_reminders_notifies_upcoming(client) -> None:
+    cust = create_user(kind="customer", email="rem@example.com", roles=("customer",))
+    db.session.commit()
+    # Due in exactly 3 days → reminded; due in 10 days → not.
+    credit_svc.record_due(customer_id=cust.id, order_id=None, amount=Decimal("400"), due_date=date.today() + timedelta(days=3))
+    credit_svc.record_due(customer_id=cust.id, order_id=None, amount=Decimal("400"), due_date=date.today() + timedelta(days=10))
+    db.session.commit()
+    assert credit_svc.due_reminders() == 1
+    from app.notifications.services import notify as notify_svc
+    assert any(n.type == "due_reminder" for n in notify_svc.list_for(cust.id))
+
+
+def test_external_channel_delivery_noop_when_unconfigured(client) -> None:
+    from app.notifications.providers.delivery import deliver
+    from app.notifications.services import notify as notify_svc
+
+    # No provider env in tests → graceful no-op (never raises).
+    assert deliver(channel="sms", target="+201000000000", title="t", body="b") is False
+    assert deliver(channel="email", target="x@example.com", title="t", body="b") is False
+    assert deliver(channel="sms", target=None, title="t", body=None) is False
+    # notify() on an external channel still succeeds and stores the row.
+    cust = create_user(kind="customer", email="smsuser@example.com", phone="+201111111111", roles=("customer",))
+    db.session.commit()
+    n = notify_svc.notify(user_id=cust.id, title="تنبيه", channel="sms")
+    assert n.id is not None and n.channel == "sms"
+
+
+def test_celery_tasks_registered(client) -> None:
+    import app.tasks  # noqa: F401 — importing registers the tasks
     from app.celery_app import celery_app
 
     assert "credit.nightly_scan" in celery_app.tasks
+    assert "credit.due_reminders" in celery_app.tasks
+    assert "notifications.dispatch" in celery_app.tasks
     assert "nightly-credit-scan" in celery_app.conf.beat_schedule
+    assert "daily-due-reminders" in celery_app.conf.beat_schedule

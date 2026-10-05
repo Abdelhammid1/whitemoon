@@ -45,6 +45,11 @@ def _make_celery() -> Celery:
                 "task": "credit.nightly_scan",
                 "schedule": crontab(hour="2", minute="0"),  # 02:00 Africa/Cairo
             },
+            # Proactive reminders (docs/04 §2): dues coming due in a few days.
+            "daily-due-reminders": {
+                "task": "credit.due_reminders",
+                "schedule": crontab(hour="8", minute="0"),  # 08:00 Africa/Cairo
+            },
         },
     )
 
