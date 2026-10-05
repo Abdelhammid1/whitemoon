@@ -50,6 +50,11 @@ def _make_celery() -> Celery:
                 "task": "credit.due_reminders",
                 "schedule": crontab(hour="8", minute="0"),  # 08:00 Africa/Cairo
             },
+            # Low-stock reorder chain (US-4.3): open + advance alerts.
+            "daily-reorder-scan": {
+                "task": "inventory.reorder_scan",
+                "schedule": crontab(hour="3", minute="0"),  # 03:00 Africa/Cairo
+            },
         },
     )
 

@@ -26,6 +26,14 @@ def due_reminders() -> int:
     return credit_svc.due_reminders()
 
 
+@celery_app.task(name="inventory.reorder_scan")
+def reorder_scan() -> dict[str, int]:
+    """Daily: open new low-stock alerts and advance the reorder chain (US-4.3)."""
+    from .inventory.services import reorder as reorder_svc
+
+    return reorder_svc.scan()
+
+
 @celery_app.task(name="notifications.dispatch")
 def dispatch_notification(notification_id: int) -> bool:
     """Async delivery of a single notification on its external channel."""

@@ -340,6 +340,28 @@ def reorder_check():
     return jsonify({"created": [reorder_svc.serialize(a) for a in created]})
 
 
+@bp.get("/reorder/alerts")
+@require_permission("inventory.manage")
+def reorder_alerts():
+    open_only = request.args.get("open", "true").lower() != "false"
+    alerts = reorder_svc.list_alerts(open_only=open_only)
+    return jsonify({"items": [reorder_svc.serialize(a) for a in alerts]})
+
+
+@bp.post("/reorder/escalate")
+@require_permission("inventory.manage")
+def reorder_escalate():
+    """Advance the low-stock escalation chain (also run on a schedule)."""
+    return jsonify(reorder_svc.escalate())
+
+
+@bp.post("/reorder/alerts/<int:alert_id>/ack")
+@require_permission("inventory.manage")
+def reorder_ack(alert_id: int):
+    alert = reorder_svc.acknowledge(alert_id=alert_id, user_id=_uid())
+    return jsonify(reorder_svc.serialize(alert))
+
+
 # ================================================================ errors
 
 

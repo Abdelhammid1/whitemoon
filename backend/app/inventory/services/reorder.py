@@ -9,13 +9,20 @@ Center can fan it out.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
 
+from ...common.errors import Conflict, NotFound
 from ...common.money import to_money
 from ...extensions import db
 from ..models import ReorderAlert, StockBalance
+
+# Hours an alert may sit at a level before it climbs the chain (docs/EPIC 4).
+ESCALATE_AFTER_HOURS = 24
+# Top of the chain: level 4 = the supplier (restock request).
+MAX_LEVEL = 4
 
 
 def check(*, supplier_id: int | None = None) -> list[ReorderAlert]:
@@ -55,6 +62,82 @@ def check(*, supplier_id: int | None = None) -> list[ReorderAlert]:
         created.append(alert)
     db.session.commit()
     return created
+
+
+def _notify_restock(bal: StockBalance) -> None:
+    """Fan a level-4 alert out to the supplier as a restock request (US-4.3)."""
+    from ...notifications.services import notify as notify_svc
+
+    notify_svc.notify(
+        user_id=bal.supplier_id,
+        title="طلب إعادة توريد",
+        body=f"المنتج #{bal.product_id} وصل حدّ إعادة الطلب في أحد المواقع — يرجى إعادة التوريد.",
+        type_="reorder",
+        channel="in_app",
+    )
+
+
+def escalate(*, min_hours_at_level: int = ESCALATE_AFTER_HOURS) -> dict[str, int]:
+    """Advance the reorder chain (docs/EPIC 4): an open alert at level < 4 whose
+    stock is still low and has sat at its level ≥ min_hours climbs one level
+    (1 customer/branch → 2 agent → 3 company → 4 supplier). A recovered balance
+    closes its alert. Level 4 notifies the supplier. Run on a schedule."""
+    now = datetime.now(UTC)
+    cutoff = now - timedelta(hours=min_hours_at_level)
+    open_alerts = db.session.execute(
+        select(ReorderAlert).where(ReorderAlert.acknowledged_at.is_(None))
+    ).scalars().all()
+
+    reached_supplier: list[StockBalance] = []
+    advanced = closed = 0
+    for a in open_alerts:
+        bal = db.session.get(StockBalance, a.stock_balance_id)
+        if bal is None:
+            continue
+        still_low = (
+            bal.reorder_point is not None
+            and to_money(bal.on_hand) <= to_money(bal.reorder_point)
+        )
+        if not still_low:
+            a.acknowledged_at = now  # restocked → auto-close
+            closed += 1
+            continue
+        if a.level < MAX_LEVEL and a.triggered_at <= cutoff:
+            a.level += 1
+            a.triggered_at = now
+            advanced += 1
+            if a.level == MAX_LEVEL:
+                reached_supplier.append(bal)
+    db.session.commit()
+    for bal in reached_supplier:
+        _notify_restock(bal)
+    return {"advanced": advanced, "closed": closed}
+
+
+def scan(*, supplier_id: int | None = None) -> dict[str, int]:
+    """One scheduled sweep: open new level-1 alerts, then advance the chain."""
+    opened = len(check(supplier_id=supplier_id))
+    result = escalate()
+    return {"opened": opened, **result}
+
+
+def acknowledge(*, alert_id: int, user_id: int) -> ReorderAlert:
+    alert = db.session.get(ReorderAlert, alert_id)
+    if alert is None:
+        raise NotFound("التنبيه غير موجود", code="alert_not_found")
+    if alert.acknowledged_at is not None:
+        raise Conflict("التنبيه مُعالَج بالفعل", code="alert_already_acked")
+    alert.acknowledged_at = datetime.now(UTC)
+    alert.acknowledged_by = user_id
+    db.session.commit()
+    return alert
+
+
+def list_alerts(*, open_only: bool = True) -> list[ReorderAlert]:
+    stmt = select(ReorderAlert).order_by(ReorderAlert.level.desc(), ReorderAlert.id.desc())
+    if open_only:
+        stmt = stmt.where(ReorderAlert.acknowledged_at.is_(None))
+    return list(db.session.execute(stmt).scalars())
 
 
 def serialize(alert: ReorderAlert) -> dict[str, Any]:
