@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import get_jwt_identity
 from sqlalchemy import or_, select
 
 from ..audit.models import AuditEvent
 from ..common.errors import BadRequest, Conflict, NotFound, Unauthorized
+from ..common.money import to_money
 from ..extensions import db
 from ..identity.services.audit import emit as audit_emit
 from .models import (
@@ -18,7 +21,12 @@ from .models import (
     User,
     UserRole,
 )
-from .schemas import AdminCreateUserIn, ImpersonateStartIn, RejectSupplierIn
+from .schemas import (
+    AdminCreateUserIn,
+    AdminUpdateUserProfileIn,
+    ImpersonateStartIn,
+    RejectSupplierIn,
+)
 from .services import impersonation as imp_svc
 from .services import passwords
 from .services import supplier_approval as supplier_svc
@@ -73,7 +81,13 @@ def create_user():
 
     # Minimal matching profile so downstream joins resolve.
     if payload.kind == "customer":
-        db.session.add(CustomerProfile(user_id=user.id, display_name=payload.display_name))
+        db.session.add(
+            CustomerProfile(
+                user_id=user.id,
+                display_name=payload.display_name,
+                geo_area=payload.geo_area.strip() if payload.geo_area else None,
+            )
+        )
     elif payload.kind == "supplier":
         db.session.add(
             SupplierProfile(
@@ -156,6 +170,19 @@ def get_user(user_id: int):
             .where(UserRole.user_id == user_id)
         ).scalars()
     )
+    # Profile-level fields the admin can edit (T-01 / T-03).
+    geo_area: str | None = None
+    min_order_value: str | None = None
+    if user.kind == "customer":
+        cp = db.session.execute(
+            select(CustomerProfile).where(CustomerProfile.user_id == user_id)
+        ).scalar_one_or_none()
+        geo_area = cp.geo_area if cp else None
+    elif user.kind == "supplier":
+        sp = db.session.execute(
+            select(SupplierProfile).where(SupplierProfile.user_id == user_id)
+        ).scalar_one_or_none()
+        min_order_value = str(to_money(sp.min_order_value)) if sp else None
     return jsonify(
         {
             "id": user.id,
@@ -166,8 +193,59 @@ def get_user(user_id: int):
             "created_at": user.created_at.isoformat() if user.created_at else None,
             "activated_at": user.activated_at.isoformat() if user.activated_at else None,
             "roles": role_codes,
+            "geo_area": geo_area,
+            "min_order_value": min_order_value,
         }
     )
+
+
+@bp.patch("/users/<int:user_id>")
+@require_permission("admin.high")
+def update_user_profile(user_id: int):
+    """Edit profile-level fields: a customer's geo_area (T-01) or a supplier's
+    min_order_value (T-03). Only the field matching the user's kind applies."""
+    user = db.session.get(User, user_id)
+    if user is None:
+        raise NotFound("المستخدم غير موجود", code="user_not_found")
+    body = request.get_json(silent=True) or {}
+    try:
+        payload = AdminUpdateUserProfileIn.model_validate(body)
+    except Exception as e:
+        raise BadRequest("Invalid payload", code="validation_error") from e
+
+    changed: dict[str, object] = {}
+    if payload.geo_area is not None:
+        if user.kind != "customer":
+            raise BadRequest("المنطقة الجغرافية للعملاء فقط", code="geo_area_customer_only")
+        cp = db.session.execute(
+            select(CustomerProfile).where(CustomerProfile.user_id == user_id)
+        ).scalar_one_or_none()
+        if cp is None:
+            raise NotFound("ملف العميل غير موجود", code="customer_profile_not_found")
+        cp.geo_area = payload.geo_area.strip() or None
+        changed["geo_area"] = cp.geo_area
+    if payload.min_order_value is not None:
+        if user.kind != "supplier":
+            raise BadRequest("الحد الأدنى للطلب للموردين فقط", code="min_order_supplier_only")
+        sp = db.session.execute(
+            select(SupplierProfile).where(SupplierProfile.user_id == user_id)
+        ).scalar_one_or_none()
+        if sp is None:
+            raise NotFound("ملف المورد غير موجود", code="supplier_profile_not_found")
+        sp.min_order_value = to_money(Decimal(str(payload.min_order_value)))
+        changed["min_order_value"] = str(sp.min_order_value)
+    if not changed:
+        raise BadRequest("لا توجد تغييرات", code="no_changes")
+
+    audit_emit(
+        "admin.user.profile_updated",
+        actor_user_id=_current_admin_id(),
+        target_type="user",
+        target_id=user_id,
+        after=changed,
+    )
+    db.session.commit()
+    return jsonify({"id": user_id, **changed})
 
 
 @bp.get("/audit")

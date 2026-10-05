@@ -77,6 +77,24 @@ export interface AccountRow {
 export async function listAccounts() {
   return api<{ items: AccountRow[] }>('/accounting/accounts')
 }
+/** Create an account under a parent (type is inherited from the parent). */
+export async function createAccount(body: {
+  code: string
+  name_ar: string
+  name_en?: string
+  parent_code: string
+  is_postable?: boolean
+  category?: string
+  eta_code?: string
+}) {
+  return api<AccountRow>('/accounting/accounts', { method: 'POST', body })
+}
+export async function updateAccount(
+  code: string,
+  body: { name_ar?: string; name_en?: string; is_postable?: boolean; category?: string; eta_code?: string },
+) {
+  return api<AccountRow>(`/accounting/accounts/${code}`, { method: 'PUT', body })
+}
 
 export interface PeriodListRow {
   id: number

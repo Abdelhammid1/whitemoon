@@ -27,11 +27,22 @@ class AdminCreateUserIn(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     display_name: str = Field(min_length=1, max_length=200)
     status: str = Field(default="active", pattern="^(active|pending|suspended)$")
+    # Customer territory (T-01) — so an admin can provision an in-scope customer.
+    geo_area: str | None = Field(default=None, max_length=200)
 
     @field_validator("phone")
     @classmethod
     def _trim_phone(cls, v: str | None) -> str | None:
         return v.strip() if v else v
+
+
+class AdminUpdateUserProfileIn(BaseModel):
+    """Admin edit of profile-level fields: a customer's territory (T-01) and a
+    supplier's minimum order value (T-03). Only the field matching the user's
+    kind is applied."""
+
+    geo_area: str | None = Field(default=None, max_length=200)
+    min_order_value: float | None = Field(default=None, ge=0)
 
 
 class RegisterSupplierIn(BaseModel):

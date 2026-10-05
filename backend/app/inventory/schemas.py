@@ -17,7 +17,9 @@ class ProductIn(BaseModel):
     sku: str = Field(min_length=1, max_length=60)
     name_ar: str = Field(min_length=1, max_length=200)
     name_en: str | None = None
-    category: str = Field(pattern="^(food|clothing)$")
+    category: str = Field(
+        pattern="^(food|clothing|electronics|home|beauty|construction|stationery|automotive|other)$"
+    )
     unit: str = "piece"
     eta_code: str | None = None
     food_expiry_tracked: bool = False

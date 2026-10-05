@@ -32,9 +32,38 @@ export async function listUsers(params: {
 export interface UserDetail extends AdminUser {
   activated_at: string | null
   roles: string[]
+  geo_area: string | null // customers (T-01)
+  min_order_value: string | null // suppliers (T-03)
 }
 export async function getUser(userId: number) {
   return api<UserDetail>(`/admin/users/${userId}`)
+}
+
+export async function createUser(body: {
+  kind: string
+  roles: string[]
+  phone?: string
+  email?: string
+  password: string
+  display_name: string
+  status?: string
+  geo_area?: string
+}) {
+  return api<{ id: number; kind: string; status: string; roles: string[] }>('/admin/users', {
+    method: 'POST',
+    body,
+  })
+}
+
+/** Set a customer's territory (geo_area) or a supplier's min_order_value. */
+export async function updateUserProfile(
+  userId: number,
+  body: { geo_area?: string; min_order_value?: number },
+) {
+  return api<{ id: number; geo_area?: string | null; min_order_value?: string }>(
+    `/admin/users/${userId}`,
+    { method: 'PATCH', body },
+  )
 }
 
 export interface AuditRow {

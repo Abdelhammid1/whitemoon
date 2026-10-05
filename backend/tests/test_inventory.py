@@ -57,6 +57,14 @@ def test_product_catalog_enforces_category(client) -> None:
         products_svc.create_product(sku="X", name_ar="x", category="toys")
 
 
+def test_product_catalog_accepts_expanded_categories(client) -> None:
+    # T-10: segments beyond food/clothing are now valid.
+    for cat in ("electronics", "home", "beauty", "construction", "stationery", "automotive", "other"):
+        p = _product(sku=f"EXP-{cat}", category=cat)
+        db.session.commit()
+        assert p.category == cat
+
+
 def test_best_price_never_exposes_supplier(client) -> None:
     p = _product()
     s1 = create_user(kind="supplier", email="s1@example.com", roles=("supplier",))

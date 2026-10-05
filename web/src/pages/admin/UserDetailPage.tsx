@@ -1,10 +1,11 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { useParams } from 'react-router-dom'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Pill, Spinner, SectionHeader, EmptyState, InlineError } from '../../components/ui'
+import { PageTitle, Pill, Button, Field, Spinner, SectionHeader, EmptyState, InlineError } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
-import { getUser, listAudit, type UserDetail, type AuditRow } from '../../api/admin'
+import { getUser, listAudit, updateUserProfile, type UserDetail, type AuditRow } from '../../api/admin'
 import { ApiError } from '../../api/client'
+import { useToast } from '../../components/Toast'
 import { formatDate } from '../../lib/format'
 
 const KIND_AR: Record<string, string> = {
@@ -17,10 +18,14 @@ const STATUS_TONE: Record<string, 'signal' | 'warning' | 'error' | 'neutral'> = 
 export function UserDetailPage() {
   const { id } = useParams()
   const uid = Number(id)
+  const toast = useToast()
   const [user, setUser] = useState<UserDetail | null>(null)
   const [activity, setActivity] = useState<AuditRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [geoArea, setGeoArea] = useState('')
+  const [minOrder, setMinOrder] = useState('')
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -29,6 +34,8 @@ export function UserDetailPage() {
       .then((u) => {
         if (!active) return
         setUser(u)
+        setGeoArea(u.geo_area ?? '')
+        setMinOrder(u.min_order_value ?? '')
         // Activity needs the governance (admin.high) audit read; best-effort
         // so a non-senior viewer still sees the user detail without it.
         return listAudit({ limit: 300 })
@@ -44,6 +51,26 @@ export function UserDetailPage() {
       .finally(() => active && setLoading(false))
     return () => { active = false }
   }, [uid])
+
+  async function refresh() {
+    const u = await getUser(uid)
+    setUser(u)
+    setGeoArea(u.geo_area ?? '')
+    setMinOrder(u.min_order_value ?? '')
+  }
+
+  async function saveProfile(body: { geo_area?: string; min_order_value?: number }) {
+    setBusy(true)
+    try {
+      await updateUserProfile(uid, body)
+      toast.success('تم الحفظ.')
+      await refresh()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'تعذّر الحفظ')
+    } finally {
+      setBusy(false)
+    }
+  }
 
   if (loading) return <Narrow><Spinner /></Narrow>
   if (error || !user) {
@@ -78,6 +105,36 @@ export function UserDetailPage() {
           <Row label="تاريخ التفعيل" value={<Mono>{user.activated_at ? formatDate(user.activated_at) : '—'}</Mono>} />
         </div>
       </section>
+
+      {user.kind === 'customer' && (
+        <section className="mt-[48px]">
+          <SectionHeader title="النطاق الجغرافي" />
+          <div className="mt-space-md flex items-end gap-space-sm">
+            <div className="flex-1">
+              <Field label="المنطقة الجغرافية" value={geoArea} onChange={(e) => setGeoArea(e.target.value)} />
+            </div>
+            <Button variant="primary" disabled={busy} onClick={() => void saveProfile({ geo_area: geoArea })}>حفظ</Button>
+          </div>
+          <p className="mt-space-xs font-small text-small text-secondary">
+            تحدِّد أي وكيل يمكنه خدمة هذا العميل (نطاق التغطية). بدونها يُرفض وصول الوكيل.
+          </p>
+        </section>
+      )}
+
+      {user.kind === 'supplier' && (
+        <section className="mt-[48px]">
+          <SectionHeader title="شروط المورد" />
+          <div className="mt-space-md flex items-end gap-space-sm">
+            <div className="w-56">
+              <Field label="الحد الأدنى للطلب (ج.م)" dir="ltr" mono inputMode="decimal" value={minOrder} onChange={(e) => setMinOrder(e.target.value)} />
+            </div>
+            <Button variant="primary" disabled={busy || minOrder === ''} onClick={() => void saveProfile({ min_order_value: Number(minOrder) })}>حفظ</Button>
+          </div>
+          <p className="mt-space-xs font-small text-small text-secondary">
+            أقل قيمة مسموح بها لطلب يحتوي على أصناف هذا المورد.
+          </p>
+        </section>
+      )}
 
       <section className="mt-[48px]">
         <SectionHeader title="النشاط الأخير" />

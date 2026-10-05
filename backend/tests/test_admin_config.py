@@ -45,6 +45,52 @@ def test_admin_create_user_rejects_duplicate_email(client) -> None:
     assert r.status_code == 409
 
 
+def test_admin_sets_customer_geo_area(client) -> None:
+    """T-01: an admin can set a customer's territory so agents are in scope."""
+    h = _high(client)
+    r = client.post("/admin/users", headers=h, json={
+        "kind": "customer", "roles": ["customer"], "email": "geo@example.com",
+        "password": "secret-pw-123", "display_name": "عميل"})
+    uid = r.get_json()["id"]
+    p = client.patch(f"/admin/users/{uid}", headers=h, json={"geo_area": "القاهرة"})
+    assert p.status_code == 200, p.get_json()
+    assert p.get_json()["geo_area"] == "القاهرة"
+    assert client.get(f"/admin/users/{uid}", headers=h).get_json()["geo_area"] == "القاهرة"
+
+
+def test_admin_create_customer_with_geo_area(client) -> None:
+    h = _high(client)
+    r = client.post("/admin/users", headers=h, json={
+        "kind": "customer", "roles": ["customer"], "email": "geocreate@example.com",
+        "password": "secret-pw-123", "display_name": "عميل", "geo_area": "الجيزة"})
+    assert r.status_code == 201, r.get_json()
+    uid = r.get_json()["id"]
+    assert client.get(f"/admin/users/{uid}", headers=h).get_json()["geo_area"] == "الجيزة"
+
+
+def test_admin_sets_supplier_min_order(client) -> None:
+    """T-03: an admin can set a supplier's minimum order value."""
+    h = _high(client)
+    r = client.post("/admin/users", headers=h, json={
+        "kind": "supplier", "roles": ["supplier"], "email": "minsup@example.com",
+        "password": "secret-pw-123", "display_name": "مورد"})
+    uid = r.get_json()["id"]
+    p = client.patch(f"/admin/users/{uid}", headers=h, json={"min_order_value": 5000})
+    assert p.status_code == 200, p.get_json()
+    assert p.get_json()["min_order_value"] == "5000.0000"
+    assert client.get(f"/admin/users/{uid}", headers=h).get_json()["min_order_value"] == "5000.0000"
+
+
+def test_geo_area_rejected_for_supplier(client) -> None:
+    h = _high(client)
+    r = client.post("/admin/users", headers=h, json={
+        "kind": "supplier", "roles": ["supplier"], "email": "wrongkind@example.com",
+        "password": "secret-pw-123", "display_name": "مورد"})
+    uid = r.get_json()["id"]
+    p = client.patch(f"/admin/users/{uid}", headers=h, json={"geo_area": "القاهرة"})
+    assert p.status_code == 400
+
+
 # ---------------------------------------------------------------- T-08
 
 

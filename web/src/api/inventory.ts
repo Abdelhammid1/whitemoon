@@ -1,16 +1,43 @@
 import { api } from './client'
 
+export interface ProductVariant {
+  id: number
+  sku: string
+  barcode: string | null
+  size: string | null
+  color: string | null
+  is_active: boolean
+}
 export interface Product {
   id: number
   sku: string
   name_ar: string
   name_en: string | null
-  category: 'food' | 'clothing'
+  category: string
+  subcategory?: string | null
+  brand?: string | null
+  barcode?: string | null
+  description?: string | null
+  image_url?: string | null
   unit: string
   eta_code: string | null
   food_expiry_tracked: boolean
   is_active: boolean
+  variants?: ProductVariant[]
 }
+
+/** Allowed product categories (curated list, T-10) — code → Arabic label. */
+export const PRODUCT_CATEGORIES: { code: string; label: string }[] = [
+  { code: 'food', label: 'غذائية' },
+  { code: 'clothing', label: 'ملابس' },
+  { code: 'electronics', label: 'إلكترونيات' },
+  { code: 'home', label: 'أدوات منزلية' },
+  { code: 'beauty', label: 'عناية وتجميل' },
+  { code: 'construction', label: 'مواد بناء' },
+  { code: 'stationery', label: 'قرطاسية' },
+  { code: 'automotive', label: 'قطع غيار' },
+  { code: 'other', label: 'أخرى' },
+]
 
 export interface Offer {
   id: number
@@ -69,11 +96,25 @@ export async function createProduct(body: {
   name_ar: string
   name_en?: string
   category: string
+  subcategory?: string
+  brand?: string
+  barcode?: string
+  description?: string
+  image_url?: string
   unit?: string
   eta_code?: string
   food_expiry_tracked?: boolean
 }) {
   return api<Product>('/inventory/products', { method: 'POST', body })
+}
+export async function addVariant(
+  productId: number,
+  body: { sku: string; barcode?: string; size?: string; color?: string },
+) {
+  return api<{ id: number; product_id: number; sku: string }>(
+    `/inventory/products/${productId}/variants`,
+    { method: 'POST', body },
+  )
 }
 export async function bestPrice(productId: number) {
   return api<{ product_id: number; best: { best_price: string; moq: string } | null }>(

@@ -37,7 +37,17 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..common.base_model import Base, TimestampMixin
 
-CATEGORIES = ("food", "clothing")
+CATEGORIES = (
+    "food",
+    "clothing",
+    "electronics",
+    "home",
+    "beauty",
+    "construction",
+    "stationery",
+    "automotive",
+    "other",
+)
 LOCATION_TYPES = ("supplier", "channel_partner", "in_transit", "customer_hold")
 TRANSFER_STATUSES = ("draft", "issued", "received", "cancelled")
 SHORTAGE_STATUSES = ("pending", "resolved", "rejected")
@@ -54,7 +64,9 @@ class Product(Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("sku", name="uq_products_sku"),
         CheckConstraint(
-            "category in ('food','clothing')", name="ck_products_category"
+            "category in ('food','clothing','electronics','home','beauty',"
+            "'construction','stationery','automotive','other')",
+            name="ck_products_category",
         ),
         {"schema": "inventory"},
     )
