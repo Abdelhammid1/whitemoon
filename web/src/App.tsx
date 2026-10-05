@@ -42,6 +42,7 @@ import { PosSalesPage } from './pages/pos/PosSalesPage'
 import { PosSettlePage } from './pages/pos/PosSettlePage'
 import { LogisticsPage } from './pages/logistics/LogisticsPage'
 import { TrackingPage } from './pages/logistics/TrackingPage'
+import { DeliveryConfirmPage } from './pages/logistics/DeliveryConfirmPage'
 import { ChatPage } from './pages/comm/ChatPage'
 import { ChatThreadPage } from './pages/comm/ChatThreadPage'
 import { BiDashboardPage } from './pages/bi/BiDashboardPage'
@@ -112,6 +113,7 @@ export function App() {
         <Route path="/pos/settle" element={<ProtectedRoute roles={FINANCE}><PosSettlePage /></ProtectedRoute>} />
 
         <Route path="/logistics" element={<ProtectedRoute roles={FINANCE}><LogisticsPage /></ProtectedRoute>} />
+        <Route path="/logistics/deliver" element={<ProtectedRoute roles={FINANCE}><DeliveryConfirmPage /></ProtectedRoute>} />
         <Route path="/orders/:id/shipment" element={<TrackingPage />} />
 
         <Route path="/chat" element={<ChatPage />} />

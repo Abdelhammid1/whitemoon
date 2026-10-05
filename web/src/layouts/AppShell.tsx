@@ -68,6 +68,7 @@ const GROUPS: NavGroup[] = [
       { to: '/partners', label: 'الوكلاء والفروع' },
       { to: '/production', label: 'أوامر التصنيع' },
       { to: '/logistics', label: 'اللوجستيات' },
+      { to: '/logistics/deliver', label: 'تأكيد التسليم' },
       { to: '/pos/settle', label: 'تسوية نقطة البيع' },
     ],
   },

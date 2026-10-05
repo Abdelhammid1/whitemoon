@@ -50,6 +50,15 @@ export async function setShipmentStatus(id: number, status: string) {
 export async function addLeg(id: number, body: { carrier_type: string; carrier_ref?: string; from_label?: string; to_label?: string }) {
   return api<{ id: number; seq: number }>(`/logistics/shipments/${id}/legs`, { method: 'POST', body })
 }
-export async function confirmDelivery(id: number, body: { confirmation_code?: string; signature?: string }) {
+export interface ShortageLine {
+  product_id: number
+  qty: number
+  photo_url?: string
+  note?: string
+}
+export async function confirmDelivery(
+  id: number,
+  body: { confirmation_code?: string; signature?: string; shortages?: ShortageLine[] },
+) {
   return api<Shipment>(`/logistics/shipments/${id}/confirm`, { method: 'POST', body })
 }
