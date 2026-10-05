@@ -4,6 +4,7 @@ import { Narrow } from '../../layouts/AppShell'
 import { PageTitle, Pill, Spinner, EmptyState, InlineError } from '../../components/ui'
 import { Icon } from '../../components/Icon'
 import { Mono } from '../../components/DataTable'
+import { ShipmentMap } from '../../components/ShipmentMap'
 import { trackShipment, type Shipment } from '../../api/logistics'
 import { ApiError } from '../../api/client'
 import { formatDate } from '../../lib/format'
@@ -76,6 +77,14 @@ export function TrackingPage() {
     } finally { setLoading(false); setRefreshing(false) }
   }, [id])
   useEffect(() => { void load() }, [load])
+
+  // Live tracking: poll for the rep's latest location until delivered/failed.
+  useEffect(() => {
+    const st = ship?.status
+    if (!st || st === 'delivered' || st === 'failed') return
+    const t = setInterval(() => { void load() }, 20000)
+    return () => clearInterval(t)
+  }, [ship?.status, load])
 
   if (loading) return <Narrow><Spinner /></Narrow>
   if (missing)
@@ -174,6 +183,21 @@ export function TrackingPage() {
                 <span>ORDER #{ship.order_id} ONLY</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Live location map (US-9.2) — free OpenStreetMap, polled above */}
+        {ship.current_lat && ship.current_lng && (
+          <div className="flex flex-col gap-space-sm">
+            <div className="flex items-center justify-between">
+              <h2 className="font-headline-2 text-headline-2 text-primary">الموقع الحي للمندوب</h2>
+              {ship.location_updated_at && (
+                <span className="font-mono-body text-small text-secondary" dir="ltr">
+                  {formatDate(ship.location_updated_at)}
+                </span>
+              )}
+            </div>
+            <ShipmentMap lat={Number(ship.current_lat)} lng={Number(ship.current_lng)} />
           </div>
         )}
 
