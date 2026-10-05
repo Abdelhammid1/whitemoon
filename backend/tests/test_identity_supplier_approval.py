@@ -52,6 +52,10 @@ def test_admin_approves_supplier(client: FlaskClient) -> None:
     assert len(events) == 1
     assert events[0].target_id == str(sup_id)
 
+    # US-1.3: the supplier is notified of the approval.
+    from app.notifications.services import notify as notify_svc
+    assert any(n.type == "supplier_approval" for n in notify_svc.list_for(sup_id))
+
 
 def test_admin_rejects_supplier_with_reason(client: FlaskClient) -> None:
     create_user(kind="admin", email="a2@example.com", roles=("admin",))

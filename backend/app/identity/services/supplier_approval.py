@@ -17,6 +17,29 @@ from . import audit
 MIN_REASON_LEN = 5
 
 
+def _notify_supplier(user_id: int, *, approved: bool, reason: str | None = None) -> None:
+    """Tell the supplier their registration status (US-1.3). Approval is in-app
+    (they can now log in); rejection goes by e-mail since they can't."""
+    from ...notifications.services import notify as notify_svc
+
+    if approved:
+        notify_svc.notify(
+            user_id=user_id,
+            title="تم اعتماد حسابك",
+            body="تم اعتماد تسجيلك كمورد — يمكنك الآن إضافة المنتجات والبيع.",
+            type_="supplier_approval",
+            channel="in_app",
+        )
+    else:
+        notify_svc.notify(
+            user_id=user_id,
+            title="تم رفض طلب التسجيل",
+            body=f"نأسف، تم رفض طلب تسجيلك كمورد. السبب: {reason}",
+            type_="supplier_approval",
+            channel="email",
+        )
+
+
 def approve(*, admin_user_id: int, user_id: int) -> User:
     user = db.session.get(User, user_id)
     if user is None or user.kind != "supplier":
@@ -41,6 +64,7 @@ def approve(*, admin_user_id: int, user_id: int) -> User:
         target_id=user_id,
     )
     db.session.commit()
+    _notify_supplier(user_id, approved=True)
     return user
 
 
@@ -65,4 +89,5 @@ def reject(*, admin_user_id: int, user_id: int, reason: str) -> User:
         reason=reason,
     )
     db.session.commit()
+    _notify_supplier(user_id, approved=False, reason=reason.strip())
     return user
