@@ -5,11 +5,19 @@ import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError } f
 import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import {
-  computeAccrual, getTerms, listAccruals, listDeposits, recordDeposit, refundDeposit, setTerms,
-  type Accrual, type Deposit, type PartnerTerms,
+  computeAccrual, getLedger, getTerms, listAccruals, listDeposits, recordDeposit,
+  recordLedgerEntry, refundDeposit, setTerms,
+  type Accrual, type Deposit, type LedgerEntry, type LedgerSummary, type PartnerTerms,
 } from '../../api/partners'
 import { ApiError } from '../../api/client'
-import { formatMoney, todayIso } from '../../lib/format'
+import { formatMoney, formatDate, todayIso } from '../../lib/format'
+
+/* movement → Arabic label + balance-effect tone (+1 = partner owes us more) */
+function ledgerLabel(e: LedgerEntry): string {
+  if (e.kind === 'payment_made') return 'دفعنا له (نقد خارج)'
+  if (e.kind === 'payment_received') return 'استلمنا منه (نقد داخل)'
+  return e.direction > 0 ? 'تعديل يدوي — تحميل عليه' : 'تعديل يدوي — زيادة لصالحه'
+}
 
 export function PartnerDetailPage() {
   const { id } = useParams()
@@ -18,17 +26,21 @@ export function PartnerDetailPage() {
   const [terms, setTermsState] = useState<PartnerTerms | null>(null)
   const [deposits, setDeposits] = useState<Deposit[]>([])
   const [accruals, setAccruals] = useState<Accrual[]>([])
+  const [ledger, setLedger] = useState<LedgerSummary | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [dep, setDep] = useState({ amount: '', recovery_conditions: '' })
   const [acc, setAcc] = useState({ kind: 'commission', year: String(new Date().getFullYear()), month: String(new Date().getMonth() + 1) })
+  const [pay, setPay] = useState({ amount: '', note: '' })
+  const [recv, setRecv] = useState({ amount: '', note: '' })
+  const [adj, setAdj] = useState({ amount: '', note: '', direction: -1 }) // -1 = زوّده له
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
     try {
-      const [t, d, a] = await Promise.all([getTerms(pid), listDeposits(pid), listAccruals(pid)])
-      setTermsState(t); setDeposits(d.items); setAccruals(a.items)
+      const [t, d, a, l] = await Promise.all([getTerms(pid), listDeposits(pid), listAccruals(pid), getLedger(pid)])
+      setTermsState(t); setDeposits(d.items); setAccruals(a.items); setLedger(l)
     } catch (err) { setError(err instanceof ApiError ? err.message : 'تعذّر التحميل') }
     finally { setLoading(false) }
   }, [pid])
@@ -41,14 +53,98 @@ export function PartnerDetailPage() {
     finally { setBusy(false) }
   }
 
+  async function recordMove(
+    body: Parameters<typeof recordLedgerEntry>[1],
+    msg: string,
+    reset: () => void,
+  ) {
+    setBusy(true)
+    try {
+      const r = await recordLedgerEntry(pid, body)
+      setLedger(r); toast.success(msg); reset()
+    } catch (err) { toast.error(err instanceof ApiError ? err.message : 'فشلت العملية') }
+    finally { setBusy(false) }
+  }
+
   if (loading) return <Narrow><Spinner /></Narrow>
   if (error || !terms) return <Narrow><div className="mt-space-xl"><InlineError message={error ?? 'غير موجود'} /></div></Narrow>
 
   return (
     <Narrow>
-      <PageTitle title={`شريك #${pid}`} subtitle="الشروط والتأمينات والاستحقاقات." />
+      <PageTitle title={`شريك #${pid}`} subtitle="الحساب الجاري والشروط والتأمينات والاستحقاقات." />
 
+      {/* الحساب الجاري — current account */}
       <section className="mt-space-xl">
+        <SectionHeader title="الحساب الجاري" action={ledger ? <span className="font-small text-small text-secondary">{ledger.count} حركة</span> : undefined} />
+
+        {/* Balance banner */}
+        {ledger && (
+          <div className="mt-space-md p-space-lg bg-surface-container-low rounded-xl flex items-center justify-between gap-space-md">
+            <span className="font-body text-body text-secondary">
+              {ledger.owed_by === 'partner' ? 'عليه للإدارة' : ledger.owed_by === 'management' ? 'له عند الإدارة' : 'الحساب متزن'}
+            </span>
+            <div className="flex items-baseline gap-space-xs" dir="ltr">
+              <span className={`font-mono-medium text-display ${ledger.owed_by === 'management' ? 'text-[#A8650C]' : ledger.owed_by === 'settled' ? 'text-[#0F6B3E]' : 'text-primary'}`}>
+                {formatMoney(ledger.abs_balance)}
+              </span>
+              <span className="font-small text-small text-secondary">ج.م</span>
+            </div>
+          </div>
+        )}
+
+        {/* Money-movement forms */}
+        <div className="mt-space-md grid grid-cols-1 md:grid-cols-3 gap-space-md">
+          {/* دفعت له */}
+          <div className="p-space-md border border-surface-container-high rounded-xl flex flex-col gap-space-sm">
+            <span className="font-body-medium text-body-medium text-primary">دفعت له فلوس</span>
+            <Field label="المبلغ (ج.م)" dir="ltr" mono value={pay.amount} onChange={(e) => setPay({ ...pay, amount: e.target.value })} />
+            <Field label="ملاحظات (اختياري)" value={pay.note} onChange={(e) => setPay({ ...pay, note: e.target.value })} />
+            <Button variant="primary" disabled={busy || !pay.amount}
+              onClick={() => recordMove({ kind: 'payment_made', amount: Number(pay.amount), note: pay.note || undefined }, 'سُجِّلت الدفعة.', () => setPay({ amount: '', note: '' }))}>دفعت</Button>
+          </div>
+          {/* استلمت منه */}
+          <div className="p-space-md border border-surface-container-high rounded-xl flex flex-col gap-space-sm">
+            <span className="font-body-medium text-body-medium text-primary">استلمت منه فلوس</span>
+            <Field label="المبلغ (ج.م)" dir="ltr" mono value={recv.amount} onChange={(e) => setRecv({ ...recv, amount: e.target.value })} />
+            <Field label="ملاحظات (اختياري)" value={recv.note} onChange={(e) => setRecv({ ...recv, note: e.target.value })} />
+            <Button variant="primary" disabled={busy || !recv.amount}
+              onClick={() => recordMove({ kind: 'payment_received', amount: Number(recv.amount), note: recv.note || undefined }, 'سُجِّل الاستلام.', () => setRecv({ amount: '', note: '' }))}>استلمت</Button>
+          </div>
+          {/* تعديل يدوي */}
+          <div className="p-space-md border border-surface-container-high rounded-xl flex flex-col gap-space-sm">
+            <span className="font-body-medium text-body-medium text-primary">تعديل يدوي</span>
+            <Field label="المبلغ (ج.م)" dir="ltr" mono value={adj.amount} onChange={(e) => setAdj({ ...adj, amount: e.target.value })} />
+            <Field label="السبب (إلزامي، ٥ أحرف فأكثر)" value={adj.note} onChange={(e) => setAdj({ ...adj, note: e.target.value })} />
+            <div className="flex gap-space-xs">
+              {([[-1, 'زوّده له'], [1, 'حمّله عليه']] as const).map(([d, lbl]) => (
+                <button key={d} type="button" onClick={() => setAdj({ ...adj, direction: d })}
+                  className={`px-3 py-1 rounded-full font-small ${adj.direction === d ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant'}`}>{lbl}</button>
+              ))}
+            </div>
+            <Button disabled={busy || !adj.amount || adj.note.trim().length < 5}
+              onClick={() => recordMove({ kind: 'manual', amount: Number(adj.amount), direction: adj.direction, note: adj.note }, 'طُبّق التعديل.', () => setAdj({ amount: '', note: '', direction: -1 }))}>نفّذ</Button>
+          </div>
+        </div>
+
+        {/* كل الحركات */}
+        <div className="mt-space-md">
+          <DataTable rows={ledger?.items ?? []} rowKey={(e) => e.id} empty="لا توجد حركات." columns={[
+            { header: 'التاريخ', cell: (e) => <Mono>{e.created_at ? formatDate(e.created_at) : '—'}</Mono> },
+            { header: 'البيان', cell: (e) => (
+              <div className="flex flex-col">
+                <span>{ledgerLabel(e)}</span>
+                {e.note && <span className="font-small text-small text-secondary">{e.note}</span>}
+              </div>
+            ) },
+            { header: 'الأثر', align: 'center', cell: (e) => (
+              <Pill tone={e.direction > 0 ? 'warning' : 'signal'}>{e.direction > 0 ? 'عليه +' : 'له −'}</Pill>
+            ) },
+            { header: 'المبلغ', align: 'end', cell: (e) => <Mono>{formatMoney(e.amount)}</Mono> },
+          ]} />
+        </div>
+      </section>
+
+      <section className="mt-[48px]">
         <SectionHeader title="الشروط" />
         <div className="flex flex-wrap items-end gap-space-md">
           <label className="flex items-center gap-space-sm font-body text-body">

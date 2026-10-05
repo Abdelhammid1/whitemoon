@@ -13,7 +13,7 @@ from datetime import UTC, date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 from ...accounting.services import events as journal
 from ...commerce.models import Order
@@ -24,7 +24,13 @@ from ...identity.models import ChannelPartnerProfile, CustomerProfile, User
 from ...identity.services import passwords
 from ...identity.services.audit import emit as audit_emit
 from ...identity.services.rbac import assign_role
-from ..models import PartnerAccrual, PartnerDeposit, PartnerTerms
+from ..models import (
+    LEDGER_KINDS,
+    PartnerAccrual,
+    PartnerDeposit,
+    PartnerLedgerEntry,
+    PartnerTerms,
+)
 
 # A sale counts toward a partner's accrual basis once it is realized —
 # confirmed or fulfilled. Pending and cancelled orders never accrue.
@@ -424,6 +430,110 @@ def attribute_order(*, order_id: int, partner_id: int, actor_user_id: int) -> Or
     return order
 
 
+# ---------------------------------------------------------------- current account
+
+# Fixed balance effect for cash movements; `manual` takes the caller's sign.
+_LEDGER_DIRECTION = {"payment_made": 1, "payment_received": -1}
+
+
+def record_ledger_entry(
+    *,
+    partner_id: int,
+    kind: str,
+    amount: Decimal,
+    direction: int | None,
+    note: str | None,
+    posted_by: int,
+) -> PartnerLedgerEntry:
+    """Record one current-account movement and return it. Operational only —
+    no journal entry is posted. The running balance is derived on read."""
+    if kind not in LEDGER_KINDS:
+        raise BadRequest("نوع الحركة غير صالح", code="bad_ledger_kind")
+    _require_partner(partner_id)
+    amount = to_money(amount)
+    if amount <= 0:
+        raise BadRequest("المبلغ يجب أن يكون موجبًا", code="amount_non_positive")
+
+    note = note.strip() if note else None
+    if kind == "manual":
+        # A manual adjustment must declare its direction and a reason.
+        if direction not in (-1, 1):
+            raise BadRequest("اتجاه التعديل مطلوب", code="direction_required")
+        if not note or len(note) < MIN_REASON_LEN:
+            raise BadRequest("سبب التعديل إلزامي (٥ أحرف فأكثر)", code="reason_required")
+        effect = direction
+    else:
+        # Cash moves have a fixed effect; any client-sent direction is ignored.
+        effect = _LEDGER_DIRECTION[kind]
+
+    # Serialise with the partner's other financial mutations so concurrent
+    # writes stay consistently ordered.
+    _lock_partner(partner_id)
+    entry = PartnerLedgerEntry(
+        partner_user_id=partner_id,
+        kind=kind,
+        direction=effect,
+        amount=amount,
+        note=note,
+        recorded_by=posted_by,
+    )
+    db.session.add(entry)
+    db.session.flush()
+    audit_emit(
+        "partner.ledger.recorded",
+        actor_user_id=posted_by,
+        target_type="partner_ledger",
+        target_id=entry.id,
+        after={"kind": kind, "amount": str(amount), "direction": effect},
+    )
+    db.session.commit()
+    return entry
+
+
+def ledger_balance(partner_id: int) -> Decimal:
+    """Net running balance as 'partner owes management' (positive) or, when
+    negative, 'management owes partner'. SUM(amount * direction)."""
+    total = db.session.execute(
+        select(
+            func.coalesce(
+                func.sum(PartnerLedgerEntry.amount * PartnerLedgerEntry.direction),
+                0,
+            )
+        ).where(PartnerLedgerEntry.partner_user_id == partner_id)
+    ).scalar_one()
+    return to_money(total)
+
+
+def list_ledger(partner_id: int) -> list[PartnerLedgerEntry]:
+    return list(
+        db.session.execute(
+            select(PartnerLedgerEntry)
+            .where(PartnerLedgerEntry.partner_user_id == partner_id)
+            .order_by(PartnerLedgerEntry.id.desc())
+        ).scalars()
+    )
+
+
+def ledger_summary(partner_id: int) -> dict[str, Any]:
+    _require_partner(partner_id)
+    balance = ledger_balance(partner_id)
+    if balance > 0:
+        owed_by = "partner"
+    elif balance < 0:
+        owed_by = "management"
+    else:
+        owed_by = "settled"
+    entries = list_ledger(partner_id)
+    return {
+        "partner_id": partner_id,
+        "balance": str(balance),
+        "abs_balance": str(abs(balance)),
+        "owed_by": owed_by,
+        "count": len(entries),
+        "items": [serialize_ledger_entry(e) for e in entries],
+    }
+
+
 # ---------------------------------------------------------------- serializers
 
 
@@ -475,6 +585,19 @@ def serialize_accrual(a: PartnerAccrual) -> dict[str, Any]:
         "rate_pct": str(a.rate_pct),
         "amount": str(a.amount),
         "computed_at": a.computed_at.isoformat(),
+    }
+
+
+def serialize_ledger_entry(e: PartnerLedgerEntry) -> dict[str, Any]:
+    return {
+        "id": e.id,
+        "partner_id": e.partner_user_id,
+        "kind": e.kind,
+        "direction": e.direction,
+        "amount": str(e.amount),
+        "note": e.note,
+        "recorded_by": e.recorded_by,
+        "created_at": e.created_at.isoformat() if e.created_at else None,
     }
 
 

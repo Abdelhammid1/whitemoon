@@ -57,6 +57,7 @@ def _reset_db(app: Flask) -> Iterator[None]:
                 "production.mo_materials, "
                 "production.mo_stages, "
                 "production.manufacturing_orders, "
+                "partners.partner_ledger, "
                 "partners.partner_accruals, "
                 "partners.partner_deposits, "
                 "partners.partner_terms, "

@@ -67,3 +67,39 @@ export async function listAccruals(id: number) {
 export async function computeAccrual(id: number, kind: string, year: number, month: number) {
   return api<Accrual>(`/partners/${id}/accruals`, { method: 'POST', body: { kind, year, month } })
 }
+
+/* ---------------------------------------------------- current account (الحساب الجاري) */
+
+export type LedgerKind = 'payment_made' | 'payment_received' | 'manual'
+
+export interface LedgerEntry {
+  id: number
+  partner_id: number
+  kind: LedgerKind
+  direction: number // +1 raises "partner owes management", -1 lowers it
+  amount: string
+  note: string | null
+  recorded_by: number
+  created_at: string | null
+}
+export interface LedgerSummary {
+  partner_id: number
+  balance: string // signed, "partner owes management"
+  abs_balance: string
+  owed_by: 'partner' | 'management' | 'settled'
+  count: number
+  items: LedgerEntry[]
+}
+
+export async function getLedger(id: number) {
+  return api<LedgerSummary>(`/partners/${id}/ledger`)
+}
+export async function recordLedgerEntry(
+  id: number,
+  body: { kind: LedgerKind; amount: number; direction?: number; note?: string },
+) {
+  return api<{ entry: LedgerEntry } & LedgerSummary>(`/partners/${id}/ledger`, {
+    method: 'POST',
+    body,
+  })
+}

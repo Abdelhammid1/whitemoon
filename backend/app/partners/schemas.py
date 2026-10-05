@@ -46,3 +46,13 @@ class AccrualIn(BaseModel):
 
 class AttributeIn(BaseModel):
     partner_id: int = Field(gt=0)
+
+
+class LedgerEntryIn(BaseModel):
+    """A current-account movement. `direction` is required (±1) only for a
+    manual adjustment; cash moves derive their sign from `kind`."""
+
+    kind: str = Field(pattern="^(payment_made|payment_received|manual)$")
+    amount: float = Field(gt=0)
+    direction: int | None = Field(default=None, ge=-1, le=1)
+    note: str | None = Field(default=None, max_length=1000)

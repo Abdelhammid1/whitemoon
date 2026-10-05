@@ -15,7 +15,15 @@ from pydantic import ValidationError
 
 from ..common.errors import ApiError, BadRequest, Forbidden, Unauthorized
 from ..identity.services.rbac import has_permission, require_permission
-from .schemas import AccrualIn, AttributeIn, CreatePartnerIn, DepositIn, RefundIn, TermsIn
+from .schemas import (
+    AccrualIn,
+    AttributeIn,
+    CreatePartnerIn,
+    DepositIn,
+    LedgerEntryIn,
+    RefundIn,
+    TermsIn,
+)
 from .services import partners as svc
 
 bp = Blueprint("partners", __name__, url_prefix="/partners")
@@ -160,6 +168,31 @@ def accrual_statement(partner_id: int):
     except (KeyError, ValueError) as e:
         raise BadRequest("year و month مطلوبان", code="period_required") from e
     return jsonify(svc.statement(partner_id, kind, year, month))
+
+
+# ---------------------------------------------------------------- current account
+
+
+@bp.get("/<int:partner_id>/ledger")
+@require_permission("partner.manage")
+def get_ledger(partner_id: int):
+    return jsonify(svc.ledger_summary(partner_id))
+
+
+@bp.post("/<int:partner_id>/ledger")
+@require_permission("partner.manage")
+def record_ledger_entry(partner_id: int):
+    p = _parse(LedgerEntryIn)
+    entry = svc.record_ledger_entry(
+        partner_id=partner_id,
+        kind=p.kind,
+        amount=Decimal(str(p.amount)),
+        direction=p.direction,
+        note=p.note,
+        posted_by=_uid(),
+    )
+    # Return the fresh statement so the UI reflects the new balance in one call.
+    return jsonify({"entry": svc.serialize_ledger_entry(entry), **svc.ledger_summary(partner_id)}), 201
 
 
 # ---------------------------------------------------------------- attribution

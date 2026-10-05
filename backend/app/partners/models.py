@@ -21,6 +21,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
+    SmallInteger,
     String,
     UniqueConstraint,
 )
@@ -30,6 +31,11 @@ from ..common.base_model import Base, TimestampMixin
 
 ACCRUAL_KINDS = ("commission", "investment_return")
 DEPOSIT_STATUSES = ("held", "refunded")
+# Current-account movement kinds. `payment_*` are cash moves; `manual` is a
+# bookkeeping adjustment (تعديل يدوي). `direction` is the signed effect on the
+# running balance measured as "partner owes management": +1 raises it (we paid
+# the partner, or debited him), -1 lowers it (he paid us, or we credited him).
+LEDGER_KINDS = ("payment_made", "payment_received", "manual")
 
 
 class PartnerTerms(Base, TimestampMixin):
@@ -135,3 +141,42 @@ class PartnerAccrual(Base, TimestampMixin):
     )
     computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     journal_entry_id: Mapped[int | None] = mapped_column(BigInteger)
+
+
+class PartnerLedgerEntry(Base, TimestampMixin):
+    """One movement on a partner's current account (الحساب الجاري): cash we
+    paid the partner, cash we received from them, or a manual adjustment. This
+    is an operational running account — it does NOT post to the general ledger.
+
+    `amount` is always positive; `direction` carries the sign of its effect on
+    the balance ("partner owes management"): +1 raises it, -1 lowers it. The
+    running balance is SUM(amount * direction), computed on read — never stored.
+    """
+
+    __tablename__ = "partner_ledger"
+    __table_args__ = (
+        CheckConstraint("amount > 0", name="ck_partner_ledger_amount_positive"),
+        CheckConstraint("direction in (-1, 1)", name="ck_partner_ledger_direction"),
+        CheckConstraint(
+            "kind in ('payment_made','payment_received','manual')",
+            name="ck_partner_ledger_kind",
+        ),
+        CheckConstraint("currency = 'EGP'", name="ck_partner_ledger_currency_egp"),
+        Index("ix_partner_ledger_partner", "partner_user_id", "id"),
+        {"schema": "partners"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    partner_user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("identity.users.id"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    direction: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
+    currency: Mapped[str] = mapped_column(
+        String(3), nullable=False, default="EGP", server_default="EGP"
+    )
+    note: Mapped[str | None] = mapped_column(String(1000))
+    recorded_by: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("identity.users.id"), nullable=False
+    )
