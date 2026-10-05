@@ -164,7 +164,7 @@ export function CreditPage() {
           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md mb-space-xl">
             <StatCard label="السقف الافتراضي" value={formatMoney(tier.credit_limit_default)} icon="account_balance_wallet" />
             <StatCard label="السقف الفعّال" value={formatMoney(tier.effective_limit)} icon="verified" />
-            <StatCard label="نسبة الآجل" value={tier.deferred_pct} icon="pie_chart" unit="%" />
+            <StatCard label="نسبة الآجل" value={String(Number(tier.deferred_pct))} icon="pie_chart" unit="%" />
             <StatCard label="المستحق القائم" value={formatMoney(tier.outstanding)} icon="hourglass_top" tone="error" />
           </section>
 

@@ -32,9 +32,13 @@ export function ProductDetailPage() {
   const load = useCallback(async () => {
     setLoading(true); setError(null); setMissing(false)
     try {
-      const p = await getProduct(pid)
+      // Fetch in parallel; related products are best-effort — a failure there
+      // must never hide a product the customer can view and buy.
+      const [p, r] = await Promise.all([
+        getProduct(pid),
+        relatedProducts(pid).catch(() => ({ items: [] as CatalogProduct[] })),
+      ])
       setProduct(p)
-      const r = await relatedProducts(pid)
       setRelated(r.items)
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) setMissing(true)

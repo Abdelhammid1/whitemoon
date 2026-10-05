@@ -186,4 +186,13 @@ def test_dunning_list_orders_by_worst_overdue(client) -> None:
     assert c1.id not in [r["customer_id"] for r in filtered]
 
 
+def test_dunning_excludes_not_yet_overdue(client) -> None:
+    c = create_user(kind="customer", email="dunfuture@example.com", roles=("customer",))
+    db.session.commit()
+    # An open due that is not yet due must not appear on the dunning board.
+    credit_svc.record_due(customer_id=c.id, order_id=None, amount=Decimal("900"), due_date=date.today() + timedelta(days=5))
+    db.session.commit()
+    assert c.id not in [r["customer_id"] for r in credit_svc.dunning_list()]
+
+
 _ = CustomerDue

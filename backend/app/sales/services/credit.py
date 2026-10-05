@@ -379,9 +379,10 @@ def list_dues(customer_id: int) -> list[CustomerDue]:
 
 
 def dunning_list(*, min_days: int = 0, tier: str | None = None) -> list[dict[str, Any]]:
-    """Customers with open dues for the collections/dunning board (C4), worst
-    overdue first. Reuses the live order_block_level / tier / outstanding
-    helpers so the board matches what checkout enforces."""
+    """Customers with OVERDUE open dues for the collections/dunning board (C4),
+    worst overdue first. Read-only: it never recomputes/writes a tier (so a GET
+    stays a read) — it uses the stored tier, falling back to a non-persisting
+    classification only when none exists."""
     today = _today()
     rows = db.session.execute(
         select(
@@ -394,22 +395,42 @@ def dunning_list(*, min_days: int = 0, tier: str | None = None) -> list[dict[str
         .group_by(CustomerDue.customer_id)
     ).all()
 
+    # A dunning board lists the overdue (≥1 day), honouring a higher floor.
+    threshold = max(1, min_days)
+    candidates = [
+        (cid, open_count, outstanding_sum, (today - oldest_due).days)
+        for (cid, open_count, outstanding_sum, oldest_due) in rows
+        if oldest_due is not None and (today - oldest_due).days >= threshold
+    ]
+    if not candidates:
+        return []
+
+    ids = [c[0] for c in candidates]
+    profiles = {
+        p.user_id: p
+        for p in db.session.execute(
+            select(CustomerProfile).where(CustomerProfile.user_id.in_(ids))
+        ).scalars()
+    }
+    tiers = {
+        t.customer_id: t
+        for t in db.session.execute(
+            select(CustomerCreditTier).where(CustomerCreditTier.customer_id.in_(ids))
+        ).scalars()
+    }
+
     out: list[dict[str, Any]] = []
-    for customer_id, open_count, outstanding_sum, oldest_due in rows:
-        worst = max(0, (today - oldest_due).days) if oldest_due else 0
-        if worst < min_days:
+    for customer_id, open_count, outstanding_sum, worst in candidates:
+        tier_row = tiers.get(customer_id)
+        tier_name = tier_row.tier if tier_row else classify(customer_id).tier
+        if tier and tier_name != tier:
             continue
-        t = get_tier(customer_id)
-        if tier and t.tier != tier:
-            continue
-        cp = db.session.execute(
-            select(CustomerProfile).where(CustomerProfile.user_id == customer_id)
-        ).scalar_one_or_none()
+        cp = profiles.get(customer_id)
         out.append(
             {
                 "customer_id": customer_id,
                 "display_name": cp.display_name if cp else None,
-                "tier": t.tier,
+                "tier": tier_name,
                 "outstanding": str(to_money(outstanding_sum)),
                 "open_due_count": open_count,
                 "worst_overdue_days": worst,
