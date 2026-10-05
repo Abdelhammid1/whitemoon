@@ -187,6 +187,20 @@ def recompute(customer_id: int) -> CustomerCreditTier:
     return row
 
 
+def recompute_all_active() -> int:
+    """Recompute the credit tier for every active customer (the nightly job).
+    Returns the number recomputed. Commits once at the end."""
+    ids = list(
+        db.session.execute(
+            select(User.id).where(User.kind == "customer", User.status == "active")
+        ).scalars()
+    )
+    for cid in ids:
+        recompute(cid)
+    db.session.commit()
+    return len(ids)
+
+
 def get_tier(customer_id: int) -> CustomerCreditTier:
     row = db.session.execute(
         select(CustomerCreditTier).where(CustomerCreditTier.customer_id == customer_id)

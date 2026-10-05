@@ -81,6 +81,16 @@ def run_all() -> int:
     return total
 
 
+def nightly_scan() -> dict[str, int]:
+    """The daily credit maintenance job (docs/04 §1): recompute every active
+    customer's tier, then open any due escalation events. Idempotent — safe to
+    run repeatedly. Driven by Celery Beat in production; also callable directly.
+    """
+    recomputed = credit.recompute_all_active()
+    opened = run_all()
+    return {"recomputed": recomputed, "escalations_opened": opened}
+
+
 def escalate_level5(*, customer_id: int, reason: str, actor_user_id: int) -> EscalationEvent:
     """Manual full freeze (US-5.3). Caller must hold admin.high; the route
     enforces the permission, this records the event and suspends the user."""
