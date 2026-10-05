@@ -62,3 +62,10 @@ export async function confirmDelivery(
 ) {
   return api<Shipment>(`/logistics/shipments/${id}/confirm`, { method: 'POST', body })
 }
+
+export async function updateShipmentLocation(id: number, lat: number, lng: number) {
+  return api<{ id: number; status: string; lat: string; lng: string }>(
+    `/logistics/shipments/${id}/location`,
+    { method: 'POST', body: { lat, lng } },
+  )
+}

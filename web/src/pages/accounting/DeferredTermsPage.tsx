@@ -1,10 +1,11 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, SectionHeader } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError } from '../../components/ui'
+import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
-import { applyEarlyDiscount, createDeferredTerms } from '../../api/accounting'
+import { applyEarlyDiscount, createDeferredTerms, listDeferredTerms, type DeferredTermRow } from '../../api/accounting'
 import { ApiError } from '../../api/client'
-import { todayIso } from '../../lib/format'
+import { formatDate, formatMoney, todayIso } from '../../lib/format'
 
 export function DeferredTermsPage() {
   const toast = useToast()
@@ -16,6 +17,24 @@ export function DeferredTermsPage() {
   const [applyOrder, setApplyOrder] = useState('')
   const [settledOn, setSettledOn] = useState(todayIso())
   const [busy, setBusy] = useState(false)
+  const [rows, setRows] = useState<DeferredTermRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const r = await listDeferredTerms()
+      setRows(r.items)
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'تعذّر تحميل الشروط المثبتة')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { void load() }, [load])
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
@@ -23,6 +42,7 @@ export function DeferredTermsPage() {
     try {
       const r = await createDeferredTerms({ order_id: Number(orderId), cash_price: cash, deferred_price: deferred, early_settlement_discount: discount, early_settlement_before: before || undefined })
       toast.success(`تم تثبيت شروط الآجل للطلب #${r.order_id}.`)
+      await load()
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'فشل الحفظ')
     } finally {
@@ -35,6 +55,7 @@ export function DeferredTermsPage() {
     try {
       const r = await applyEarlyDiscount(Number(applyOrder), settledOn)
       toast.success(r.discount_applied ? 'تم تطبيق الخصم.' : 'كان مطبّقًا مسبقًا — لا تغيير.')
+      await load()
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'فشل التطبيق')
     } finally {
@@ -69,6 +90,30 @@ export function DeferredTermsPage() {
           <div className="w-56"><Field label="تاريخ السداد" type="date" dir="ltr" value={settledOn} onChange={(e) => setSettledOn(e.target.value)} required /></div>
           <Button variant="primary" type="submit" disabled={busy}>تطبيق</Button>
         </form>
+      </section>
+
+      <section className="mt-[48px]">
+        <SectionHeader title="الشروط المثبتة" />
+        {loading ? (
+          <Spinner />
+        ) : error ? (
+          <InlineError message={error} />
+        ) : (
+          <DataTable
+            rows={rows}
+            rowKey={(t) => t.id}
+            empty="لا توجد شروط آجل مثبتة بعد."
+            columns={[
+              { header: 'الطلب', width: '80px', cell: (t) => <Mono>#{t.order_id}</Mono> },
+              { header: 'السعر النقدي', align: 'end', cell: (t) => <Mono>{formatMoney(t.cash_price)}</Mono> },
+              { header: 'السعر الآجل', align: 'end', cell: (t) => <Mono>{formatMoney(t.deferred_price)}</Mono> },
+              { header: 'خصم مبكر', align: 'end', cell: (t) => <Mono>{formatMoney(t.early_settlement_discount)}</Mono> },
+              { header: 'قبل تاريخ', align: 'end', cell: (t) => <Mono>{t.early_settlement_before ? formatDate(t.early_settlement_before) : '—'}</Mono> },
+              { header: 'الخصم', align: 'center', cell: (t) => <Pill tone={t.discount_applied ? 'signal' : 'neutral'}>{t.discount_applied ? 'مُطبّق' : 'لا'}</Pill> },
+              { header: 'سُوِّي', align: 'end', cell: (t) => <Mono>{t.settled_at ? formatDate(t.settled_at) : '—'}</Mono> },
+            ]}
+          />
+        )}
       </section>
     </Narrow>
   )

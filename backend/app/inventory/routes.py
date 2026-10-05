@@ -340,6 +340,16 @@ def reorder_check():
     return jsonify({"created": [reorder_svc.serialize(a) for a in created]})
 
 
+@bp.get("/categories")
+@jwt_required()
+def list_categories():
+    """Allowed product categories (code + Arabic label) — the UI's single
+    source so its picker can't drift from the CHECK constraint."""
+    from .models import CATEGORIES, CATEGORY_LABELS
+
+    return jsonify({"items": [{"code": c, "label": CATEGORY_LABELS.get(c, c)} for c in CATEGORIES]})
+
+
 @bp.get("/reorder/alerts")
 @require_permission("inventory.manage")
 def reorder_alerts():

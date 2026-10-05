@@ -6,7 +6,7 @@ import { DataTable, Mono } from '../../components/DataTable'
 import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
-import { checkout, getCart, removeCartItem, type Cart } from '../../api/commerce'
+import { checkout, getCart, removeCartItem, updateCartItem, type Cart } from '../../api/commerce'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
 
@@ -33,6 +33,17 @@ export function CartPage() {
     setBusy(true)
     try { setCart(await removeCartItem(itemId)) }
     catch (err) { toast.error(err instanceof ApiError ? err.message : 'تعذّر الحذف') }
+    finally { setBusy(false) }
+  }
+
+  // Qty is a Decimal string on the server; we step by whole units and let the
+  // server enforce the offer's MOQ and stock ceiling, surfacing any rejection.
+  async function changeQty(itemId: number, current: string, delta: number) {
+    const next = Number(current) + delta
+    if (!Number.isFinite(next) || next < 1) return
+    setBusy(true)
+    try { setCart(await updateCartItem(itemId, String(next))) }
+    catch (err) { toast.error(err instanceof ApiError ? err.message : 'تعذّر تعديل الكمية') }
     finally { setBusy(false) }
   }
 
@@ -96,8 +107,30 @@ export function CartPage() {
                 {
                   header: 'الكمية',
                   align: 'center',
-                  width: '6rem',
-                  cell: (i) => <Mono className="text-primary">{i.qty}</Mono>,
+                  width: '8rem',
+                  cell: (i) => (
+                    <div className="inline-flex items-center gap-1" dir="ltr">
+                      <button
+                        type="button"
+                        className="w-7 h-7 flex items-center justify-center rounded-md border border-surface-container-high text-secondary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
+                        onClick={() => changeQty(i.item_id, i.qty, -1)}
+                        disabled={busy || Number(i.qty) <= 1}
+                        title="إنقاص الكمية"
+                      >
+                        <Icon name="remove" size={16} />
+                      </button>
+                      <Mono className="text-primary w-10 text-center">{i.qty}</Mono>
+                      <button
+                        type="button"
+                        className="w-7 h-7 flex items-center justify-center rounded-md border border-surface-container-high text-secondary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed"
+                        onClick={() => changeQty(i.item_id, i.qty, 1)}
+                        disabled={busy}
+                        title="زيادة الكمية"
+                      >
+                        <Icon name="add" size={16} />
+                      </button>
+                    </div>
+                  ),
                 },
                 {
                   header: 'سعر الوحدة',

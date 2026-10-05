@@ -57,6 +57,18 @@ def test_product_catalog_enforces_category(client) -> None:
         products_svc.create_product(sku="X", name_ar="x", category="toys")
 
 
+def test_categories_endpoint_lists_from_backend(client) -> None:
+    from tests.helpers import auth_header, create_user
+    create_user(kind="admin", email="catadmin@example.com", roles=("admin",))
+    h = auth_header(client, email="catadmin@example.com")
+    r = client.get("/inventory/categories", headers=h)
+    assert r.status_code == 200
+    items = r.get_json()["items"]
+    codes = {x["code"] for x in items}
+    assert {"food", "electronics", "other"} <= codes
+    assert all(x.get("label") for x in items)
+
+
 def test_product_catalog_accepts_expanded_categories(client) -> None:
     # T-10: segments beyond food/clothing are now valid.
     for cat in ("electronics", "home", "beauty", "construction", "stationery", "automotive", "other"):

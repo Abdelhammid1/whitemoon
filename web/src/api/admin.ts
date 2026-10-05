@@ -39,6 +39,15 @@ export async function getUser(userId: number) {
   return api<UserDetail>(`/admin/users/${userId}`)
 }
 
+export interface Role {
+  code: string
+  name_ar: string
+  name_en: string
+}
+export async function listRoles() {
+  return api<{ items: Role[] }>('/admin/roles')
+}
+
 export async function createUser(body: {
   kind: string
   roles: string[]

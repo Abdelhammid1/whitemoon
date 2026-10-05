@@ -48,6 +48,18 @@ CATEGORIES = (
     "automotive",
     "other",
 )
+# Arabic labels — single source for the UI (served by GET /inventory/categories).
+CATEGORY_LABELS = {
+    "food": "غذائية",
+    "clothing": "ملابس",
+    "electronics": "إلكترونيات",
+    "home": "أدوات منزلية",
+    "beauty": "عناية وتجميل",
+    "construction": "مواد بناء",
+    "stationery": "قرطاسية",
+    "automotive": "قطع غيار",
+    "other": "أخرى",
+}
 LOCATION_TYPES = ("supplier", "channel_partner", "in_transit", "customer_hold")
 TRANSFER_STATUSES = ("draft", "issued", "received", "cancelled")
 SHORTAGE_STATUSES = ("pending", "resolved", "rejected")

@@ -129,3 +129,26 @@ export async function submitRfqOffer(id: number, unit_price: string, moq: string
     body: { unit_price, moq },
   })
 }
+
+export interface SupplierOrderRow {
+  sub_order_id: number
+  order_number: string
+  order_status: string
+  sub_order_status: string
+  subtotal?: string
+  lines?: { product_id: number; qty: string; line_total: string }[]
+}
+export async function supplierOrders() {
+  return api<{ items: SupplierOrderRow[] }>('/commerce/supplier/orders')
+}
+
+export interface CustomerStatement {
+  customer_id: number
+  profile: { display_name: string | null; geo_area: string | null }
+  orders: Order[]
+  dues: { id: number; amount: string; due_date: string; status: string; days_late: number | null }[]
+  outstanding: string
+}
+export async function customerStatement(customerId: number) {
+  return api<CustomerStatement>(`/commerce/customers/${customerId}/statement`)
+}

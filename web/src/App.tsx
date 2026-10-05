@@ -25,6 +25,7 @@ import { CashFlowPage } from './pages/accounting/reports/CashFlowPage'
 import { GeneralLedgerPage } from './pages/accounting/reports/GeneralLedgerPage'
 import { CatalogPage } from './pages/commerce/CatalogPage'
 import { ProductDetailPage } from './pages/commerce/ProductDetailPage'
+import { SupplierOrdersPage } from './pages/commerce/SupplierOrdersPage'
 import { CartPage } from './pages/commerce/CartPage'
 import { OrdersPage } from './pages/commerce/OrdersPage'
 import { OrderDetailPage } from './pages/commerce/OrderDetailPage'
@@ -53,6 +54,7 @@ import { NotificationsPage } from './pages/notifications/NotificationsPage'
 import { ProductsPage } from './pages/inventory/ProductsPage'
 import { OffersPage } from './pages/inventory/OffersPage'
 import { StockPage } from './pages/inventory/StockPage'
+import { ReorderAlertsPage } from './pages/inventory/ReorderAlertsPage'
 import { TransfersPage } from './pages/inventory/TransfersPage'
 import { ShortagesPage } from './pages/inventory/ShortagesPage'
 
@@ -77,6 +79,7 @@ export function App() {
         <Route path="/orders/:id" element={<OrderDetailPage />} />
         <Route path="/rfq" element={<RfqPage />} />
         <Route path="/rfq/:id" element={<RfqDetailPage />} />
+        <Route path="/supplier/orders" element={<ProtectedRoute roles={['supplier']}><SupplierOrdersPage /></ProtectedRoute>} />
 
         <Route path="/admin/users" element={<ProtectedRoute roles={FINANCE}><UsersPage /></ProtectedRoute>} />
         <Route path="/admin/users/:id" element={<ProtectedRoute roles={FINANCE}><UserDetailPage /></ProtectedRoute>} />
@@ -99,6 +102,7 @@ export function App() {
         <Route path="/inventory/products" element={<ProtectedRoute roles={FINANCE}><ProductsPage /></ProtectedRoute>} />
         <Route path="/inventory/offers" element={<ProtectedRoute roles={['supplier']}><OffersPage /></ProtectedRoute>} />
         <Route path="/inventory/stock" element={<StockPage />} />
+        <Route path="/inventory/reorder" element={<ProtectedRoute roles={FINANCE}><ReorderAlertsPage /></ProtectedRoute>} />
         <Route path="/inventory/transfers" element={<ProtectedRoute roles={FINANCE}><TransfersPage /></ProtectedRoute>} />
         <Route path="/inventory/shortages" element={<ProtectedRoute roles={FINANCE}><ShortagesPage /></ProtectedRoute>} />
 

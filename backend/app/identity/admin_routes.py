@@ -248,6 +248,17 @@ def update_user_profile(user_id: int):
     return jsonify({"id": user_id, **changed})
 
 
+@bp.get("/roles")
+@require_permission("user.read")
+def list_roles():
+    """The assignable roles, from the identity.roles table — so the create-user
+    form's options come from the DB, not a hand-maintained client list."""
+    rows = db.session.execute(select(Role).order_by(Role.id)).scalars().all()
+    return jsonify(
+        {"items": [{"code": r.code, "name_ar": r.name_ar, "name_en": r.name_en} for r in rows]}
+    )
+
+
 @bp.get("/audit")
 @require_permission("admin.high")
 def list_audit():

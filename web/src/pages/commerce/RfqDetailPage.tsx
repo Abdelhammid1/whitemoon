@@ -1,18 +1,26 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Pill, Spinner, EmptyState, InlineError } from '../../components/ui'
+import { PageTitle, Pill, Spinner, EmptyState, InlineError, Button, Field, SectionHeader } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
-import { getRfq, listRfqOffers, type Rfq, type RfqOffer } from '../../api/commerce'
+import { useToast } from '../../components/Toast'
+import { useAuth } from '../../auth/AuthContext'
+import { getRfq, listRfqOffers, submitRfqOffer, type Rfq, type RfqOffer } from '../../api/commerce'
 import { ApiError } from '../../api/client'
 import { formatDate, formatMoney } from '../../lib/format'
 
 export function RfqDetailPage() {
   const { id } = useParams()
+  const toast = useToast()
+  const { user } = useAuth()
+  const isSupplier = user?.kind === 'supplier'
   const [rfq, setRfq] = useState<Rfq | null>(null)
   const [offers, setOffers] = useState<RfqOffer[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [unitPrice, setUnitPrice] = useState('')
+  const [moq, setMoq] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -29,6 +37,24 @@ export function RfqDetailPage() {
   }, [id])
 
   useEffect(() => { void load() }, [load])
+
+  async function submitOffer(e: React.FormEvent) {
+    e.preventDefault()
+    if (!unitPrice || !moq) { toast.error('أدخل سعر الوحدة وأدنى كمية.'); return }
+    setSubmitting(true)
+    try {
+      await submitRfqOffer(Number(id), unitPrice, moq)
+      toast.success('تم إرسال عرضك.')
+      setUnitPrice('')
+      setMoq('')
+      const o = await listRfqOffers(Number(id))
+      setOffers(o.items)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'تعذّر إرسال العرض')
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   if (loading) return <Narrow><Spinner /></Narrow>
   if (error || !rfq) return <Narrow><div className="mt-space-xl"><InlineError message={error ?? 'غير موجود'} /></div></Narrow>
@@ -58,6 +84,40 @@ export function RfqDetailPage() {
           />
         )}
       </div>
+
+      {isSupplier && rfq.status === 'open' && (
+        <form onSubmit={submitOffer} className="mt-space-xl flex flex-col gap-space-md">
+          <SectionHeader title="تقديم عرض" />
+          <p className="font-small text-small text-secondary">
+            عرضك يُعرض على العميل بالسعر فقط — دون كشف هويتك.
+          </p>
+          <div className="flex flex-wrap items-end gap-space-md">
+            <div className="w-48">
+              <Field
+                label="سعر الوحدة (ج.م)"
+                dir="ltr"
+                mono
+                inputMode="decimal"
+                value={unitPrice}
+                onChange={(e) => setUnitPrice(e.target.value)}
+              />
+            </div>
+            <div className="w-40">
+              <Field
+                label="أدنى كمية"
+                dir="ltr"
+                mono
+                inputMode="numeric"
+                value={moq}
+                onChange={(e) => setMoq(e.target.value)}
+              />
+            </div>
+            <Button type="submit" variant="primary" disabled={submitting} iconRight="send">
+              إرسال العرض
+            </Button>
+          </div>
+        </form>
+      )}
     </Narrow>
   )
 }

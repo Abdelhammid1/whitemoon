@@ -5,21 +5,16 @@ import { PageTitle, Button, Field, Pill, Spinner, EmptyState, InlineError } from
 import { Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import { addCartItem, browseCatalog, type CatalogProduct } from '../../api/commerce'
-import { PRODUCT_CATEGORIES } from '../../api/inventory'
+import { listCategories, type Category } from '../../api/inventory'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
-
-const CATS = ['', ...PRODUCT_CATEGORIES.map((c) => c.code)]
-const CAT_AR: Record<string, string> = {
-  '': 'الكل',
-  ...Object.fromEntries(PRODUCT_CATEGORIES.map((c) => [c.code, c.label])),
-}
 
 export function CatalogPage() {
   const toast = useToast()
   const navigate = useNavigate()
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('')
+  const [categories, setCategories] = useState<Category[]>([])
   const [rows, setRows] = useState<CatalogProduct[]>([])
   const [qty, setQty] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
@@ -40,6 +35,13 @@ export function CatalogPage() {
   }, [q, cat])
 
   useEffect(() => { void load() }, [cat]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    listCategories()
+      .then((r) => setCategories(r.items))
+      .catch(() => setCategories([]))
+  }, [])
+
+  const catAr = (code: string) => (code === '' ? 'الكل' : categories.find((c) => c.code === code)?.label ?? code)
 
   async function add(p: CatalogProduct) {
     setBusyId(p.product_id)
@@ -69,9 +71,9 @@ export function CatalogPage() {
         <form onSubmit={(e) => { e.preventDefault(); void load() }} className="max-w-[420px]">
           <Field label="بحث (اسم/كود)" value={q} onChange={(e) => setQ(e.target.value)} />
         </form>
-        <div className="flex gap-space-xs">
-          {CATS.map((c) => (
-            <button key={c || 'all'} className={chip(cat === c)} onClick={() => setCat(c)}>{CAT_AR[c]}</button>
+        <div className="flex gap-space-xs flex-wrap">
+          {['', ...categories.map((c) => c.code)].map((c) => (
+            <button key={c || 'all'} className={chip(cat === c)} onClick={() => setCat(c)}>{catAr(c)}</button>
           ))}
         </div>
       </div>
@@ -89,7 +91,7 @@ export function CatalogPage() {
               <div key={p.product_id} className="flex flex-col gap-space-sm rounded-xl bg-surface-container-lowest border border-surface-container-high p-space-md">
                 <div className="flex items-start justify-between gap-space-sm">
                   <Link to={`/catalog/${p.product_id}`} className="font-body-medium text-body-medium text-on-surface hover:text-primary hover:underline">{p.name_ar}</Link>
-                  <Pill tone="neutral">{CAT_AR[p.category] ?? p.category}</Pill>
+                  <Pill tone="neutral">{catAr(p.category)}</Pill>
                 </div>
                 <span className="font-mono-body text-mono-body text-secondary">{p.sku}</span>
                 <span className="font-display text-headline-1 text-primary"><Mono>{formatMoney(p.best_price)}</Mono> ج.م</span>

@@ -14,6 +14,14 @@ def _high(client):
 # ---------------------------------------------------------------- T-07
 
 
+def test_list_roles_from_db(client) -> None:
+    h = _high(client)
+    r = client.get("/admin/roles", headers=h)
+    assert r.status_code == 200
+    codes = {x["code"] for x in r.get_json()["items"]}
+    assert {"admin.high", "admin", "staff", "customer", "supplier", "agent", "branch"} <= codes
+
+
 def test_admin_creates_user_with_role(client) -> None:
     h = _high(client)
     r = client.post(

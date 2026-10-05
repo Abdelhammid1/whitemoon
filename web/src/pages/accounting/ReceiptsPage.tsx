@@ -3,7 +3,8 @@ import { Narrow } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
-import { listReceipts, resolveReceipt, uploadReceiptFile, type ReceiptRow } from '../../api/accounting'
+import { Modal } from '../../components/Overlay'
+import { fetchReceiptImageUrl, listReceipts, resolveReceipt, uploadReceiptFile, type ReceiptRow } from '../../api/accounting'
 import { ApiError } from '../../api/client'
 import { formatDate, formatMoney } from '../../lib/format'
 
@@ -27,6 +28,37 @@ export function ReceiptsPage() {
   const [rows, setRows] = useState<ReceiptRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [previewId, setPreviewId] = useState<number | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [previewLoading, setPreviewLoading] = useState(false)
+
+  // Load the receipt image (auth'd blob → object URL) whenever a row is opened,
+  // and always revoke the previous object URL to avoid leaking blob handles.
+  useEffect(() => {
+    if (previewId == null) return
+    let url: string | null = null
+    let alive = true
+    setPreviewLoading(true)
+    setPreviewUrl(null)
+    void (async () => {
+      try {
+        url = await fetchReceiptImageUrl(previewId)
+        if (alive) setPreviewUrl(url)
+        else URL.revokeObjectURL(url)
+      } catch (err) {
+        if (alive) {
+          toast.error(err instanceof ApiError ? err.message : 'تعذّر تحميل الصورة')
+          setPreviewId(null)
+        }
+      } finally {
+        if (alive) setPreviewLoading(false)
+      }
+    })()
+    return () => {
+      alive = false
+      if (url) URL.revokeObjectURL(url)
+    }
+  }, [previewId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -153,6 +185,7 @@ export function ReceiptsPage() {
           <DataTable
             rows={rows}
             rowKey={(r) => r.id}
+            onRowClick={(r) => setPreviewId(r.id)}
             empty="لا توجد إيصالات بعد."
             columns={[
               { header: 'المعرف', width: '70px', cell: (r) => <Mono>#{r.id}</Mono> },
@@ -165,6 +198,22 @@ export function ReceiptsPage() {
           />
         )}
       </section>
+
+      <Modal
+        open={previewId != null}
+        onClose={() => setPreviewId(null)}
+        title={previewId != null ? `صورة الإيصال #${previewId}` : 'صورة الإيصال'}
+      >
+        <div className="flex items-center justify-center min-h-[200px]">
+          {previewLoading ? (
+            <Spinner />
+          ) : previewUrl ? (
+            <img src={previewUrl} alt="صورة الإيصال" className="max-h-[60vh] w-auto rounded-lg" />
+          ) : (
+            <p className="font-body text-body text-secondary">لا توجد صورة.</p>
+          )}
+        </div>
+      </Modal>
     </Narrow>
   )
 }

@@ -174,10 +174,45 @@ export async function resolveShortage(
   return api<Shortage>(`/inventory/shortages/${id}/resolve`, { method: 'POST', body })
 }
 export async function reorderCheck(supplierId?: number) {
-  return api<{ created: unknown[] }>('/inventory/reorder/check', {
+  return api<{ created: ReorderAlert[] }>('/inventory/reorder/check', {
     method: 'POST',
     query: supplierId ? { supplier_id: supplierId } : {},
   })
+}
+export interface ReorderAlert {
+  id: number
+  stock_balance_id: number
+  level: number
+  payload: Record<string, unknown>
+  acknowledged_at: string | null
+}
+export async function reorderAlerts(openOnly = true) {
+  return api<{ items: ReorderAlert[] }>('/inventory/reorder/alerts', {
+    query: { open: openOnly ? 'true' : 'false' },
+  })
+}
+export async function reorderEscalate() {
+  return api<{ advanced: number; closed: number }>('/inventory/reorder/escalate', { method: 'POST' })
+}
+export async function ackReorderAlert(id: number) {
+  return api<ReorderAlert>(`/inventory/reorder/alerts/${id}/ack`, { method: 'POST' })
+}
+export async function reportShortage(body: {
+  product_id: number
+  supplier_id: number
+  qty: number
+  unit_cost: number
+  evidence_s3_keys: string[] // US-4.4: photo documentation is mandatory
+  transfer_order_id?: number
+}) {
+  return api<Shortage>('/inventory/shortages', { method: 'POST', body })
+}
+export interface Category {
+  code: string
+  label: string
+}
+export async function listCategories() {
+  return api<{ items: Category[] }>('/inventory/categories')
 }
 
 // --- planned read endpoints (not built yet; return [] on 404) ---

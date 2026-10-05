@@ -24,6 +24,10 @@ export function LogisticsPage() {
   const [cap, setCap] = useState('10')
   const [orderId, setOrderId] = useState('')
   const [ship, setShip] = useState<Shipment | null>(null)
+  const [legCarrier, setLegCarrier] = useState('external')
+  const [legRef, setLegRef] = useState('')
+  const [legFrom, setLegFrom] = useState('')
+  const [legTo, setLegTo] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -54,6 +58,21 @@ export function LogisticsPage() {
     try { await fn(); toast.success(msg); if (ship) setShip(await trackShipment(ship.order_id)) }
     catch (err) { toast.error(err instanceof ApiError ? err.message : 'فشلت العملية') }
     finally { setBusy(false) }
+  }
+
+  async function addLegSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!ship) return
+    await run(
+      () => addLeg(ship.id, {
+        carrier_type: legCarrier,
+        carrier_ref: legRef.trim() || undefined,
+        from_label: legFrom.trim() || undefined,
+        to_label: legTo.trim() || undefined,
+      }),
+      'أُضيف المسار.',
+    )
+    setLegRef(''); setLegFrom(''); setLegTo('')
   }
 
   return (
@@ -94,8 +113,21 @@ export function LogisticsPage() {
             <div className="flex flex-wrap gap-space-sm">
               {ship.status === 'scheduled' && <Button disabled={busy} onClick={() => run(() => setShipmentStatus(ship.id, 'shipped'), 'تم الشحن.')}>شحن</Button>}
               {(ship.status === 'shipped' || ship.status === 'scheduled') && <Button disabled={busy} onClick={() => run(() => setShipmentStatus(ship.id, 'in_transit'), 'في الطريق.')}>في الطريق</Button>}
-              <Button disabled={busy} onClick={() => run(() => addLeg(ship.id, { carrier_type: 'external', carrier_ref: 'شركة شحن', from_label: 'مركز الفرز', to_label: 'العميل' }), 'أُضيف مسار خارجي.')}>+ مسار خارجي</Button>
             </div>
+            <form onSubmit={addLegSubmit} className="flex flex-wrap items-end gap-space-sm border-t border-surface-container-high pt-space-md">
+              <div className="w-36">
+                <label className="block font-small text-small text-secondary mb-1">الناقل</label>
+                <select value={legCarrier} onChange={(e) => setLegCarrier(e.target.value)}
+                  className="w-full bg-transparent border-b border-surface-container-high py-1.5 font-body text-body text-primary focus:outline-none focus:border-primary">
+                  <option value="internal">أسطول داخلي</option>
+                  <option value="external">شحن خارجي</option>
+                </select>
+              </div>
+              <div className="w-40"><Field label="مرجع الناقل" value={legRef} onChange={(e) => setLegRef(e.target.value)} /></div>
+              <div className="w-40"><Field label="من" value={legFrom} onChange={(e) => setLegFrom(e.target.value)} /></div>
+              <div className="w-40"><Field label="إلى" value={legTo} onChange={(e) => setLegTo(e.target.value)} /></div>
+              <Button type="submit" disabled={busy}>+ إضافة مسار</Button>
+            </form>
             {ship.legs.length > 0 && (
               <DataTable rows={ship.legs} rowKey={(l) => l.seq} columns={[
                 { header: 'المسار', cell: (l) => `${l.from_label ?? '—'} ← ${l.to_label ?? '—'}` },

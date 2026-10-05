@@ -174,22 +174,15 @@ export async function postManualJournal(body: {
   })
 }
 
-export async function uploadReceipt(body: {
-  image_s3_key: string
-  expected_amount?: string
-  expected_reference?: string
-  ocr_stub_amount?: string
-  ocr_stub_reference?: string
-}) {
-  return api<{
-    receipt_id: number
-    status: string
-    ocr_amount: string | null
-    ocr_reference: string | null
-  }>('/accounting/receipts/upload', {
-    method: 'POST',
-    body,
-  })
+/** Fetch a stored receipt image with auth and return an object URL for <img>.
+ *  The caller should URL.revokeObjectURL(url) when done. */
+export async function fetchReceiptImageUrl(receiptId: number): Promise<string> {
+  const headers: Record<string, string> = {}
+  const token = tokenStore.getAccess()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const res = await fetch(`${API_BASE}/accounting/receipts/${receiptId}/image`, { headers })
+  if (!res.ok) throw new ApiError(res.status, 'image_failed', 'تعذّر تحميل الصورة')
+  return URL.createObjectURL(await res.blob())
 }
 
 export async function resolveReceipt(receiptId: number, status: 'matched' | 'rejected') {

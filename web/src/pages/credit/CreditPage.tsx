@@ -10,6 +10,7 @@ import {
   listDues, payDue,
   type CreditTier, type Escalation, type Due,
 } from '../../api/credit'
+import { customerStatement, type CustomerStatement } from '../../api/commerce'
 import { ApiError } from '../../api/client'
 import { formatDate, formatMoney, todayIso } from '../../lib/format'
 
@@ -52,7 +53,9 @@ export function CreditPage() {
   const [dues, setDues] = useState<Due[]>([])
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState(false)
-  const [modal, setModal] = useState<null | 'override' | 'freeze' | 'pay'>(null)
+  const [modal, setModal] = useState<null | 'override' | 'freeze' | 'pay' | 'statement'>(null)
+  const [statement, setStatement] = useState<CustomerStatement | null>(null)
+  const [stmtLoading, setStmtLoading] = useState(false)
   const [limit, setLimit] = useState('')
   const [reason, setReason] = useState('')
   const [payDueId, setPayDueId] = useState<number | null>(null)
@@ -69,6 +72,13 @@ export function CreditPage() {
   }
 
   function onLookup(e: FormEvent) { e.preventDefault(); if (cid) void load(Number(cid)) }
+
+  async function openStatement(customerId: number) {
+    setModal('statement'); setStatement(null); setStmtLoading(true)
+    try { setStatement(await customerStatement(customerId)) }
+    catch (err) { toast.error(err instanceof ApiError ? err.message : 'تعذّر تحميل كشف الحساب') }
+    finally { setStmtLoading(false) }
+  }
 
   async function act(fn: () => Promise<unknown>, msg: string) {
     setBusy(true)
@@ -171,6 +181,7 @@ export function CreditPage() {
           {/* Actions */}
           <section className="flex flex-wrap justify-end gap-space-sm mb-[48px]">
             <Button onClick={() => act(() => recomputeCredit(tier.customer_id), 'أُعيد الاحتساب.')} disabled={busy} iconRight="sync">إعادة الاحتساب</Button>
+            <Button onClick={() => void openStatement(tier.customer_id)} disabled={busy} iconRight="receipt_long">كشف الحساب</Button>
             <Button onClick={() => setModal('override')} disabled={busy}>استثناء على السقف</Button>
             <Button variant="destructive" onClick={() => setModal('freeze')} disabled={busy}>تجميد (مستوى ٥)</Button>
           </section>
@@ -250,6 +261,57 @@ export function CreditPage() {
           <Button variant="destructive" disabled={busy || reason.trim().length < 5}
             onClick={() => tier && act(() => freezeCustomer(tier.customer_id, reason), 'تم التجميد.')}>تأكيد التجميد</Button></>}>
         <Field label="سبب التجميد (إلزامي)" value={reason} onChange={(e) => setReason(e.target.value)} />
+      </Modal>
+
+      <Modal open={modal === 'statement'} onClose={() => setModal(null)} title="كشف حساب العميل"
+        footer={<Button onClick={() => setModal(null)}>إغلاق</Button>}>
+        {stmtLoading ? <Spinner /> : !statement ? <EmptyState title="لا توجد بيانات." /> : (
+          <div className="flex flex-col gap-space-lg">
+            <div className="flex flex-wrap items-center gap-space-md">
+              <span className="font-body-medium text-body-medium text-primary">
+                {statement.profile.display_name ?? `عميل #${statement.customer_id}`}
+              </span>
+              {statement.profile.geo_area && (
+                <span className="font-small text-small text-secondary">{statement.profile.geo_area}</span>
+              )}
+              <span className="ml-auto inline-flex items-baseline gap-1 font-mono-medium text-mono-medium text-[#ba1a1a]" dir="ltr">
+                <Mono>{formatMoney(statement.outstanding)}</Mono>
+                <span className="text-secondary">ج.م مستحق</span>
+              </span>
+            </div>
+
+            <div>
+              <span className="font-small-medium text-small-medium text-secondary">الطلبات</span>
+              {statement.orders.length === 0 ? (
+                <p className="mt-space-xs font-small text-small text-secondary">لا توجد طلبات.</p>
+              ) : (
+                <DataTable rows={statement.orders} rowKey={(o) => o.id} columns={[
+                  { header: 'الطلب', cell: (o) => <Mono>{o.number}</Mono> },
+                  { header: 'الحالة', align: 'center', cell: (o) => <span className="font-small text-small text-secondary">{o.status}</span> },
+                  { header: 'آجل', align: 'end', cell: (o) => <span dir="ltr"><Mono>{formatMoney(o.total_deferred)}</Mono> ج.م</span> },
+                  { header: 'نقدي', align: 'end', cell: (o) => <span dir="ltr"><Mono>{formatMoney(o.total_cash)}</Mono> ج.م</span> },
+                ]} />
+              )}
+            </div>
+
+            <div>
+              <span className="font-small-medium text-small-medium text-secondary">الذمم</span>
+              {statement.dues.length === 0 ? (
+                <p className="mt-space-xs font-small text-small text-secondary">لا توجد ذمم.</p>
+              ) : (
+                <DataTable rows={statement.dues} rowKey={(d) => d.id} columns={[
+                  { header: 'الاستحقاق', cell: (d) => <Mono>{formatDate(d.due_date)}</Mono> },
+                  { header: 'المبلغ', align: 'end', cell: (d) => <span dir="ltr"><Mono>{formatMoney(d.amount)}</Mono> ج.م</span> },
+                  { header: 'الحالة', align: 'center', cell: (d) => {
+                    const s = DUE_STATUS[d.status] ?? { ar: d.status, tone: 'neutral' as const }
+                    return <Pill tone={s.tone}>{s.ar}</Pill>
+                  } },
+                  { header: 'تأخّر', align: 'end', cell: (d) => <Mono>{d.days_late != null ? `${d.days_late} يوم` : '—'}</Mono> },
+                ]} />
+              )}
+            </div>
+          </div>
+        )}
       </Modal>
 
       <Modal open={modal === 'pay'} onClose={() => setModal(null)} title="تسجيل سداد ذمّة"

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
+import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import {
+  createTransfer,
   getTransfer,
   issueTransfer,
   listTransfersPlanned,
@@ -22,6 +24,15 @@ const STATUS: Record<string, { ar: string; tone: 'signal' | 'warning' | 'neutral
   cancelled: { ar: 'ملغي', tone: 'error' },
 }
 
+const LOC_TYPES = ['supplier', 'channel_partner', 'in_transit', 'customer_hold']
+
+interface LineDraft { product_id: string; qty: string; unit_cost: string }
+const EMPTY_LINE: LineDraft = { product_id: '', qty: '', unit_cost: '' }
+const EMPTY_CREATE = {
+  supplier_id: '', from_location_type: 'supplier', from_location_id: '',
+  to_location_type: 'channel_partner', to_location_id: '',
+}
+
 export function TransfersPage() {
   const toast = useToast()
   const [lookupId, setLookupId] = useState('')
@@ -30,6 +41,9 @@ export function TransfersPage() {
   const [rows, setRows] = useState<TransferOrder[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [form, setForm] = useState(EMPTY_CREATE)
+  const [lines, setLines] = useState<LineDraft[]>([{ ...EMPTY_LINE }])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -62,9 +76,43 @@ export function TransfersPage() {
     finally { setBusy(false) }
   }
 
+  const validLines = lines.filter((l) => l.product_id && l.qty && l.unit_cost)
+  const canCreate = Boolean(form.supplier_id) && validLines.length > 0
+
+  async function onCreate() {
+    setBusy(true)
+    try {
+      const created = await createTransfer({
+        supplier_id: Number(form.supplier_id),
+        from_location_type: form.from_location_type,
+        ...(form.from_location_id ? { from_location_id: Number(form.from_location_id) } : {}),
+        to_location_type: form.to_location_type,
+        ...(form.to_location_id ? { to_location_id: Number(form.to_location_id) } : {}),
+        lines: validLines.map((l) => ({ product_id: Number(l.product_id), qty: l.qty, unit_cost: l.unit_cost })),
+      })
+      toast.success(`تم إنشاء الإذن ${created.number}.`)
+      setCreateOpen(false)
+      setForm(EMPTY_CREATE)
+      setLines([{ ...EMPTY_LINE }])
+      setOrder(created)
+      setLookupId(String(created.id))
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'فشل الإنشاء')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const selectCls =
+    'bg-transparent border-b border-surface-container-high py-2 font-body text-body focus:outline-none focus:border-primary'
+
   return (
     <Wide>
-      <PageTitle title="إذون التحويل" subtitle="كل حركة بضاعة موثّقة بإذن تحويل وقيد محاسبي مرتبط." />
+      <div className="flex items-start justify-between">
+        <PageTitle title="إذون التحويل" subtitle="كل حركة بضاعة موثّقة بإذن تحويل وقيد محاسبي مرتبط." />
+        <Button variant="primary" onClick={() => { setForm(EMPTY_CREATE); setLines([{ ...EMPTY_LINE }]); setCreateOpen(true) }} iconRight="add">إذن تحويل جديد</Button>
+      </div>
 
       <form onSubmit={onLookup} className="mt-space-xl flex items-end gap-space-md">
         <div className="w-56"><Field label="استعراض إذن برقمه" dir="ltr" mono inputMode="numeric" value={lookupId} onChange={(e) => setLookupId(e.target.value)} /></div>
@@ -123,6 +171,50 @@ export function TransfersPage() {
           />
         )}
       </section>
+
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="إذن تحويل جديد" footer={
+        <>
+          <Button onClick={() => setCreateOpen(false)}>إلغاء</Button>
+          <Button variant="primary" onClick={onCreate} disabled={busy || !canCreate}>إنشاء (مسودة)</Button>
+        </>
+      }>
+        <div className="flex flex-col gap-space-md">
+          <Field label="رقم المورد" dir="ltr" mono inputMode="numeric" value={form.supplier_id} onChange={(e) => setForm({ ...form, supplier_id: e.target.value })} required />
+          <div className="grid grid-cols-2 gap-space-md">
+            <div className="flex flex-col">
+              <label className="font-small text-small text-secondary mb-1">من موقع</label>
+              <select className={selectCls} value={form.from_location_type} onChange={(e) => setForm({ ...form, from_location_type: e.target.value })}>
+                {LOC_TYPES.map((l) => <option key={l} value={l}>{LOC_AR[l]}</option>)}
+              </select>
+            </div>
+            <Field label="رقم الموقع المصدر (اختياري)" dir="ltr" mono inputMode="numeric" value={form.from_location_id} onChange={(e) => setForm({ ...form, from_location_id: e.target.value })} />
+          </div>
+          <div className="grid grid-cols-2 gap-space-md">
+            <div className="flex flex-col">
+              <label className="font-small text-small text-secondary mb-1">إلى موقع</label>
+              <select className={selectCls} value={form.to_location_type} onChange={(e) => setForm({ ...form, to_location_type: e.target.value })}>
+                {LOC_TYPES.map((l) => <option key={l} value={l}>{LOC_AR[l]}</option>)}
+              </select>
+            </div>
+            <Field label="رقم الموقع الوجهة (اختياري)" dir="ltr" mono inputMode="numeric" value={form.to_location_id} onChange={(e) => setForm({ ...form, to_location_id: e.target.value })} />
+          </div>
+
+          <div className="border-t border-surface-container-high pt-space-md flex flex-col gap-space-sm">
+            <div className="flex items-center justify-between">
+              <span className="font-body-medium text-body-medium text-primary">الأصناف</span>
+              <button type="button" className="font-small text-small text-primary hover:underline" onClick={() => setLines((ls) => [...ls, { ...EMPTY_LINE }])}>+ إضافة صنف</button>
+            </div>
+            {lines.map((l, i) => (
+              <div key={i} className="grid grid-cols-[1fr_1fr_1fr_auto] items-end gap-space-sm">
+                <Field label="المنتج" dir="ltr" mono inputMode="numeric" value={l.product_id} onChange={(e) => setLines((ls) => ls.map((x, j) => j === i ? { ...x, product_id: e.target.value } : x))} />
+                <Field label="الكمية" dir="ltr" mono inputMode="decimal" value={l.qty} onChange={(e) => setLines((ls) => ls.map((x, j) => j === i ? { ...x, qty: e.target.value } : x))} />
+                <Field label="التكلفة" dir="ltr" mono inputMode="decimal" value={l.unit_cost} onChange={(e) => setLines((ls) => ls.map((x, j) => j === i ? { ...x, unit_cost: e.target.value } : x))} />
+                <button type="button" className="pb-2 text-secondary hover:text-[#B3261E] disabled:opacity-30" disabled={lines.length === 1} onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>حذف</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </Modal>
     </Wide>
   )
 }

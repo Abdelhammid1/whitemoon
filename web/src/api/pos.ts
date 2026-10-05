@@ -39,3 +39,7 @@ export async function listSales(posted?: boolean) {
 export async function settleBatch() {
   return api<PosBatch>('/pos/settle', { method: 'POST', body: {} })
 }
+
+export async function getSale(id: number) {
+  return api<PosSale>(`/pos/sales/${id}`)
+}

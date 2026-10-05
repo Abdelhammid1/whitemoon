@@ -5,7 +5,7 @@ import { PageTitle, Pill, Field, Button, Spinner } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
-import { createUser, listUsers, type AdminUser } from '../../api/admin'
+import { createUser, listUsers, listRoles, type AdminUser, type Role } from '../../api/admin'
 import { ApiError } from '../../api/client'
 import { formatDate } from '../../lib/format'
 
@@ -25,8 +25,16 @@ const STATUS_TONE: Record<string, 'signal' | 'warning' | 'error' | 'neutral'> = 
 
 // Create-user form options.
 const NEW_KINDS = ['customer', 'supplier', 'agent', 'branch', 'staff', 'admin'] as const
-const ROLE_OPTIONS = ['customer', 'supplier', 'agent', 'branch', 'staff', 'admin', 'admin.high']
-const ROLE_AR: Record<string, string> = { ...KIND_AR, 'admin.high': 'مدير أعلى' }
+// Fallback role list used only if the backend role registry can't be reached.
+const FALLBACK_ROLES: Role[] = [
+  { code: 'customer', name_ar: 'عميل', name_en: 'Customer' },
+  { code: 'supplier', name_ar: 'مورد', name_en: 'Supplier' },
+  { code: 'agent', name_ar: 'وكيل', name_en: 'Agent' },
+  { code: 'branch', name_ar: 'فرع', name_en: 'Branch' },
+  { code: 'staff', name_ar: 'موظف', name_en: 'Staff' },
+  { code: 'admin', name_ar: 'مدير', name_en: 'Admin' },
+  { code: 'admin.high', name_ar: 'مدير أعلى', name_en: 'Super Admin' },
+]
 const NEW_STATUSES = ['active', 'pending', 'suspended'] as const
 
 const emptyForm = {
@@ -46,6 +54,22 @@ export function UsersPage() {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState(emptyForm)
+  const [roles, setRoles] = useState<Role[]>(FALLBACK_ROLES)
+
+  // Role registry is loaded from the backend (nothing hard-coded); falls back
+  // to FALLBACK_ROLES only if the request fails.
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      try {
+        const resp = await listRoles()
+        if (alive && resp.items.length) setRoles(resp.items)
+      } catch {
+        /* keep FALLBACK_ROLES */
+      }
+    })()
+    return () => { alive = false }
+  }, [])
 
   // Picking a kind preselects the matching role.
   function setFormKind(k: string) {
@@ -183,10 +207,10 @@ export function UsersPage() {
           <div>
             <span className="font-small text-small text-secondary mb-1 block">الأدوار</span>
             <div className="flex flex-wrap gap-space-md">
-              {ROLE_OPTIONS.map((code) => (
-                <label key={code} className="flex items-center gap-space-xs font-body text-body">
-                  <input type="checkbox" checked={form.roles.includes(code)} onChange={() => toggleRole(code)} />
-                  {ROLE_AR[code] ?? code}
+              {roles.map((r) => (
+                <label key={r.code} className="flex items-center gap-space-xs font-body text-body">
+                  <input type="checkbox" checked={form.roles.includes(r.code)} onChange={() => toggleRole(r.code)} />
+                  {r.name_ar}
                 </label>
               ))}
             </div>

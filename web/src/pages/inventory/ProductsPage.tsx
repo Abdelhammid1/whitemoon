@@ -5,13 +5,9 @@ import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import {
-  addVariant, createProduct, listProducts, PRODUCT_CATEGORIES, type Product,
+  addVariant, createProduct, listCategories, listProducts, type Category, type Product,
 } from '../../api/inventory'
 import { ApiError } from '../../api/client'
-
-const CAT_LABEL: Record<string, string> = Object.fromEntries(
-  PRODUCT_CATEGORIES.map((c) => [c.code, c.label]),
-)
 
 const EMPTY_FORM = {
   sku: '', name_ar: '', name_en: '', category: 'food', subcategory: '', brand: '',
@@ -25,6 +21,7 @@ export function ProductsPage() {
   const toast = useToast()
   const [q, setQ] = useState('')
   const [category, setCategory] = useState('')
+  const [categories, setCategories] = useState<Category[]>([])
   const [rows, setRows] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
@@ -45,6 +42,13 @@ export function ProductsPage() {
     finally { setLoading(false) }
   }
   useEffect(() => { void load() }, [category]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    listCategories()
+      .then((r) => setCategories(r.items))
+      .catch(() => setCategories([]))
+  }, [])
+
+  const catLabel = (code: string) => categories.find((c) => c.code === code)?.label ?? code
 
   async function onCreate(e: FormEvent) {
     e.preventDefault()
@@ -114,7 +118,7 @@ export function ProductsPage() {
         <form onSubmit={(e) => { e.preventDefault(); void load() }} className="w-[320px]"><Field label="بحث (SKU / اسم)" value={q} onChange={(e) => setQ(e.target.value)} /></form>
         <div className="flex flex-wrap gap-space-xs">
           <button className={chip(category === '')} onClick={() => setCategory('')}>الكل</button>
-          {PRODUCT_CATEGORIES.map((c) => (
+          {categories.map((c) => (
             <button key={c.code} className={chip(category === c.code)} onClick={() => setCategory(c.code)}>
               {c.label}
             </button>
@@ -132,7 +136,7 @@ export function ProductsPage() {
                 {p.brand && <span className="font-small text-small text-secondary">{p.brand}</span>}
               </div>
             ) },
-            { header: 'الفئة', cell: (p) => <Pill tone="neutral">{CAT_LABEL[p.category] ?? p.category}</Pill> },
+            { header: 'الفئة', cell: (p) => <Pill tone="neutral">{catLabel(p.category)}</Pill> },
             { header: 'الوحدة', cell: (p) => <span className="font-body text-body">{p.unit}</span> },
             { header: 'المتغيّرات', align: 'center', cell: (p) => (
               <button className="font-small text-small text-primary hover:underline" onClick={() => { setVariantFor(p); setVariant(EMPTY_VARIANT) }}>
@@ -157,7 +161,7 @@ export function ProductsPage() {
             <div className="flex flex-col">
               <label className="font-small text-small text-secondary mb-1">الفئة</label>
               <select className={selectCls} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                {PRODUCT_CATEGORIES.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
+                {categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
               </select>
             </div>
           </div>

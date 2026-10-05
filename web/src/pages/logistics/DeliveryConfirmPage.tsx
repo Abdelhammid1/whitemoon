@@ -4,7 +4,7 @@ import { PageTitle, Button, Field, Pill, SectionHeader, EmptyState } from '../..
 import { Icon } from '../../components/Icon'
 import { Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
-import { confirmDelivery, trackShipment, type Shipment } from '../../api/logistics'
+import { confirmDelivery, trackShipment, updateShipmentLocation, type Shipment } from '../../api/logistics'
 import { ApiError } from '../../api/client'
 
 const STATUS_AR: Record<string, string> = {
@@ -63,6 +63,39 @@ export function DeliveryConfirmPage() {
     }
   }
 
+  function updateLocation() {
+    if (!shipment) return
+    if (!('geolocation' in navigator)) {
+      toast.error('تحديد الموقع غير مدعوم على هذا الجهاز.')
+      return
+    }
+    setBusy(true)
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        void (async () => {
+          try {
+            await updateShipmentLocation(shipment.id, pos.coords.latitude, pos.coords.longitude)
+            setShipment(await trackShipment(shipment.order_id))
+            toast.success('تم تحديث موقع الشحنة.')
+          } catch (err) {
+            toast.error(err instanceof ApiError ? err.message : 'تعذّر تحديث الموقع')
+          } finally {
+            setBusy(false)
+          }
+        })()
+      },
+      (err) => {
+        setBusy(false)
+        toast.error(
+          err.code === err.PERMISSION_DENIED
+            ? 'تم رفض إذن الوصول إلى الموقع.'
+            : 'تعذّر قراءة الموقع الحالي.',
+        )
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
+
   const canSubmit = !busy && !!shipment && shipment.status !== 'delivered' &&
     (method === 'code' ? code.trim().length > 0 : signature.trim().length > 0)
 
@@ -83,6 +116,9 @@ export function DeliveryConfirmPage() {
             <Pill tone={shipment.status === 'delivered' ? 'signal' : shipment.status === 'failed' ? 'error' : 'warning'}>
               {STATUS_AR[shipment.status] ?? shipment.status}
             </Pill>
+            {shipment.status !== 'delivered' && (
+              <Button disabled={busy} onClick={() => updateLocation()} iconRight="my_location">تحديث موقعي</Button>
+            )}
           </section>
 
           {shipment.status === 'delivered' ? (

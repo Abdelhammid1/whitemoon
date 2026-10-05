@@ -57,16 +57,6 @@ class PeriodIn(BaseModel):
     month: int = Field(ge=1, le=12)
 
 
-class ReceiptUploadIn(BaseModel):
-    image_s3_key: str = Field(min_length=1, max_length=500)
-    expected_amount: Decimal | None = None
-    expected_reference: str | None = None
-    # For the stub provider: the body may carry the OCR values directly so
-    # tests can seed them without a real image.
-    ocr_stub_amount: Decimal | None = None
-    ocr_stub_reference: str | None = None
-
-
 class ResolveReceiptIn(BaseModel):
     status: str = Field(pattern="^(matched|rejected)$")
 

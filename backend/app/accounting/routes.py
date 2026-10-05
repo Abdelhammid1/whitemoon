@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Any
 
 from flask import Blueprint, Response, jsonify, request
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended import get_jwt_identity
 from pydantic import ValidationError
 from sqlalchemy import select
 
@@ -24,7 +24,6 @@ from .schemas import (
     DeferredTermsIn,
     ManualJournalIn,
     PeriodIn,
-    ReceiptUploadIn,
     ReportFilterIn,
     ResolveReceiptIn,
 )
@@ -429,47 +428,6 @@ def receipt_image(receipt_id: int):
     key = receipt.image_s3_key
     ext = "." + key.rsplit(".", 1)[-1].lower() if "." in key else ""
     return Response(data, mimetype=_IMAGE_MIME.get(ext, "application/octet-stream"))
-
-
-@bp.post("/receipts/upload")
-@jwt_required()
-def receipt_upload():
-    """Any authenticated user may upload a receipt for their own payment.
-    No `@require_permission` — the identity gate is enough; audit happens.
-    """
-    user_id = _current_user_id()
-    payload = _parse(ReceiptUploadIn)
-
-    # Dev convenience: if the stub-OCR values were posted in the body,
-    # prime the stub provider so `extract` returns them.
-    if payload.ocr_stub_amount is not None or payload.ocr_stub_reference is not None:
-        from .providers.ocr_provider import get_stub
-        get_stub().prime(
-            amount=payload.ocr_stub_amount,
-            reference=payload.ocr_stub_reference,
-        )
-
-    result = receipts_svc.upload_and_match(
-        uploaded_by=user_id,
-        image_s3_key=payload.image_s3_key,
-        image_bytes=b"",  # the real upload path reads bytes from S3
-        expected_amount=payload.expected_amount,
-        expected_reference=payload.expected_reference,
-    )
-    audit_emit(
-        "accounting.receipt.upload",
-        actor_user_id=user_id,
-        target_type="receipt",
-        target_id=result.receipt_id,
-    )
-    return jsonify(
-        {
-            "receipt_id": result.receipt_id,
-            "status": result.status,
-            "ocr_amount": str(result.ocr_amount) if result.ocr_amount else None,
-            "ocr_reference": result.ocr_reference,
-        }
-    ), 201
 
 
 @bp.post("/receipts/<int:receipt_id>/resolve")
