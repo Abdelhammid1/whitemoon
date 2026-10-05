@@ -3,7 +3,8 @@ import { Narrow } from '../../../layouts/AppShell'
 import { PageTitle } from '../../../components/ui'
 import { ReportFilterForm } from '../../../components/ReportFilterForm'
 import { DataTable, Mono } from '../../../components/DataTable'
-import { cashFlow, type CashFlowResponse } from '../../../api/accounting'
+import { cashFlow, type ReportFilterBody, type CashFlowResponse } from '../../../api/accounting'
+import { ReportExport } from '../../../components/ReportExport'
 import { ApiError } from '../../../api/client'
 import { useToast } from '../../../components/Toast'
 import { formatMoney } from '../../../lib/format'
@@ -11,6 +12,7 @@ import { formatMoney } from '../../../lib/format'
 export function CashFlowPage() {
   const toast = useToast()
   const [data, setData] = useState<CashFlowResponse | null>(null)
+  const [filter, setFilter] = useState<ReportFilterBody | null>(null)
   const [busy, setBusy] = useState(false)
   const cols = [
     { header: 'الكود', width: '80px', cell: (r: { code: string }) => <Mono>{r.code}</Mono> },
@@ -19,11 +21,14 @@ export function CashFlowPage() {
   ]
   return (
     <Narrow>
-      <PageTitle title="قائمة التدفقات النقدية" />
+      <div className="flex items-center justify-between">
+        <PageTitle title="قائمة التدفقات النقدية" />
+        <ReportExport path="/accounting/reports/cash-flow" name="التدفقات-النقدية" body={filter} disabled={!data || !filter} />
+      </div>
       <div className="mt-space-xl">
         <ReportFilterForm busy={busy} showAccountPrefix={false} showPartner={false} onRun={async (f) => {
           setBusy(true)
-          try { setData(await cashFlow(f)) }
+          try { setData(await cashFlow(f)); setFilter(f) }
           catch (err) { toast.error(err instanceof ApiError ? err.message : 'فشل التشغيل') }
           finally { setBusy(false) }
         }} />

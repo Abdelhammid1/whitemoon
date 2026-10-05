@@ -3,6 +3,7 @@ import { Wide } from '../../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill } from '../../../components/ui'
 import { DataTable, Mono } from '../../../components/DataTable'
 import { generalLedger, type GeneralLedgerResponse } from '../../../api/accounting'
+import { ReportExport } from '../../../components/ReportExport'
 import { ApiError } from '../../../api/client'
 import { useToast } from '../../../components/Toast'
 import { formatDate, formatMoney, todayIso } from '../../../lib/format'
@@ -28,7 +29,16 @@ export function GeneralLedgerPage() {
 
   return (
     <Wide>
-      <PageTitle title="الأستاذ العام" subtitle="حركة حساب واحد خلال فترة." />
+      <div className="flex items-center justify-between">
+        <PageTitle title="الأستاذ العام" subtitle="حركة حساب واحد خلال فترة." />
+        <ReportExport
+          method="GET"
+          path={`/accounting/reports/general-ledger/${account}`}
+          query={{ date_from: from, date_to: to }}
+          name={`الأستاذ-${account}`}
+          disabled={!data || !('account' in data)}
+        />
+      </div>
       <form onSubmit={onRun} className="mt-space-xl flex flex-wrap items-end gap-space-md">
         <div className="w-40"><Field label="كود الحساب" dir="ltr" mono value={account} onChange={(e) => setAccount(e.target.value)} required /></div>
         <div className="w-44"><Field label="من" type="date" dir="ltr" value={from} onChange={(e) => setFrom(e.target.value)} required /></div>

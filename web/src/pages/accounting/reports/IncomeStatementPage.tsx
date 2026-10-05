@@ -3,7 +3,8 @@ import { Narrow } from '../../../layouts/AppShell'
 import { PageTitle } from '../../../components/ui'
 import { ReportFilterForm } from '../../../components/ReportFilterForm'
 import { DataTable, Mono } from '../../../components/DataTable'
-import { incomeStatement, type IncomeStatementResponse } from '../../../api/accounting'
+import { incomeStatement, type ReportFilterBody, type IncomeStatementResponse } from '../../../api/accounting'
+import { ReportExport } from '../../../components/ReportExport'
 import { ApiError } from '../../../api/client'
 import { useToast } from '../../../components/Toast'
 import { formatMoney } from '../../../lib/format'
@@ -11,6 +12,7 @@ import { formatMoney } from '../../../lib/format'
 export function IncomeStatementPage() {
   const toast = useToast()
   const [data, setData] = useState<IncomeStatementResponse | null>(null)
+  const [filter, setFilter] = useState<ReportFilterBody | null>(null)
   const [busy, setBusy] = useState(false)
 
   const cols = [
@@ -21,11 +23,14 @@ export function IncomeStatementPage() {
 
   return (
     <Narrow>
-      <PageTitle title="قائمة الدخل" />
+      <div className="flex items-center justify-between">
+        <PageTitle title="قائمة الدخل" />
+        <ReportExport path="/accounting/reports/income-statement" name="قائمة-الدخل" body={filter} disabled={!data || !filter} />
+      </div>
       <div className="mt-space-xl">
         <ReportFilterForm busy={busy} showAccountPrefix={false} showPartner={false} onRun={async (f) => {
           setBusy(true)
-          try { setData(await incomeStatement(f)) }
+          try { setData(await incomeStatement(f)); setFilter(f) }
           catch (err) { toast.error(err instanceof ApiError ? err.message : 'فشل التشغيل') }
           finally { setBusy(false) }
         }} />

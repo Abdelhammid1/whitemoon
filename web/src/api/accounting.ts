@@ -225,6 +225,47 @@ export async function applyEarlyDiscount(order_id: number, settled_on: string) {
 
 // ---------------------------------------------------------------- reports
 
+/** Fetch a report as an Excel/PDF file and trigger a browser download (US-3.5). */
+export async function downloadReport(opts: {
+  path: string
+  format: 'xlsx' | 'pdf'
+  filename: string
+  method?: 'GET' | 'POST'
+  body?: unknown
+  query?: Record<string, string>
+}): Promise<void> {
+  const { path, format, filename, method = 'POST', body, query } = opts
+  const headers: Record<string, string> = {}
+  const token = tokenStore.getAccess()
+  if (token) headers.Authorization = `Bearer ${token}`
+  if (body) headers['Content-Type'] = 'application/json'
+  const qs = new URLSearchParams({ ...(query ?? {}), format })
+  const res = await fetch(`${API_BASE}${path}?${qs.toString()}`, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  if (!res.ok) {
+    let msg = 'تعذّر التصدير'
+    try {
+      const j = await res.json()
+      msg = (j as { message?: string }).message ?? msg
+    } catch {
+      /* non-JSON error body */
+    }
+    throw new ApiError(res.status, 'export_failed', msg)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export interface TrialBalanceRow {
   code: string
   name_ar: string

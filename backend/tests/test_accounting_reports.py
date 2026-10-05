@@ -47,6 +47,23 @@ def test_trial_balance_is_balanced(client) -> None:
     assert tb["rows"], "trial balance should have rows after seeding"
 
 
+def test_report_export_xlsx_over_http(client) -> None:
+    from tests.helpers import auth_header, create_user
+
+    create_user(kind="admin", email="rptadmin@example.com", roles=("admin.high",))
+    _seed_a_tiny_month()
+    hdr = auth_header(client, email="rptadmin@example.com")
+    r = client.post(
+        "/accounting/reports/trial-balance?format=xlsx",
+        json={"date_from": "2026-10-01", "date_to": "2026-10-28"},
+        headers=hdr,
+    )
+    assert r.status_code == 200, r.get_data()[:200]
+    assert "spreadsheetml" in r.headers["Content-Type"]
+    assert r.data[:2] == b"PK"  # a real .xlsx (zip)
+    assert "attachment" in r.headers.get("Content-Disposition", "")
+
+
 def test_income_statement_sees_revenue_and_cogs(client) -> None:
     _seed_a_tiny_month()
     pl = reports_svc.income_statement(_f())

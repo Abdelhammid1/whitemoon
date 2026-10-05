@@ -3,7 +3,8 @@ import { Wide } from '../../../layouts/AppShell'
 import { PageTitle, Pill } from '../../../components/ui'
 import { ReportFilterForm } from '../../../components/ReportFilterForm'
 import { DataTable, Mono } from '../../../components/DataTable'
-import { balanceSheet, type BalanceSheetResponse } from '../../../api/accounting'
+import { balanceSheet, type ReportFilterBody, type BalanceSheetResponse } from '../../../api/accounting'
+import { ReportExport } from '../../../components/ReportExport'
 import { ApiError } from '../../../api/client'
 import { useToast } from '../../../components/Toast'
 import { formatMoney } from '../../../lib/format'
@@ -11,6 +12,7 @@ import { formatMoney } from '../../../lib/format'
 export function BalanceSheetPage() {
   const toast = useToast()
   const [data, setData] = useState<BalanceSheetResponse | null>(null)
+  const [filter, setFilter] = useState<ReportFilterBody | null>(null)
   const [busy, setBusy] = useState(false)
 
   const cols = [
@@ -21,11 +23,14 @@ export function BalanceSheetPage() {
 
   return (
     <Wide>
-      <PageTitle title="المركز المالي (الميزانية العمومية)" />
+      <div className="flex items-center justify-between">
+        <PageTitle title="المركز المالي (الميزانية العمومية)" />
+        <ReportExport path="/accounting/reports/balance-sheet" name="المركز-المالي" body={filter} disabled={!data || !filter} />
+      </div>
       <div className="mt-space-xl">
         <ReportFilterForm busy={busy} showAccountPrefix={false} showPartner={false} onRun={async (f) => {
           setBusy(true)
-          try { setData(await balanceSheet(f)) }
+          try { setData(await balanceSheet(f)); setFilter(f) }
           catch (err) { toast.error(err instanceof ApiError ? err.message : 'فشل التشغيل') }
           finally { setBusy(false) }
         }} />

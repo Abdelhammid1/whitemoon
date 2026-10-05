@@ -31,6 +31,7 @@ from .schemas import (
 from .services import deferred as deferred_svc
 from .services import periods as periods_svc
 from .services import receipts as receipts_svc
+from .services import report_export
 from .services import reports as reports_svc
 from .services.events import LineInput, post_manual
 from .services.reports import ReportFilter
@@ -554,32 +555,61 @@ def _report_filter(payload: ReportFilterIn) -> ReportFilter:
     )
 
 
+_EXPORT_MIME = {
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "pdf": "application/pdf",
+}
+
+
+def _report_response(report_name: str, data: dict[str, Any]):
+    """Return JSON, or an Excel/PDF file when ?format=xlsx|pdf (US-3.5)."""
+    fmt = (request.args.get("format") or "json").lower()
+    if fmt == "json":
+        return jsonify(data)
+    if fmt not in _EXPORT_MIME:
+        raise BadRequest("صيغة تصدير غير مدعومة", code="bad_export_format")
+    doc = report_export.build_doc(report_name, data)
+    try:
+        payload = report_export.to_xlsx(doc) if fmt == "xlsx" else report_export.to_pdf(doc)
+    except RuntimeError as e:
+        if str(e) == "pdf_engine_unavailable":
+            return jsonify({"error": "pdf_unavailable", "message": "محرك PDF غير متاح على هذا الخادم"}), 501
+        raise
+    stamp = data.get("as_of") or data.get("date_to") or data.get("filter", {}).get("date_to") or "report"
+    fname = f"{report_name}-{stamp}.{fmt}"
+    return Response(
+        payload,
+        mimetype=_EXPORT_MIME[fmt],
+        headers={"Content-Disposition": f'attachment; filename="{fname}"'},
+    )
+
+
 @bp.post("/reports/trial-balance")
 @require_permission("period.close")
 def report_tb():
     payload = _parse(ReportFilterIn)
-    return jsonify(reports_svc.trial_balance(_report_filter(payload)))
+    return _report_response("trial-balance", reports_svc.trial_balance(_report_filter(payload)))
 
 
 @bp.post("/reports/income-statement")
 @require_permission("period.close")
 def report_pl():
     payload = _parse(ReportFilterIn)
-    return jsonify(reports_svc.income_statement(_report_filter(payload)))
+    return _report_response("income-statement", reports_svc.income_statement(_report_filter(payload)))
 
 
 @bp.post("/reports/balance-sheet")
 @require_permission("period.close")
 def report_bs():
     payload = _parse(ReportFilterIn)
-    return jsonify(reports_svc.balance_sheet(_report_filter(payload)))
+    return _report_response("balance-sheet", reports_svc.balance_sheet(_report_filter(payload)))
 
 
 @bp.post("/reports/cash-flow")
 @require_permission("period.close")
 def report_cf():
     payload = _parse(ReportFilterIn)
-    return jsonify(reports_svc.cash_flow(_report_filter(payload)))
+    return _report_response("cash-flow", reports_svc.cash_flow(_report_filter(payload)))
 
 
 @bp.get("/reports/general-ledger/<account_code>")
@@ -588,14 +618,12 @@ def report_gl(account_code: str):
     df = date.fromisoformat(request.args["date_from"])
     dt = date.fromisoformat(request.args["date_to"])
     limit = int(request.args.get("limit", "500"))
-    return jsonify(
-        reports_svc.general_ledger(
-            account_code=account_code,
-            date_from=df,
-            date_to=dt,
-            limit=limit,
-        )
+    data = reports_svc.general_ledger(
+        account_code=account_code, date_from=df, date_to=dt, limit=limit
     )
+    if "error" in data:
+        return jsonify(data), 404
+    return _report_response("general-ledger", data)
 
 
 # ================================================================ errors

@@ -2,8 +2,9 @@ import { useState } from 'react'
 import { Wide } from '../../../layouts/AppShell'
 import { PageTitle, Pill } from '../../../components/ui'
 import { ReportFilterForm } from '../../../components/ReportFilterForm'
+import { ReportExport } from '../../../components/ReportExport'
 import { DataTable, Mono } from '../../../components/DataTable'
-import { trialBalance, type TrialBalanceResponse } from '../../../api/accounting'
+import { trialBalance, type ReportFilterBody, type TrialBalanceResponse } from '../../../api/accounting'
 import { ApiError } from '../../../api/client'
 import { useToast } from '../../../components/Toast'
 import { formatMoney } from '../../../lib/format'
@@ -11,15 +12,19 @@ import { formatMoney } from '../../../lib/format'
 export function TrialBalancePage() {
   const toast = useToast()
   const [data, setData] = useState<TrialBalanceResponse | null>(null)
+  const [filter, setFilter] = useState<ReportFilterBody | null>(null)
   const [busy, setBusy] = useState(false)
 
   return (
     <Wide>
-      <PageTitle title="ميزان المراجعة" />
+      <div className="flex items-center justify-between">
+        <PageTitle title="ميزان المراجعة" />
+        <ReportExport path="/accounting/reports/trial-balance" name="ميزان-المراجعة" body={filter} disabled={!data || !filter} />
+      </div>
       <div className="mt-space-xl">
         <ReportFilterForm busy={busy} onRun={async (f) => {
           setBusy(true)
-          try { setData(await trialBalance(f)) }
+          try { setData(await trialBalance(f)); setFilter(f) }
           catch (err) { toast.error(err instanceof ApiError ? err.message : 'فشل التشغيل') }
           finally { setBusy(false) }
         }} />

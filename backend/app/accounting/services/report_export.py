@@ -43,6 +43,20 @@ def _m(s: Any) -> str:
         return str(s)
 
 
+def _safe(v: Any) -> str:
+    """Neutralise spreadsheet formula injection: a cell whose text begins with
+    =,+,-,@ or a control char is interpreted as a formula by Excel. Prefix such
+    TEXT with an apostrophe, but let genuine numbers (incl. negatives / grouped)
+    through so money columns stay numeric."""
+    s = str(v)
+    if s[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        try:
+            float(s.replace(",", ""))
+        except ValueError:
+            return "'" + s
+    return s
+
+
 def build_doc(report: str, data: dict[str, Any]) -> ReportDoc:
     """Normalise a report dict into a ReportDoc. `report` is the report key."""
     if report == "trial-balance":
@@ -165,7 +179,7 @@ def to_xlsx(doc: ReportDoc) -> bytes:
         r += 1
         for row in sec.rows:
             for ci, val in enumerate(row, start=1):
-                ws.cell(r, ci, val).alignment = right
+                ws.cell(r, ci, _safe(val)).alignment = right
             r += 1
         r += 1  # blank line between sections
 
