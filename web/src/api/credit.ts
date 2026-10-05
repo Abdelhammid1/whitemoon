@@ -8,6 +8,7 @@ export interface CreditTier {
   effective_limit: string
   deferred_pct: string
   outstanding: string
+  order_block_level: number // 0 none · 2 block deferred + 50% cut · 4 freeze all orders
 }
 export interface Escalation {
   id: number

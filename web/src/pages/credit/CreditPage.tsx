@@ -118,6 +118,25 @@ export function CreditPage() {
             </div>
           )}
 
+          {/* Automatic overdue-escalation banner (independent of tier) */}
+          {tier.order_block_level >= 4 ? (
+            <div className="bg-[#ffdad6] text-[#93000a] p-space-md rounded-lg flex items-center gap-space-sm mb-space-xl">
+              <Icon name="block" size={20} className="shrink-0" />
+              <div className="flex flex-col">
+                <span className="font-body-medium text-body-medium">تجميد الطلبات — تصعيد المستوى ٤</span>
+                <span className="font-small text-small">يرفض النظام أي طلب جديد (نقدي أو آجل) حتى تسوية المتأخرات ولو جزئياً.</span>
+              </div>
+            </div>
+          ) : tier.order_block_level >= 2 ? (
+            <div className="bg-[rgba(168,101,12,0.08)] text-[#A8650C] p-space-md rounded-lg flex items-center gap-space-sm mb-space-xl">
+              <Icon name="warning" size={20} className="shrink-0" />
+              <div className="flex flex-col">
+                <span className="font-body-medium text-body-medium">تخفيض السقف — تصعيد المستوى ٢</span>
+                <span className="font-small text-small">خُفض السقف الفعّال ٥٠٪ ومُنع البيع الآجل الجديد بسبب تأخر السداد. يُرفع تلقائياً عند التسوية.</span>
+              </div>
+            </div>
+          ) : null}
+
           {/* Tier + score */}
           <section className="flex flex-wrap items-center gap-space-md mb-space-lg">
             <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-mono-medium text-mono-medium ${t.tint}`}>
