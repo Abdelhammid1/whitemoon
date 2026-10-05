@@ -7,6 +7,10 @@
 # Auth: set PGPASSWORD or use ~/.pgpass on the host. Never hard-code it here.
 set -euo pipefail
 
+# Dumps hold the entire database (financials, PII, password hashes): make every
+# file/dir this script creates owner-only.
+umask 077
+
 PGHOST="${PGHOST:-localhost}"
 PGPORT="${PGPORT:-5432}"
 PGUSER="${PGUSER:-wm}"
@@ -17,11 +21,13 @@ RCLONE_REMOTE="${RCLONE_REMOTE:-}"   # e.g. hetzner-box:whitemoon/pg (optional)
 export PGHOST PGPORT PGUSER
 
 mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 OUT="${BACKUP_DIR}/${PGDATABASE}-${STAMP}.dump"
 
 echo "[backup] pg_dump ${PGDATABASE} -> ${OUT}"
 pg_dump --format=custom --compress=6 --file="$OUT" "$PGDATABASE"
+chmod 600 "$OUT"
 
 # Integrity: the archive's table of contents must parse.
 pg_restore --list "$OUT" >/dev/null
