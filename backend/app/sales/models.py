@@ -56,6 +56,12 @@ class CustomerCreditTier(Base, TimestampMixin):
         String(3), nullable=False, default="EGP", server_default="EGP"
     )
     last_recomputed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Escalation floor (docs/04 §2): the worst colour an active dunning
+    # escalation has forced the customer to. recompute() never shows a tier
+    # better (less toward red) than this until de-escalation recovers it a step
+    # at a time. NULL = no active floor. floor_set_at gates the 24h recovery.
+    escalation_floor: Mapped[str | None] = mapped_column(String(10))
+    floor_set_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class CreditTierSetting(Base, TimestampMixin):

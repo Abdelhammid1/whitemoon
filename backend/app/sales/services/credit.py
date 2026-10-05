@@ -105,6 +105,9 @@ class Classification:
 
 
 def _today() -> date:
+    # UTC calendar day — the single date source for the credit module
+    # (classify, overdue, escalation). The Beat scan runs daily regardless;
+    # the ≤3h UTC/Cairo boundary offset is immaterial to range-based day bands.
     return datetime.now(UTC).date()
 
 
@@ -169,22 +172,101 @@ def classify(customer_id: int) -> Classification:
     return Classification(tier=tier, score=score)
 
 
+# Colour severity toward red (higher = worse). `white` (new account, 250k)
+# sits between green and yellow by limit.
+_SEVERITY = {"green": 0, "white": 1, "yellow": 2, "red": 3}
+# One-step forced downgrade toward red (docs/04 §2 L3): green/white → yellow,
+# yellow → red; red is terminal.
+_DOWNGRADE = {"green": "yellow", "white": "yellow", "yellow": "red", "red": "red"}
+# One-step de-escalation recovery toward green: red → yellow; yellow (or better)
+# is released so the score decides white/green ("أحمر → أصفر → أبيض/أخضر").
+_RECOVER = {"red": "yellow"}
+DEESCALATE_AFTER_HOURS = 24
+
+
+def _severity(tier: str) -> int:
+    return _SEVERITY.get(tier, 0)
+
+
 def recompute(customer_id: int) -> CustomerCreditTier:
     c = classify(customer_id)
-    limit, pct = tier_defaults(c.tier)
     row = db.session.execute(
         select(CustomerCreditTier).where(CustomerCreditTier.customer_id == customer_id)
     ).scalar_one_or_none()
     if row is None:
         row = CustomerCreditTier(customer_id=customer_id)
         db.session.add(row)
-    row.tier = c.tier
+    # An active escalation floor never lets the shown tier be better (less
+    # toward red) than the floor (docs/04 §2).
+    effective = c.tier
+    if row.escalation_floor and _severity(row.escalation_floor) > _severity(c.tier):
+        effective = row.escalation_floor
+    limit, pct = tier_defaults(effective)
+    row.tier = effective
     row.score = c.score
     row.credit_limit = limit
     row.deferred_pct = pct
     row.last_recomputed_at = datetime.now(UTC)
     db.session.flush()
     return row
+
+
+def apply_l3_downgrade(customer_id: int) -> CustomerCreditTier:
+    """Force the colour tier one step toward red (docs/04 §2, Level 3). Sets or
+    worsens the escalation floor so it persists through recompute until
+    de-escalation recovers it. Idempotent at red."""
+    row = get_tier(customer_id)
+    target = _DOWNGRADE.get(row.tier, row.tier)
+    if _severity(target) <= _severity(row.tier):
+        return row  # already at red — nothing to downgrade
+    if not row.escalation_floor or _severity(target) > _severity(row.escalation_floor):
+        row.escalation_floor = target
+        row.floor_set_at = datetime.now(UTC)
+        db.session.flush()
+    return recompute(customer_id)
+
+
+def de_escalate(customer_id: int) -> bool:
+    """Recover the escalation floor one step toward green — but only once the
+    customer has no overdue open dues and ≥24h have passed since the floor last
+    moved (docs/04 §2). Returns True if a step was recovered."""
+    row = db.session.execute(
+        select(CustomerCreditTier).where(CustomerCreditTier.customer_id == customer_id)
+    ).scalar_one_or_none()
+    if row is None or not row.escalation_floor:
+        return False
+    today = _today()
+    if any((today - d.due_date).days > 0 for d in _open_dues(customer_id)):
+        return False  # still delinquent — no recovery
+    if row.floor_set_at and (
+        datetime.now(UTC) - row.floor_set_at
+    ) < timedelta(hours=DEESCALATE_AFTER_HOURS):
+        return False
+    recovered = _RECOVER.get(row.escalation_floor)
+    if recovered is None:
+        row.escalation_floor = None  # released — the score decides the tier
+        row.floor_set_at = None
+    else:
+        row.escalation_floor = recovered
+        row.floor_set_at = datetime.now(UTC)
+    db.session.flush()
+    recompute(customer_id)
+    return True
+
+
+def de_escalate_all() -> int:
+    """Run one de-escalation step for every customer with an active floor
+    (nightly). Returns the number of customers that recovered a step."""
+    ids = list(
+        db.session.execute(
+            select(CustomerCreditTier.customer_id).where(
+                CustomerCreditTier.escalation_floor.isnot(None)
+            )
+        ).scalars()
+    )
+    n = sum(1 for cid in ids if de_escalate(cid))
+    db.session.commit()
+    return n
 
 
 def recompute_all_active() -> int:
@@ -461,8 +543,9 @@ REMINDER_DAYS_BEFORE = 3
 def due_reminders() -> int:
     """Proactive reminder (docs/04 §2): notify customers of open dues coming due
     in REMINDER_DAYS_BEFORE days. In-app by default (switch the channel once the
-    SMS/WhatsApp provider is configured). Returns the count sent. Driven by Beat
-    daily, so each due is reminded once."""
+    SMS/WhatsApp provider is configured). Returns the count sent. Intended to run
+    once per day from Beat (not idempotent — a second run the same day
+    re-reminds, so the task acks early and is not retried)."""
     from ...notifications.services import notify as notify_svc
 
     target_date = _today() + timedelta(days=REMINDER_DAYS_BEFORE)

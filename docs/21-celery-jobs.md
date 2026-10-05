@@ -32,7 +32,7 @@ the worker and Beat run as separate `systemd` services.
 
 | job (task name) | schedule | what it does |
 |---|---|---|
-| `credit.nightly_scan` | daily 02:00 Africa/Cairo | `escalation.nightly_scan`: recompute every active customer's tier, then open due dunning/escalation events (docs/04 §1). Idempotent. |
+| `credit.nightly_scan` | daily 02:00 Africa/Cairo | `escalation.nightly_scan`: recompute every active customer's tier, open due escalation events (incl. the forced L3 colour downgrade), then de-escalate eligible customers one step (docs/04 §1–§2). Idempotent. |
 | `credit.due_reminders` | daily 08:00 Africa/Cairo | `credit.due_reminders`: notify customers of open dues coming due in 3 days (docs/04 §2). In-app today; flip the channel to sms/whatsapp once a provider is configured. |
 
 Also available (not scheduled): `notifications.dispatch(notification_id)` —
@@ -57,8 +57,11 @@ row. Delivery never raises — a provider failure cannot roll back a notificatio
 
 ## Still to layer on (follow-ups)
 
-- **Forced L3 colour downgrade + graduated de-escalation** (docs/04 §2) — a
-  change to the *signed* credit classification; needs finance sign-off first.
+- **Forced L3 colour downgrade + graduated de-escalation** (docs/04 §2) —
+  *implemented*: the escalation floor on `customer_credit_tiers` (migration
+  0021) persists a one-step downgrade through recompute, and `nightly_scan`
+  recovers it a step every 24h once the customer settles. The formal finance
+  signature still belongs on docs/04 as the signed credit rule.
 - **Real OTP delivery** — point `identity.providers.otp_provider.TwilioProvider`
   at the same Twilio path (currently console-only in dev); needs credentials.
 - Switch the due-reminder channel from in-app to SMS/WhatsApp once Twilio is

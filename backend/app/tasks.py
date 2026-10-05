@@ -18,9 +18,11 @@ def nightly_credit_scan() -> dict[str, int]:
     return esc_svc.nightly_scan()
 
 
-@celery_app.task(name="credit.due_reminders")
+@celery_app.task(name="credit.due_reminders", acks_late=False)
 def due_reminders() -> int:
-    """Daily: remind customers of dues coming due in a few days (docs/04 §2)."""
+    """Daily: remind customers of dues coming due in a few days (docs/04 §2).
+    acks_late=False (override the global): this task is NOT idempotent, so it
+    must not be redelivered on a worker crash and re-send reminders."""
     return credit_svc.due_reminders()
 
 

@@ -131,6 +131,54 @@ def test_auto_escalation_level_by_overdue(client) -> None:
     assert esc_svc.run_for_customer(cust.id) == []
 
 
+def test_l3_forces_one_step_downgrade_and_persists(client) -> None:
+    # A green customer with one 20-day-overdue due → L3 forces green→yellow,
+    # and the floor holds through a later recompute even though the score is green.
+    cust = _aged_customer("l3down@example.com")
+    for _ in range(4):
+        _paid_due(cust.id, due_days_ago=40, late=0)  # on-time history → green
+    assert credit_svc.recompute(cust.id).tier == "green"
+    credit_svc.record_due(customer_id=cust.id, order_id=None, amount=Decimal("100"), due_date=date.today() - timedelta(days=20))
+    db.session.commit()
+    esc_svc.run_for_customer(cust.id)
+    row = credit_svc.get_tier(cust.id)
+    assert row.tier == "yellow"
+    assert row.escalation_floor == "yellow"
+    # recompute must not restore green while the floor stands.
+    assert credit_svc.recompute(cust.id).tier == "yellow"
+
+
+def test_de_escalation_recovers_one_step_after_settlement(client) -> None:
+    cust = create_user(kind="customer", email="deesc@example.com", roles=("customer",))
+    db.session.commit()
+    row = credit_svc.recompute(cust.id)
+    # Simulate a red floor set > 24h ago, with no overdue dues.
+    row.escalation_floor = "red"
+    row.floor_set_at = datetime.now(UTC) - timedelta(hours=25)
+    db.session.commit()
+    assert credit_svc.de_escalate(cust.id) is True
+    row = credit_svc.get_tier(cust.id)
+    assert row.escalation_floor == "yellow"  # red → yellow, one step
+    # A second step needs another 24h.
+    assert credit_svc.de_escalate(cust.id) is False
+    row.floor_set_at = datetime.now(UTC) - timedelta(hours=25)
+    db.session.commit()
+    assert credit_svc.de_escalate(cust.id) is True
+    assert credit_svc.get_tier(cust.id).escalation_floor is None  # released
+
+
+def test_de_escalation_blocked_while_overdue(client) -> None:
+    cust = create_user(kind="customer", email="deescblk@example.com", roles=("customer",))
+    db.session.commit()
+    row = credit_svc.recompute(cust.id)
+    row.escalation_floor = "yellow"
+    row.floor_set_at = datetime.now(UTC) - timedelta(hours=25)
+    db.session.commit()
+    credit_svc.record_due(customer_id=cust.id, order_id=None, amount=Decimal("100"), due_date=date.today() - timedelta(days=5))
+    db.session.commit()
+    assert credit_svc.de_escalate(cust.id) is False  # still delinquent
+
+
 def test_level5_is_manual_and_suspends(client) -> None:
     cust = create_user(kind="customer", email="freeze@example.com", roles=("customer",))
     db.session.commit()

@@ -8,6 +8,7 @@ the acting admin's id. docs/04-credit-rating-rules.md §2.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import select
@@ -30,7 +31,7 @@ MIN_REASON_LEN = 5
 
 
 def _max_overdue_days(customer_id: int) -> int:
-    today = datetime.now(UTC).date()
+    today = credit._today()
     open_dues = db.session.execute(
         select(CustomerDue).where(
             CustomerDue.customer_id == customer_id, CustomerDue.status == "open"
@@ -48,24 +49,57 @@ def _already_at_level(customer_id: int, level: int) -> bool:
     return row is not None
 
 
+def _overdue_over_30pct(customer_id: int) -> bool:
+    """Total overdue open dues exceed 30% of the customer's limit — the
+    secondary Level-3 trigger (docs/04 §2)."""
+    today = credit._today()
+    open_dues = db.session.execute(
+        select(CustomerDue).where(
+            CustomerDue.customer_id == customer_id, CustomerDue.status == "open"
+        )
+    ).scalars().all()
+    overdue_sum = sum(
+        (d.amount for d in open_dues if (today - d.due_date).days > 0),
+        start=Decimal("0"),
+    )
+    if overdue_sum <= 0:
+        return False
+    limit = credit.effective_limit(customer_id)
+    return limit > 0 and overdue_sum > limit * Decimal("0.30")
+
+
 def run_for_customer(customer_id: int) -> list[EscalationEvent]:
-    """Open the appropriate automatic (1–4) escalation events for one
-    customer based on their worst overdue due. Returns new events."""
+    """Open the appropriate automatic (1–4) escalation events for one customer
+    based on their worst overdue due (and the secondary >30%-of-limit L3
+    trigger). Level 3 forces a one-step colour downgrade. Returns new events."""
     overdue = _max_overdue_days(customer_id)
     created: list[EscalationEvent] = []
     for level, lo, hi, reason in _AUTO_LEVELS:
         if lo <= overdue <= hi and not _already_at_level(customer_id, level):
             ev = EscalationEvent(
-                customer_id=customer_id,
-                level=level,
-                trigger_reason=reason,
-                is_automatic=True,
+                customer_id=customer_id, level=level, trigger_reason=reason, is_automatic=True
             )
             db.session.add(ev)
             created.append(ev)
-            if level == 3:
-                # Downgrade one tier toward red immediately.
-                credit.recompute(customer_id)
+    # Secondary L3 trigger: overdue > 30% of limit, even below 16 days.
+    if (
+        all(ev.level != 3 for ev in created)
+        and not _already_at_level(customer_id, 3)
+        and _overdue_over_30pct(customer_id)
+    ):
+        ev = EscalationEvent(
+            customer_id=customer_id,
+            level=3,
+            trigger_reason="تجاوز المتأخرات ٣٠٪ من السقف",
+            is_automatic=True,
+        )
+        db.session.add(ev)
+        created.append(ev)
+    # Level 3 → force a one-step colour downgrade; other levels just refresh.
+    if any(ev.level == 3 for ev in created):
+        credit.apply_l3_downgrade(customer_id)
+    elif created:
+        credit.recompute(customer_id)
     db.session.commit()
     return created
 
@@ -88,7 +122,12 @@ def nightly_scan() -> dict[str, int]:
     """
     recomputed = credit.recompute_all_active()
     opened = run_all()
-    return {"recomputed": recomputed, "escalations_opened": opened}
+    de_escalated = credit.de_escalate_all()
+    return {
+        "recomputed": recomputed,
+        "escalations_opened": opened,
+        "de_escalated": de_escalated,
+    }
 
 
 def escalate_level5(*, customer_id: int, reason: str, actor_user_id: int) -> EscalationEvent:

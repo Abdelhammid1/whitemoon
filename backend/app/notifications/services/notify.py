@@ -50,9 +50,14 @@ def notify(
         raise BadRequest("قناة غير صالحة", code="bad_channel")
     n = Notification(user_id=user_id, type=type_, title=title, body=body, channel=channel)
     db.session.add(n)
-    db.session.flush()
-    _dispatch(n)
+    # Persist first, then deliver: external delivery (network I/O) runs AFTER
+    # commit so it never holds the transaction open or rolls the row back. For
+    # high-volume external sending use the notifications.dispatch Celery task.
     db.session.commit()
+    try:
+        _dispatch(n)
+    except Exception:  # pragma: no cover
+        log.exception("notification dispatch failed (id=%s, channel=%s)", n.id, n.channel)
     return n
 
 
