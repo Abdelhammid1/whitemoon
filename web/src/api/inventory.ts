@@ -214,6 +214,10 @@ export interface Category {
 export async function listCategories() {
   return api<{ items: Category[] }>('/inventory/categories')
 }
+/** Stock/transfer location types (code + Arabic label) from the backend. */
+export async function listLocationTypes() {
+  return api<{ items: Category[] }>('/inventory/location-types')
+}
 
 // --- planned read endpoints (not built yet; return [] on 404) ---
 

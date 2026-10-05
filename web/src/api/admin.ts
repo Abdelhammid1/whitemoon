@@ -48,6 +48,19 @@ export async function listRoles() {
   return api<{ items: Role[] }>('/admin/roles')
 }
 
+export interface CodeLabel {
+  code: string
+  label: string
+}
+/** User kinds (code + Arabic label) from the backend — the UI's single source. */
+export async function listUserKinds() {
+  return api<{ items: CodeLabel[] }>('/admin/user-kinds')
+}
+/** Account statuses (code + Arabic label) from the backend. */
+export async function listUserStatuses() {
+  return api<{ items: CodeLabel[] }>('/admin/user-statuses')
+}
+
 export async function createUser(body: {
   kind: string
   roles: string[]

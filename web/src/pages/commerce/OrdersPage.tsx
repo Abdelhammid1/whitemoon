@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Pill, Spinner, InlineError } from '../../components/ui'
+import { PageTitle, Pill, Spinner, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { listOrders, type Order } from '../../api/commerce'
 import { ApiError } from '../../api/client'
@@ -36,19 +36,21 @@ export function OrdersPage() {
         ) : error ? (
           <InlineError message={error} />
         ) : (
-          <DataTable
-            rows={rows}
-            rowKey={(o) => o.id}
-            onRowClick={(o) => navigate(`/orders/${o.id}`)}
-            empty="لا توجد طلبات بعد."
-            columns={[
-              { header: 'رقم الطلب', cell: (o) => <Mono>{o.number}</Mono> },
-              { header: 'الدفع', cell: (o) => (o.payment_mode === 'deferred' ? 'آجل' : 'نقدي') },
-              { header: 'الإجمالي', align: 'end', cell: (o) => <Mono>{formatMoney(o.payment_mode === 'deferred' ? o.total_deferred : o.total_cash)}</Mono> },
-              { header: 'الحالة', align: 'center', cell: (o) => <Pill tone={STATUS[o.status]?.tone ?? 'neutral'}>{STATUS[o.status]?.ar ?? o.status}</Pill> },
-              { header: 'التاريخ', align: 'end', cell: (o) => <Mono>{formatDate(o.placed_at)}</Mono> },
-            ]}
-          />
+          <Card padded={false} className="overflow-hidden">
+            <DataTable
+              rows={rows}
+              rowKey={(o) => o.id}
+              onRowClick={(o) => navigate(`/orders/${o.id}`)}
+              empty="لا توجد طلبات بعد."
+              columns={[
+                { header: 'رقم الطلب', cell: (o) => <Mono>{o.number}</Mono> },
+                { header: 'الدفع', cell: (o) => (o.payment_mode === 'deferred' ? 'آجل' : 'نقدي') },
+                { header: 'الإجمالي', align: 'end', cell: (o) => <Mono>{formatMoney(o.payment_mode === 'deferred' ? o.total_deferred : o.total_cash)}</Mono> },
+                { header: 'الحالة', align: 'center', cell: (o) => <Pill tone={STATUS[o.status]?.tone ?? 'neutral'}>{STATUS[o.status]?.ar ?? o.status}</Pill> },
+                { header: 'التاريخ', align: 'end', cell: (o) => <Mono>{formatDate(o.placed_at)}</Mono> },
+              ]}
+            />
+          </Card>
         )}
       </div>
     </Wide>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Pill, Spinner, Button } from '../../components/ui'
+import { PageTitle, Pill, Spinner, Button, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import {
@@ -88,7 +88,7 @@ export function ReorderAlertsPage() {
   }
 
   const chip = (active: boolean) =>
-    `px-2 py-0.5 rounded-full font-mono-body text-small transition-colors ${active ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant hover:text-primary'}`
+    `px-2 py-0.5 rounded-full font-small text-small transition-colors ${active ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant hover:text-primary'}`
 
   return (
     <Wide>
@@ -105,7 +105,7 @@ export function ReorderAlertsPage() {
         <button className={chip(!openOnly)} onClick={() => setOpenOnly(false)}>الكل</button>
       </div>
 
-      <div className="mt-space-lg">
+      <Card padded={false} className="mt-space-lg overflow-hidden">
         {loading ? <Spinner /> : (
           <DataTable rows={rows} rowKey={(a) => a.id} empty="لا توجد تنبيهات." columns={[
             { header: 'المستوى', cell: (a) => {
@@ -120,7 +120,7 @@ export function ReorderAlertsPage() {
             )) },
           ]} />
         )}
-      </div>
+      </Card>
     </Wide>
   )
 }

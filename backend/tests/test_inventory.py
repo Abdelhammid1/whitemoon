@@ -69,6 +69,18 @@ def test_categories_endpoint_lists_from_backend(client) -> None:
     assert all(x.get("label") for x in items)
 
 
+def test_location_types_endpoint_lists_from_backend(client) -> None:
+    from tests.helpers import auth_header, create_user
+    create_user(kind="admin", email="loctadmin@example.com", roles=("admin",))
+    h = auth_header(client, email="loctadmin@example.com")
+    r = client.get("/inventory/location-types", headers=h)
+    assert r.status_code == 200
+    items = r.get_json()["items"]
+    codes = {x["code"] for x in items}
+    assert {"supplier", "channel_partner", "in_transit", "customer_hold"} <= codes
+    assert all(x.get("label") for x in items)
+
+
 def test_product_catalog_accepts_expanded_categories(client) -> None:
     # T-10: segments beyond food/clothing are now valid.
     for cat in ("electronics", "home", "beauty", "construction", "stationery", "automotive", "other"):

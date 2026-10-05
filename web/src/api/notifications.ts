@@ -21,6 +21,10 @@ export async function markRead(id: number) {
 export async function markAllRead() {
   return api<{ marked: number }>('/notifications/read-all', { method: 'POST' })
 }
+/** Delivery channels (code + Arabic label) from the backend — the UI's single source. */
+export async function listChannels() {
+  return api<{ items: { code: string; label: string }[] }>('/notifications/channels')
+}
 export async function sendNotification(body: {
   user_id: number
   title: string

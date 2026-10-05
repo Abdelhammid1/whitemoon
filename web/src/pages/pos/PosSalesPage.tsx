@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Pill, Spinner, InlineError } from '../../components/ui'
+import { PageTitle, Pill, Spinner, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { getSale, listSales, type PosSale } from '../../api/pos'
@@ -44,12 +44,14 @@ export function PosSalesPage() {
       <PageTitle title="مبيعاتي" subtitle="مبيعات نقطة البيع التي سجّلتها وحالتها المحاسبية." />
       <div className="mt-space-xl">
         {loading ? <Spinner /> : error ? <InlineError message={error} /> : (
-          <DataTable rows={rows} rowKey={(s) => s.id} onRowClick={(s) => void openDetail(s)} empty="لا توجد مبيعات." columns={[
-            { header: 'الرقم', cell: (s) => <Mono>{s.number}</Mono> },
-            { header: 'الأصناف', align: 'center', cell: (s) => <Mono>{s.lines.length}</Mono> },
-            { header: 'الإجمالي', align: 'end', cell: (s) => <Mono>{formatMoney(s.total)}</Mono> },
-            { header: 'الترحيل', align: 'center', cell: (s) => <Pill tone={s.posted ? 'signal' : 'warning'}>{s.posted ? 'مُرحَّل' : 'غير مُرحَّل'}</Pill> },
-          ]} />
+          <Card padded={false} className="overflow-hidden">
+            <DataTable rows={rows} rowKey={(s) => s.id} onRowClick={(s) => void openDetail(s)} empty="لا توجد مبيعات." columns={[
+              { header: 'الرقم', cell: (s) => <Mono>{s.number}</Mono> },
+              { header: 'الأصناف', align: 'center', cell: (s) => <Mono>{s.lines.length}</Mono> },
+              { header: 'الإجمالي', align: 'end', cell: (s) => <Mono>{formatMoney(s.total)}</Mono> },
+              { header: 'الترحيل', align: 'center', cell: (s) => <Pill tone={s.posted ? 'signal' : 'warning'}>{s.posted ? 'مُرحَّل' : 'غير مُرحَّل'}</Pill> },
+            ]} />
+          </Card>
         )}
       </div>
 

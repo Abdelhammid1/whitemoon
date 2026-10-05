@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Spinner, InlineError, Pill } from '../../components/ui'
+import { PageTitle, Spinner, InlineError, Pill, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { listAudit, type AuditRow } from '../../api/admin'
 import { ApiError } from '../../api/client'
@@ -27,35 +27,37 @@ export function AuditLogPage() {
         ) : error ? (
           <InlineError message={error} />
         ) : (
-          <DataTable
-            rows={rows}
-            rowKey={(e) => e.id}
-            empty="لا توجد أحداث مسجّلة بعد."
-            columns={[
-              { header: 'الوقت', cell: (e) => <Mono>{formatDate(e.at)}</Mono> },
-              { header: 'الإجراء', cell: (e) => <Pill tone="neutral">{e.action}</Pill> },
-              {
-                header: 'المنفِّذ',
-                align: 'center',
-                cell: (e) => <Mono>{e.actor_user_id ?? '—'}</Mono>,
-              },
-              {
-                header: 'الهدف',
-                cell: (e) => (
-                  <span className="font-body text-body text-secondary">
-                    {e.target_type ? `${e.target_type} ` : ''}
-                    {e.target_id ? <Mono>#{e.target_id}</Mono> : '—'}
-                  </span>
-                ),
-              },
-              {
-                header: 'السبب',
-                cell: (e) => (
-                  <span className="font-body text-body text-secondary">{e.reason ?? '—'}</span>
-                ),
-              },
-            ]}
-          />
+          <Card padded={false} className="overflow-hidden">
+            <DataTable
+              rows={rows}
+              rowKey={(e) => e.id}
+              empty="لا توجد أحداث مسجّلة بعد."
+              columns={[
+                { header: 'الوقت', cell: (e) => <Mono>{formatDate(e.at)}</Mono> },
+                { header: 'الإجراء', cell: (e) => <Pill tone="neutral">{e.action}</Pill> },
+                {
+                  header: 'المنفِّذ',
+                  align: 'center',
+                  cell: (e) => <Mono>{e.actor_user_id ?? '—'}</Mono>,
+                },
+                {
+                  header: 'الهدف',
+                  cell: (e) => (
+                    <span className="font-body text-body text-secondary">
+                      {e.target_type ? `${e.target_type} ` : ''}
+                      {e.target_id ? <Mono>#{e.target_id}</Mono> : '—'}
+                    </span>
+                  ),
+                },
+                {
+                  header: 'السبب',
+                  cell: (e) => (
+                    <span className="font-body text-body text-secondary">{e.reason ?? '—'}</span>
+                  ),
+                },
+              ]}
+            />
+          </Card>
         )}
       </div>
     </Wide>

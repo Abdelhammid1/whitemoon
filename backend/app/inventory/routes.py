@@ -350,6 +350,18 @@ def list_categories():
     return jsonify({"items": [{"code": c, "label": CATEGORY_LABELS.get(c, c)} for c in CATEGORIES]})
 
 
+@bp.get("/location-types")
+@jwt_required()
+def list_location_types():
+    """Stock/transfer location types (code + Arabic label) — the UI's single
+    source so its picker can't drift from the CHECK constraint."""
+    from .models import LOCATION_TYPE_LABELS, LOCATION_TYPES
+
+    return jsonify(
+        {"items": [{"code": t, "label": LOCATION_TYPE_LABELS.get(t, t)} for t in LOCATION_TYPES]}
+    )
+
+
 @bp.get("/reorder/alerts")
 @require_permission("inventory.manage")
 def reorder_alerts():

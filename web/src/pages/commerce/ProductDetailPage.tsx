@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, Spinner, EmptyState, InlineError, SectionHeader } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, Spinner, EmptyState, InlineError, SectionHeader, Card } from '../../components/ui'
 import { Icon } from '../../components/Icon'
 import { Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
@@ -90,7 +90,7 @@ export function ProductDetailPage() {
         <Link to="/cart" className="font-small text-small text-primary hover:underline">السلة</Link>
       </div>
 
-      <div className="mt-space-md flex flex-col md:flex-row gap-space-lg">
+      <Card className="mt-space-md flex flex-col md:flex-row gap-space-lg">
         {/* Image */}
         <div className="w-full md:w-[280px] shrink-0">
           {product.image_url ? (
@@ -134,7 +134,7 @@ export function ProductDetailPage() {
           </div>
           <span className="font-small text-small text-secondary">السعر يُثبَّت ٦٠ دقيقة عند الإضافة.</span>
         </div>
-      </div>
+      </Card>
 
       {/* Related */}
       {related.length > 0 && (
@@ -142,14 +142,15 @@ export function ProductDetailPage() {
           <SectionHeader title="منتجات مشابهة" />
           <div className="mt-space-md grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-space-md">
             {related.map((p) => (
-              <Link
-                key={p.product_id}
-                to={`/catalog/${p.product_id}`}
-                className="flex flex-col gap-space-xs rounded-xl bg-surface-container-lowest border border-surface-container-high p-space-md hover:bg-surface transition-colors"
-              >
-                <span className="font-body-medium text-body-medium text-on-surface">{p.name_ar}</span>
-                <Mono className="text-secondary">{p.sku}</Mono>
-                <span className="font-display text-headline-2 text-primary"><Mono>{formatMoney(p.best_price)}</Mono> ج.م</span>
+              <Link key={p.product_id} to={`/catalog/${p.product_id}`} className="group">
+                <Card className="h-full flex flex-col gap-space-xs transition-all group-hover:shadow-overlay group-hover:-translate-y-0.5">
+                  <span className="font-body-medium text-body-medium text-on-surface group-hover:text-primary transition-colors line-clamp-2">{p.name_ar}</span>
+                  <Mono className="text-secondary">{p.sku}</Mono>
+                  <div className="mt-auto flex items-baseline gap-space-xs" dir="ltr">
+                    <span className="font-mono-medium text-headline-2 text-primary">{formatMoney(p.best_price)}</span>
+                    <span className="font-small text-small text-secondary">ج.م</span>
+                  </div>
+                </Card>
               </Link>
             ))}
           </div>

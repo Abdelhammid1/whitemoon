@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import { applyEarlyDiscount, createDeferredTerms, listDeferredTerms, type DeferredTermRow } from '../../api/accounting'
@@ -67,9 +67,10 @@ export function DeferredTermsPage() {
     <Narrow>
       <PageTitle title="البيع الآجل" subtitle="السعر الآجل كامل مُثبت لحظة الطلب — لا فائدة يومية، فقط خصم استحقاق عند السداد المبكر." />
 
-      <section className="mt-space-xl">
+      <section className="mt-space-xl flex flex-col gap-space-md">
         <SectionHeader title="تثبيت شروط الآجل" />
-        <form onSubmit={onCreate} className="mt-space-md flex flex-col gap-space-md">
+        <Card>
+        <form onSubmit={onCreate} className="flex flex-col gap-space-md">
           <Field label="رقم الطلب" dir="ltr" mono inputMode="numeric" value={orderId} onChange={(e) => setOrderId(e.target.value)} required />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md">
             <Field label="السعر النقدي (ج.م)" dir="ltr" mono inputMode="decimal" value={cash} onChange={(e) => setCash(e.target.value)} required />
@@ -81,24 +82,28 @@ export function DeferredTermsPage() {
           </div>
           <div className="flex justify-end"><Button variant="primary" type="submit" disabled={busy}>{busy ? 'جار الحفظ…' : 'حفظ الشروط'}</Button></div>
         </form>
+        </Card>
       </section>
 
-      <section className="mt-[48px]">
+      <section className="mt-[48px] flex flex-col gap-space-md">
         <SectionHeader title="تطبيق خصم السداد المبكر" />
-        <form onSubmit={onApply} className="mt-space-md flex flex-wrap items-end gap-space-md">
+        <Card>
+        <form onSubmit={onApply} className="flex flex-wrap items-end gap-space-md">
           <div className="w-40"><Field label="رقم الطلب" dir="ltr" mono inputMode="numeric" value={applyOrder} onChange={(e) => setApplyOrder(e.target.value)} required /></div>
           <div className="w-56"><Field label="تاريخ السداد" type="date" dir="ltr" value={settledOn} onChange={(e) => setSettledOn(e.target.value)} required /></div>
           <Button variant="primary" type="submit" disabled={busy}>تطبيق</Button>
         </form>
+        </Card>
       </section>
 
-      <section className="mt-[48px]">
+      <section className="mt-[48px] flex flex-col gap-space-md">
         <SectionHeader title="الشروط المثبتة" />
         {loading ? (
           <Spinner />
         ) : error ? (
           <InlineError message={error} />
         ) : (
+          <Card padded={false} className="overflow-hidden">
           <DataTable
             rows={rows}
             rowKey={(t) => t.id}
@@ -113,6 +118,7 @@ export function DeferredTermsPage() {
               { header: 'سُوِّي', align: 'end', cell: (t) => <Mono>{t.settled_at ? formatDate(t.settled_at) : '—'}</Mono> },
             ]}
           />
+          </Card>
         )}
       </section>
     </Narrow>

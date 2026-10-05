@@ -60,7 +60,7 @@ export function LoginPage() {
         </>
       }
     >
-      <div className="w-full flex items-center justify-start gap-6 border-b border-surface-container-high mb-6">
+      <div className="w-full flex items-center justify-start gap-space-lg border-b border-surface-container-high mb-space-lg">
         <button type="button" className={tab(mode === 'phone')} onClick={() => setMode('phone')}>
           رقم الهاتف
         </button>
@@ -69,7 +69,7 @@ export function LoginPage() {
         </button>
       </div>
 
-      <form onSubmit={onSubmit} className="w-full flex flex-col gap-5">
+      <form onSubmit={onSubmit} className="w-full flex flex-col gap-space-md">
         <Field
           label={mode === 'phone' ? 'رقم الهاتف المسجل' : 'البريد الإلكتروني التجاري'}
           dir="ltr"

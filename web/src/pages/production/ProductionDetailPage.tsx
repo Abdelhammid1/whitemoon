@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Button, Pill, SectionHeader, Spinner, InlineError } from '../../components/ui'
+import { PageTitle, Button, Pill, SectionHeader, Spinner, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import { advanceMO, cancelMO, completeMO, getMO, type ManufacturingOrder } from '../../api/production'
@@ -43,36 +43,38 @@ export function ProductionDetailPage() {
   return (
     <Narrow>
       <PageTitle title={`أمر تصنيع ${mo.number}`} />
-      <div className="mt-space-sm flex items-center gap-space-sm">
+      <Card className="mt-space-md flex flex-wrap items-center gap-space-sm">
         <Pill tone={mo.status === 'completed' ? 'signal' : mo.status === 'cancelled' ? 'error' : 'warning'}>{STATUS_AR[mo.status] ?? mo.status}</Pill>
         <span className="font-body text-body text-secondary">منتج <Mono>#{mo.output_product_id}</Mono> — كمية <Mono>{mo.output_qty}</Mono></span>
         {mo.journal_entry_id && <span className="font-mono-body text-mono-body text-secondary">القيد JV #{mo.journal_entry_id}</span>}
-      </div>
+      </Card>
 
       <section className="mt-space-xl">
         <SectionHeader title="المراحل" />
-        <div className="flex flex-col gap-space-xs">
+        <Card className="mt-space-md flex flex-col">
           {mo.stages.map((s) => (
-            <div key={s.seq} className="flex items-center justify-between py-space-sm border-b border-surface-container-high">
+            <div key={s.seq} className="flex items-center justify-between py-space-sm border-b border-surface-container-high last:border-b-0">
               <span className="font-body text-body">{s.seq}. {s.name}</span>
               <Pill tone={s.status === 'done' ? 'signal' : 'neutral'}>{s.status === 'done' ? 'تم' : 'معلّق'}</Pill>
             </div>
           ))}
-        </div>
-        {open && !allDone && <Button className="mt-space-md" disabled={busy} onClick={() => run(() => advanceMO(mo.id), 'تم إتمام المرحلة.')}>إتمام المرحلة التالية</Button>}
+          {open && !allDone && <Button className="mt-space-md self-start" disabled={busy} onClick={() => run(() => advanceMO(mo.id), 'تم إتمام المرحلة.')}>إتمام المرحلة التالية</Button>}
+        </Card>
       </section>
 
       <section className="mt-[48px]">
         <SectionHeader title="الخامات" />
-        <DataTable rows={mo.materials} rowKey={(m) => m.product_id} columns={[
-          { header: 'الخامة', cell: (m) => <Mono>#{m.product_id}</Mono> },
-          { header: 'الكمية', align: 'end', cell: (m) => <Mono>{m.qty}</Mono> },
-          { header: 'التكلفة', align: 'end', cell: (m) => <Mono>{formatMoney(m.unit_cost)}</Mono> },
-        ]} />
-        <div className="mt-space-md flex items-center justify-between">
-          <span className="font-small text-small text-secondary">إجمالي تكلفة الخامات</span>
-          <span className="font-body-medium"><Mono>{formatMoney(mo.total_material_cost)}</Mono> ج.م</span>
-        </div>
+        <Card padded={false} className="mt-space-md overflow-hidden">
+          <DataTable rows={mo.materials} rowKey={(m) => m.product_id} columns={[
+            { header: 'الخامة', cell: (m) => <Mono>#{m.product_id}</Mono> },
+            { header: 'الكمية', align: 'end', cell: (m) => <Mono>{m.qty}</Mono> },
+            { header: 'التكلفة', align: 'end', cell: (m) => <Mono>{formatMoney(m.unit_cost)}</Mono> },
+          ]} />
+          <div className="flex items-center justify-between px-space-sm py-space-md border-t border-surface-container-high bg-surface-container-low">
+            <span className="font-small text-small text-secondary">إجمالي تكلفة الخامات</span>
+            <span className="font-body-medium"><Mono>{formatMoney(mo.total_material_cost)}</Mono> ج.م</span>
+          </div>
+        </Card>
       </section>
 
       {open && (

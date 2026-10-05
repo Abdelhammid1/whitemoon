@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, Spinner, EmptyState, InlineError } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, Spinner, EmptyState, InlineError, Card } from '../../components/ui'
+import { Icon } from '../../components/Icon'
 import { Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import { addCartItem, browseCatalog, type CatalogProduct } from '../../api/commerce'
@@ -58,8 +59,10 @@ export function CatalogPage() {
   }
 
   const chip = (active: boolean) =>
-    `px-3 py-1 rounded-full font-small transition-colors ${
-      active ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant hover:text-primary'
+    `px-3 py-1 rounded-pill font-small text-small transition-colors ${
+      active
+        ? 'bg-primary text-on-primary shadow-card-sm'
+        : 'bg-surface-variant text-on-surface-variant hover:text-primary'
     }`
 
   return (
@@ -90,23 +93,53 @@ export function CatalogPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-space-md">
             {rows.map((p) => (
-              <div key={p.product_id} className="flex flex-col gap-space-sm rounded-xl bg-surface-container-lowest border border-surface-container-high p-space-md">
+              <Card
+                key={p.product_id}
+                className="group flex flex-col gap-space-md transition-all hover:shadow-overlay hover:-translate-y-0.5"
+              >
+                {/* Image area */}
+                <Link
+                  to={`/catalog/${p.product_id}`}
+                  className="aspect-[4/3] w-full rounded-xl overflow-hidden bg-surface-container-low border border-surface-container-high flex items-center justify-center"
+                >
+                  {p.image_url ? (
+                    <img
+                      src={p.image_url}
+                      alt={p.name_ar}
+                      className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                    />
+                  ) : (
+                    <Icon name="inventory_2" size={36} className="text-outline-variant" />
+                  )}
+                </Link>
+
                 <div className="flex items-start justify-between gap-space-sm">
-                  <Link to={`/catalog/${p.product_id}`} className="font-body-medium text-body-medium text-on-surface hover:text-primary hover:underline">{p.name_ar}</Link>
+                  <Link
+                    to={`/catalog/${p.product_id}`}
+                    className="font-body-medium text-body-medium text-on-surface hover:text-primary transition-colors line-clamp-2"
+                  >
+                    {p.name_ar}
+                  </Link>
                   <Pill tone="neutral">{catAr(p.category)}</Pill>
                 </div>
-                <span className="font-mono-body text-mono-body text-secondary">{p.sku}</span>
-                <span className="font-display text-headline-1 text-primary"><Mono>{formatMoney(p.best_price)}</Mono> ج.م</span>
-                <div className="mt-space-sm flex items-center gap-space-sm">
+
+                <Mono className="text-secondary">{p.sku}</Mono>
+
+                <div className="mt-auto flex items-baseline gap-space-xs" dir="ltr">
+                  <span className="font-mono-medium text-headline-1 text-primary">{formatMoney(p.best_price)}</span>
+                  <span className="font-small text-small text-secondary">ج.م / {p.unit}</span>
+                </div>
+
+                <div className="flex items-center gap-space-sm">
                   <div className="w-20">
                     <Field dir="ltr" mono inputMode="decimal" value={qty[p.product_id] ?? '1'}
                       onChange={(e) => setQty((s) => ({ ...s, [p.product_id]: e.target.value }))} />
                   </div>
-                  <Button variant="primary" onClick={() => add(p)} disabled={busyId === p.product_id}>
+                  <Button variant="primary" className="flex-1" onClick={() => add(p)} disabled={busyId === p.product_id} iconRight="add_shopping_cart">
                     {busyId === p.product_id ? '…' : 'أضف للسلة'}
                   </Button>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         )}

@@ -43,21 +43,23 @@ export function OtpVerifyPage() {
       title="التحقق من الرمز"
       subtitle={channel === 'email' ? 'أرسلنا رمزًا على بريدك الإلكتروني.' : 'أرسلنا رمزًا على رقم هاتفك.'}
     >
-      <form onSubmit={onSubmit} className="w-full flex flex-col gap-5">
+      <form onSubmit={onSubmit} className="w-full flex flex-col gap-space-md">
         <Field label="الرمز" dir="ltr" mono inputMode="numeric" maxLength={10} value={code} onChange={(e) => setCode(e.target.value)} required />
         {debug && (
-          <p className="font-small text-small text-secondary">
-            رمز التطوير:{' '}
-            <bdi dir="ltr" className="font-mono-medium text-on-surface">{debug}</bdi>
-          </p>
+          <div className="flex items-center justify-between gap-space-sm rounded-xl bg-surface-container-low px-space-md py-space-sm font-small text-small text-secondary">
+            <span>رمز التطوير</span>
+            <bdi dir="ltr" className="font-mono-medium text-mono-medium text-on-surface">{debug}</bdi>
+          </div>
         )}
         {status === 'pending' && isSupplier && (
-          <p className="font-small text-small text-on-surface">
+          <p className="flex items-center gap-space-sm font-small text-small text-on-surface">
             تم التحقق بنجاح. حسابك كمورد <Pill tone="warning">قيد الاعتماد</Pill> من الإدارة.
           </p>
         )}
         {status === 'active' && (
-          <p className="font-small text-small text-on-surface">تم التفعيل — سيتم تحويلك لتسجيل الدخول…</p>
+          <p className="flex items-center gap-space-sm font-small text-small text-on-surface">
+            <Pill tone="signal">تم التفعيل</Pill> سيتم تحويلك لتسجيل الدخول…
+          </p>
         )}
         {error && <InlineError message={error} />}
         <Button variant="primary" type="submit" disabled={busy} className="w-full">

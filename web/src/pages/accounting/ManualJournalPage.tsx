@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, InlineError } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, InlineError, Card } from '../../components/ui'
+import { Icon } from '../../components/Icon'
 import { useToast } from '../../components/Toast'
 import { postManualJournal, type ManualJournalLine } from '../../api/accounting'
 import { ApiError } from '../../api/client'
@@ -49,18 +50,21 @@ export function ManualJournalPage() {
       <PageTitle title="إنشاء قيد يومية يدوي" subtitle="يتطلب صلاحية قيد يدوي — الوصف والسبب لا يقل كل منهما عن ١٠ أحرف." />
 
       <form onSubmit={onSubmit} className="mt-space-xl flex flex-col gap-space-lg">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-space-md">
-          <Field label="تاريخ القيد" type="date" dir="ltr" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} required />
-          <div className="md:col-span-2"><Field label="الوصف / البيان العام" value={description} onChange={(e) => setDescription(e.target.value)} minLength={10} required /></div>
-        </div>
-        <Field label="السبب (يُسجَّل في التدقيق)" value={reason} onChange={(e) => setReason(e.target.value)} minLength={10} required />
+        <Card className="flex flex-col gap-space-md">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-space-md">
+            <Field label="تاريخ القيد" type="date" dir="ltr" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} required />
+            <div className="md:col-span-2"><Field label="الوصف / البيان العام" value={description} onChange={(e) => setDescription(e.target.value)} minLength={10} required /></div>
+          </div>
+          <Field label="السبب (يُسجَّل في التدقيق)" value={reason} onChange={(e) => setReason(e.target.value)} minLength={10} required />
 
-        <label className="flex items-center gap-space-sm font-body text-body text-on-surface">
-          <input type="checkbox" checked={allowClosed} onChange={(e) => setAllowClosed(e.target.checked)} />
-          السماح بالترحيل على فترة مُقفلة (يتطلب صلاحية إضافية)
-        </label>
+          <label className="flex items-center gap-space-sm font-body text-body text-on-surface">
+            <input type="checkbox" checked={allowClosed} onChange={(e) => setAllowClosed(e.target.checked)} />
+            السماح بالترحيل على فترة مُقفلة (يتطلب صلاحية إضافية)
+          </label>
+        </Card>
 
-        <div className="mt-space-sm">
+        <Card padded={false} className="flex flex-col gap-space-md p-space-lg">
+          <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
               <tr className="bg-surface-container-low border-b border-surface-container-high">
@@ -81,16 +85,17 @@ export function ManualJournalPage() {
               ))}
             </tbody>
           </table>
-        </div>
-
-        <div className="flex items-center justify-between">
-          <Button onClick={() => setLines((p) => [...p, emptyLine()])}>+ إضافة طرف قيد</Button>
-          <div className="flex items-center gap-space-md font-mono-body text-mono-body text-on-surface">
-            <span>مدين: <bdi dir="ltr">{totalDebit.toFixed(2)}</bdi></span>
-            <span>دائن: <bdi dir="ltr">{totalCredit.toFixed(2)}</bdi></span>
-            <Pill tone={balanced ? 'signal' : 'error'}>{balanced ? 'متوازن' : 'غير متوازن'}</Pill>
           </div>
-        </div>
+
+          <div className="flex items-center justify-between flex-wrap gap-space-md border-t border-surface-container-high pt-space-md">
+            <Button onClick={() => setLines((p) => [...p, emptyLine()])}>+ إضافة طرف قيد</Button>
+            <div className="flex items-center gap-space-md font-mono-body text-mono-body text-on-surface">
+              <span>مدين: <bdi dir="ltr">{totalDebit.toFixed(2)}</bdi></span>
+              <span>دائن: <bdi dir="ltr">{totalCredit.toFixed(2)}</bdi></span>
+              <Pill tone={balanced ? 'signal' : 'error'}>{balanced ? 'متوازن' : 'غير متوازن'}</Pill>
+            </div>
+          </div>
+        </Card>
 
         {error && <InlineError message={error} />}
         <div className="flex justify-end">
@@ -101,9 +106,14 @@ export function ManualJournalPage() {
       </form>
 
       {result && (
-        <p className="mt-space-lg font-body text-body text-on-surface">
-          رقم القيد: <bdi dir="ltr" className="font-mono-medium">{result.entry_no}</bdi>
-        </p>
+        <Card className="mt-space-lg flex items-center gap-space-md">
+          <span className="w-10 h-10 rounded-xl bg-signal-weak text-signal flex items-center justify-center shrink-0">
+            <Icon name="check_circle" size={20} />
+          </span>
+          <span className="font-body text-body text-on-surface">
+            تم ترحيل القيد رقم <bdi dir="ltr" className="font-mono-medium">{result.entry_no}</bdi>
+          </span>
+        </Card>
       )}
     </Narrow>
   )

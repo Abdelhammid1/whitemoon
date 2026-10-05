@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
@@ -8,8 +8,10 @@ import {
   createTransfer,
   getTransfer,
   issueTransfer,
+  listLocationTypes,
   listTransfersPlanned,
   receiveTransfer,
+  type Category,
   type TransferOrder,
 } from '../../api/inventory'
 import { ApiError } from '../../api/client'
@@ -24,7 +26,13 @@ const STATUS: Record<string, { ar: string; tone: 'signal' | 'warning' | 'neutral
   cancelled: { ar: 'ملغي', tone: 'error' },
 }
 
-const LOC_TYPES = ['supplier', 'channel_partner', 'in_transit', 'customer_hold']
+// Static fallback so the selects never empty; overwritten by the backend list on mount.
+const LOC_TYPES_FALLBACK: Category[] = [
+  { code: 'supplier', label: 'مخزن المورد' },
+  { code: 'channel_partner', label: 'عهدة وكيل/فرع' },
+  { code: 'in_transit', label: 'في الطريق' },
+  { code: 'customer_hold', label: 'حجز عميل' },
+]
 
 interface LineDraft { product_id: string; qty: string; unit_cost: string }
 const EMPTY_LINE: LineDraft = { product_id: '', qty: '', unit_cost: '' }
@@ -44,6 +52,13 @@ export function TransfersPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState(EMPTY_CREATE)
   const [lines, setLines] = useState<LineDraft[]>([{ ...EMPTY_LINE }])
+  const [locTypes, setLocTypes] = useState<Category[]>(LOC_TYPES_FALLBACK)
+
+  useEffect(() => {
+    listLocationTypes()
+      .then((r) => { if (r.items.length) setLocTypes(r.items) })
+      .catch(() => { /* keep the static fallback */ })
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -120,7 +135,7 @@ export function TransfersPage() {
       </form>
 
       {order && (
-        <section className="mt-space-xl border-t border-surface-container-high pt-space-lg">
+        <Card className="mt-space-xl flex flex-col gap-space-lg">
           <div className="flex flex-wrap items-center gap-space-md">
             <Mono className="font-mono-medium">{order.number}</Mono>
             <Pill tone={STATUS[order.status]?.tone ?? 'neutral'}>{STATUS[order.status]?.ar ?? order.status}</Pill>
@@ -129,7 +144,7 @@ export function TransfersPage() {
             </span>
           </div>
 
-          <div className="mt-space-md">
+          <div className="rounded-xl border border-surface-container-high overflow-hidden">
             <DataTable rows={order.lines} rowKey={(l) => l.product_id} columns={[
               { header: 'رقم المنتج', cell: (l) => <Mono>{l.product_id}</Mono> },
               { header: 'الكمية', align: 'end', cell: (l) => <Mono>{l.qty}</Mono> },
@@ -137,17 +152,19 @@ export function TransfersPage() {
             ]} />
           </div>
 
-          <div className="mt-space-lg flex flex-col gap-space-sm">
+          <div className="flex flex-col gap-space-sm">
             <div className="flex items-center gap-space-sm font-small text-small text-secondary">أُنشئ الإذن</div>
             {order.issue_entry_id && <div className="flex items-center gap-space-sm font-small text-small text-secondary">صدر — القيد <Mono>JV #{order.issue_entry_id}</Mono></div>}
             {order.receive_entry_id && <div className="flex items-center gap-space-sm font-small text-small text-secondary">استُلم — القيد <Mono>JV #{order.receive_entry_id}</Mono></div>}
           </div>
 
-          <div className="mt-space-lg flex justify-end">
-            {order.status === 'draft' && <Button variant="primary" onClick={() => act(issueTransfer, 'تم إصدار الإذن.')} disabled={busy}>إصدار</Button>}
-            {order.status === 'issued' && <Button variant="primary" onClick={() => act(receiveTransfer, 'تم تأكيد الاستلام.')} disabled={busy}>تأكيد الاستلام</Button>}
-          </div>
-        </section>
+          {(order.status === 'draft' || order.status === 'issued') && (
+            <div className="flex justify-end">
+              {order.status === 'draft' && <Button variant="primary" onClick={() => act(issueTransfer, 'تم إصدار الإذن.')} disabled={busy}>إصدار</Button>}
+              {order.status === 'issued' && <Button variant="primary" onClick={() => act(receiveTransfer, 'تم تأكيد الاستلام.')} disabled={busy}>تأكيد الاستلام</Button>}
+            </div>
+          )}
+        </Card>
       )}
 
       <section className="mt-[48px]">
@@ -155,20 +172,22 @@ export function TransfersPage() {
         {loading ? (
           <Spinner />
         ) : error ? (
-          <InlineError message={error} />
+          <div className="mt-space-md"><InlineError message={error} /></div>
         ) : (
-          <DataTable
-            rows={rows}
-            rowKey={(o) => o.id}
-            onRowClick={(o) => { setOrder(o); setLookupId(String(o.id)) }}
-            empty="لا توجد إذون تحويل بعد."
-            columns={[
-              { header: 'رقم الإذن', cell: (o) => <Mono>{o.number}</Mono> },
-              { header: 'المسار', cell: (o) => <span className="font-body text-body text-secondary">{LOC_AR[o.from_location_type]} ← {LOC_AR[o.to_location_type]}</span> },
-              { header: 'عدد الأصناف', align: 'center', cell: (o) => <Mono>{o.lines.length}</Mono> },
-              { header: 'الحالة', align: 'center', cell: (o) => <Pill tone={STATUS[o.status]?.tone ?? 'neutral'}>{STATUS[o.status]?.ar ?? o.status}</Pill> },
-            ]}
-          />
+          <Card padded={false} className="mt-space-md overflow-hidden">
+            <DataTable
+              rows={rows}
+              rowKey={(o) => o.id}
+              onRowClick={(o) => { setOrder(o); setLookupId(String(o.id)) }}
+              empty="لا توجد إذون تحويل بعد."
+              columns={[
+                { header: 'رقم الإذن', cell: (o) => <Mono>{o.number}</Mono> },
+                { header: 'المسار', cell: (o) => <span className="font-body text-body text-secondary">{LOC_AR[o.from_location_type]} ← {LOC_AR[o.to_location_type]}</span> },
+                { header: 'عدد الأصناف', align: 'center', cell: (o) => <Mono>{o.lines.length}</Mono> },
+                { header: 'الحالة', align: 'center', cell: (o) => <Pill tone={STATUS[o.status]?.tone ?? 'neutral'}>{STATUS[o.status]?.ar ?? o.status}</Pill> },
+              ]}
+            />
+          </Card>
         )}
       </section>
 
@@ -184,7 +203,7 @@ export function TransfersPage() {
             <div className="flex flex-col">
               <label className="font-small text-small text-secondary mb-1">من موقع</label>
               <select className={selectCls} value={form.from_location_type} onChange={(e) => setForm({ ...form, from_location_type: e.target.value })}>
-                {LOC_TYPES.map((l) => <option key={l} value={l}>{LOC_AR[l]}</option>)}
+                {locTypes.map((l) => <option key={l.code} value={l.code}>{LOC_AR[l.code] ?? l.label}</option>)}
               </select>
             </div>
             <Field label="رقم الموقع المصدر (اختياري)" dir="ltr" mono inputMode="numeric" value={form.from_location_id} onChange={(e) => setForm({ ...form, from_location_id: e.target.value })} />
@@ -193,7 +212,7 @@ export function TransfersPage() {
             <div className="flex flex-col">
               <label className="font-small text-small text-secondary mb-1">إلى موقع</label>
               <select className={selectCls} value={form.to_location_type} onChange={(e) => setForm({ ...form, to_location_type: e.target.value })}>
-                {LOC_TYPES.map((l) => <option key={l} value={l}>{LOC_AR[l]}</option>)}
+                {locTypes.map((l) => <option key={l.code} value={l.code}>{LOC_AR[l.code] ?? l.label}</option>)}
               </select>
             </div>
             <Field label="رقم الموقع الوجهة (اختياري)" dir="ltr" mono inputMode="numeric" value={form.to_location_id} onChange={(e) => setForm({ ...form, to_location_id: e.target.value })} />
@@ -209,7 +228,7 @@ export function TransfersPage() {
                 <Field label="المنتج" dir="ltr" mono inputMode="numeric" value={l.product_id} onChange={(e) => setLines((ls) => ls.map((x, j) => j === i ? { ...x, product_id: e.target.value } : x))} />
                 <Field label="الكمية" dir="ltr" mono inputMode="decimal" value={l.qty} onChange={(e) => setLines((ls) => ls.map((x, j) => j === i ? { ...x, qty: e.target.value } : x))} />
                 <Field label="التكلفة" dir="ltr" mono inputMode="decimal" value={l.unit_cost} onChange={(e) => setLines((ls) => ls.map((x, j) => j === i ? { ...x, unit_cost: e.target.value } : x))} />
-                <button type="button" className="pb-2 text-secondary hover:text-[#B3261E] disabled:opacity-30" disabled={lines.length === 1} onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>حذف</button>
+                <button type="button" className="pb-2 text-secondary hover:text-danger disabled:opacity-30" disabled={lines.length === 1} onClick={() => setLines((ls) => ls.filter((_, j) => j !== i))}>حذف</button>
               </div>
             ))}
           </div>

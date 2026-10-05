@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import { Modal } from '../../components/Overlay'
@@ -125,7 +125,8 @@ export function ReceiptsPage() {
     <Narrow>
       <PageTitle title="الإيصالات والعمليات اليومية" subtitle="مطابقة التحويلات البنكية ضوئيًا (OCR). المتعارض يذهب للمراجعة اليدوية." />
 
-      <form onSubmit={onUpload} className="mt-space-xl flex flex-col gap-space-md">
+      <Card className="mt-space-xl">
+      <form onSubmit={onUpload} className="flex flex-col gap-space-md">
         <div className="border border-dashed border-surface-container-high rounded-xl p-space-xl text-center">
           <p className="font-body text-body text-secondary">ارفع صورة الإيصال (تُخزَّن على الخادم)</p>
           <div className="max-w-[420px] mx-auto mt-space-md">
@@ -156,9 +157,10 @@ export function ReceiptsPage() {
         </div>
         <div className="flex justify-end"><Button variant="primary" type="submit" disabled={busy}>{busy ? 'جار الرفع…' : 'رفع ومطابقة'}</Button></div>
       </form>
+      </Card>
 
       {result && (
-        <div className="mt-space-lg flex flex-col gap-space-sm border-t border-surface-container-high pt-space-lg">
+        <Card className="mt-space-lg flex flex-col gap-space-sm">
           <div className="flex items-center justify-between">
             <span className="font-body text-body text-on-surface">إيصال <bdi dir="ltr" className="font-mono-medium">#{result.receipt_id}</bdi></span>
             <Pill tone={STATUS_TONE[result.status] ?? 'warning'}>{result.status}</Pill>
@@ -172,16 +174,17 @@ export function ReceiptsPage() {
               <Button variant="primary" onClick={() => resolve('matched')} disabled={busy}>اعتماد كمطابقة</Button>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
-      <section className="mt-[48px]">
+      <section className="mt-[48px] flex flex-col gap-space-md">
         <SectionHeader title="طابور الإيصالات" />
         {loading ? (
           <Spinner />
         ) : error ? (
           <InlineError message={error} />
         ) : (
+          <Card padded={false} className="overflow-hidden">
           <DataTable
             rows={rows}
             rowKey={(r) => r.id}
@@ -196,6 +199,7 @@ export function ReceiptsPage() {
               { header: 'رُفع', align: 'end', cell: (r) => <Mono>{r.uploaded_at ? formatDate(r.uploaded_at) : '—'}</Mono> },
             ]}
           />
+          </Card>
         )}
       </section>
 

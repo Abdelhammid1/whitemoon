@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Pill, Button, Spinner, EmptyState, InlineError } from '../../components/ui'
+import { PageTitle, Pill, Button, Card, Spinner, EmptyState, InlineError } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
+import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import { listFlagged, listMessages, type FlaggedConversation, type Message } from '../../api/comm'
@@ -59,47 +60,51 @@ export function ModerationPage() {
 
       <div className="mt-space-lg">
         {loading ? <Spinner /> : error ? <InlineError message={error} /> : rows.length === 0 ? (
-          <EmptyState title="لا توجد محادثات محظورة." description="لم يرصد النظام أي محاولة تبادل بيانات اتصال." />
+          <Card>
+            <EmptyState title="لا توجد محادثات محظورة." description="لم يرصد النظام أي محاولة تبادل بيانات اتصال." />
+          </Card>
         ) : (
-          <DataTable
-            rows={rows}
-            rowKey={(c) => c.id}
-            onRowClick={(c) => void open(c)}
-            columns={[
-              {
-                header: 'المحادثة',
-                cell: (c) => (
-                  <div className="flex flex-col">
-                    <Mono>#{c.id}</Mono>
-                    {c.subject && <span className="font-small text-small text-secondary">{c.subject}</span>}
-                  </div>
-                ),
-              },
-              { header: 'الطلب', cell: (c) => (c.order_id ? <Mono>#{c.order_id}</Mono> : '—') },
-              {
-                header: 'الطرفان',
-                cell: (c) => (
-                  <span className="font-mono-body text-mono-body" dir="ltr">
-                    عميل #{c.customer_id} ↔ مورد #{c.supplier_id}
-                  </span>
-                ),
-              },
-              {
-                header: 'الرسائل المحجوبة',
-                align: 'center',
-                cell: (c) => <Mono className="text-[#B3261E]">{c.blocked_count}</Mono>,
-              },
-              {
-                header: 'الحالة',
-                align: 'center',
-                cell: (c) => (
-                  <Pill tone={c.status === 'open' ? 'signal' : 'neutral'}>
-                    {c.status === 'open' ? 'مفتوحة' : 'مغلقة'}
-                  </Pill>
-                ),
-              },
-            ]}
-          />
+          <Card padded={false} className="overflow-hidden">
+            <DataTable
+              rows={rows}
+              rowKey={(c) => c.id}
+              onRowClick={(c) => void open(c)}
+              columns={[
+                {
+                  header: 'المحادثة',
+                  cell: (c) => (
+                    <div className="flex flex-col">
+                      <Mono>#{c.id}</Mono>
+                      {c.subject && <span className="font-small text-small text-secondary">{c.subject}</span>}
+                    </div>
+                  ),
+                },
+                { header: 'الطلب', cell: (c) => (c.order_id ? <Mono>#{c.order_id}</Mono> : '—') },
+                {
+                  header: 'الطرفان',
+                  cell: (c) => (
+                    <span className="font-mono-body text-mono-body" dir="ltr">
+                      عميل #{c.customer_id} ↔ مورد #{c.supplier_id}
+                    </span>
+                  ),
+                },
+                {
+                  header: 'الرسائل المحجوبة',
+                  align: 'center',
+                  cell: (c) => <Pill tone="error">{c.blocked_count}</Pill>,
+                },
+                {
+                  header: 'الحالة',
+                  align: 'center',
+                  cell: (c) => (
+                    <Pill tone={c.status === 'open' ? 'signal' : 'neutral'}>
+                      {c.status === 'open' ? 'مفتوحة' : 'مغلقة'}
+                    </Pill>
+                  ),
+                },
+              ]}
+            />
+          </Card>
         )}
       </div>
 
@@ -125,7 +130,7 @@ export function ModerationPage() {
         ) : (
           <div className="flex flex-col gap-space-md">
             {blocked.map((m) => (
-              <div key={m.id} className="flex flex-col gap-space-xs border-b border-surface-container-high pb-space-md">
+              <div key={m.id} className="flex flex-col gap-space-sm border-b border-surface-container-high pb-space-md last:border-b-0 last:pb-0">
                 <div className="flex items-center justify-between gap-space-sm">
                   <span className="font-body-medium text-body-medium text-on-surface">
                     {ROLE_AR[m.sender_role] ?? m.sender_role}
@@ -138,8 +143,11 @@ export function ModerationPage() {
                   </span>
                 </div>
                 {m.body && <p className="font-body text-body text-on-surface">{m.body}</p>}
-                <div className="bg-error-container text-[#93000a] px-space-sm py-space-xs rounded font-small text-small">
-                  حُجبت: {reasonLabel(m.block_reason)}
+                <div className="flex items-center gap-space-sm rounded-lg border border-danger/25 bg-danger-weak px-space-sm py-space-xs">
+                  <Icon name="block" size={16} className="text-danger shrink-0" />
+                  <span className="font-small-medium text-small-medium text-danger">
+                    حُجبت: {reasonLabel(m.block_reason)}
+                  </span>
                 </div>
               </div>
             ))}

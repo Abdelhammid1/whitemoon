@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, Spinner } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, Spinner, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
@@ -47,17 +47,17 @@ export function OffersPage() {
         <Button variant="primary" onClick={() => setOpen(true)} iconRight="add">إضافة / تعديل عرض</Button>
       </div>
 
-      <div className="mt-space-xl">
+      <Card padded={false} className="mt-space-xl overflow-hidden">
         {loading ? <Spinner /> : (
           <DataTable rows={rows} rowKey={(o) => o.id} empty="لا توجد عروض بعد." columns={[
             { header: 'رقم العرض', width: '90px', cell: (o) => <Mono>{o.id}</Mono> },
             { header: 'رقم المنتج', cell: (o) => <Mono>{o.product_id}</Mono> },
-            { header: 'السعر', align: 'end', cell: (o) => <Mono>{formatMoney(o.unit_price)}</Mono> },
+            { header: 'السعر (ج.م)', align: 'end', cell: (o) => <Mono>{formatMoney(o.unit_price)}</Mono> },
             { header: 'الحد الأدنى', align: 'end', cell: (o) => <Mono>{o.moq}</Mono> },
             { header: 'الحالة', align: 'end', cell: (o) => <Pill tone={o.is_active ? 'signal' : 'neutral'}>{o.is_active ? 'متاح' : 'موقوف'}</Pill> },
           ]} />
         )}
-      </div>
+      </Card>
 
       <Modal open={open} onClose={() => setOpen(false)} title="إضافة / تعديل عرض" footer={
         <>

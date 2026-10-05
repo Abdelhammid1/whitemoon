@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
@@ -51,37 +51,41 @@ export function PeriodsPage() {
     <Narrow>
       <PageTitle title="الفترات المالية" subtitle="إنشاء / إقفال / إعادة فتح الفترات الشهرية. إقفال الفترة يرفض أي قيد جديد عليها." />
 
-      <section className="mt-space-xl flex flex-wrap items-end gap-space-md">
-        <div className="w-28"><Field label="السنة" dir="ltr" mono value={String(year)} onChange={(e) => setYear(Number(e.target.value) || now.getFullYear())} /></div>
-        <div className="w-28"><Field label="الشهر" dir="ltr" mono value={String(month)} onChange={(e) => setMonth(Number(e.target.value) || 1)} /></div>
-        <Button variant="primary" onClick={() => run(() => periodEnsure(year, month), `أُنشئت الفترة ${year}/${month}`)} disabled={busy}>إنشاء / تأكيد</Button>
-        <Button onClick={() => setConfirm('close')} disabled={busy}>إقفال</Button>
-        <Button onClick={() => setConfirm('reopen')} disabled={busy}>إعادة فتح</Button>
-      </section>
+      <Card className="mt-space-xl">
+        <div className="flex flex-wrap items-end gap-space-md">
+          <div className="w-28"><Field label="السنة" dir="ltr" mono value={String(year)} onChange={(e) => setYear(Number(e.target.value) || now.getFullYear())} /></div>
+          <div className="w-28"><Field label="الشهر" dir="ltr" mono value={String(month)} onChange={(e) => setMonth(Number(e.target.value) || 1)} /></div>
+          <Button variant="primary" onClick={() => run(() => periodEnsure(year, month), `أُنشئت الفترة ${year}/${month}`)} disabled={busy}>إنشاء / تأكيد</Button>
+          <Button onClick={() => setConfirm('close')} disabled={busy}>إقفال</Button>
+          <Button onClick={() => setConfirm('reopen')} disabled={busy}>إعادة فتح</Button>
+        </div>
+      </Card>
 
-      <section className="mt-[48px]">
+      <section className="mt-[48px] flex flex-col gap-space-md">
         <SectionHeader title="قائمة الفترات" />
         {loading ? (
           <Spinner />
         ) : error ? (
           <InlineError message={error} />
         ) : (
-          <DataTable
-            rows={rows}
-            rowKey={(p) => p.id}
-            empty="لا توجد فترات مُنشأة بعد."
-            columns={[
-              { header: 'الفترة', cell: (p) => <Mono>{p.year}/{String(p.month).padStart(2, '0')}</Mono> },
-              { header: 'من', cell: (p) => <Mono>{p.starts_on}</Mono> },
-              { header: 'إلى', cell: (p) => <Mono>{p.ends_on}</Mono> },
-              {
-                header: 'الحالة',
-                align: 'center',
-                cell: (p) =>
-                  p.is_closed ? <Pill tone="error">مُقفلة</Pill> : <Pill tone="signal">مفتوحة</Pill>,
-              },
-            ]}
-          />
+          <Card padded={false} className="overflow-hidden">
+            <DataTable
+              rows={rows}
+              rowKey={(p) => p.id}
+              empty="لا توجد فترات مُنشأة بعد."
+              columns={[
+                { header: 'الفترة', cell: (p) => <Mono>{p.year}/{String(p.month).padStart(2, '0')}</Mono> },
+                { header: 'من', cell: (p) => <Mono>{p.starts_on}</Mono> },
+                { header: 'إلى', cell: (p) => <Mono>{p.ends_on}</Mono> },
+                {
+                  header: 'الحالة',
+                  align: 'center',
+                  cell: (p) =>
+                    p.is_closed ? <Pill tone="error">مُقفلة</Pill> : <Pill tone="signal">مفتوحة</Pill>,
+                },
+              ]}
+            />
+          </Card>
         )}
       </section>
 

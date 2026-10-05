@@ -26,18 +26,22 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-space-lg modal-backdrop" onClick={onClose}>
       <div
-        className="w-full max-w-[540px] bg-surface-container-lowest rounded-xl overlay-shadow"
+        className="w-full max-w-[560px] max-h-[90vh] flex flex-col bg-surface-container-lowest rounded-2xl border border-surface-container-high overlay-shadow"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-space-lg py-space-md border-b border-surface-container-high">
-          <h2 className="font-headline-2 text-headline-2 text-primary font-medium">{title}</h2>
-          <button onClick={onClose} className="text-secondary hover:text-primary">
+        <div className="flex items-center justify-between gap-space-md px-space-lg py-space-md border-b border-surface-container-high shrink-0">
+          <h2 className="font-headline-2 text-headline-2 text-on-surface font-semibold">{title}</h2>
+          <button
+            onClick={onClose}
+            aria-label="إغلاق"
+            className="w-8 h-8 -me-space-xs rounded-lg flex items-center justify-center text-secondary hover:bg-surface-container-low hover:text-on-surface transition-colors"
+          >
             <Icon name="close" size={20} />
           </button>
         </div>
-        <div className="px-space-lg py-space-lg">{children}</div>
+        <div className="px-space-lg py-space-lg overflow-y-auto">{children}</div>
         {footer && (
-          <div className="flex items-center justify-end gap-space-sm px-space-lg py-space-md border-t border-surface-container-high">
+          <div className="flex items-center justify-end gap-space-sm px-space-lg py-space-md border-t border-surface-container-high shrink-0">
             {footer}
           </div>
         )}
@@ -69,12 +73,16 @@ export function SideSheet({
   return (
     <div className="fixed inset-0 z-50 modal-backdrop" onClick={onClose}>
       <div
-        className="absolute inset-y-0 left-0 w-full max-w-[440px] bg-surface-container-lowest overlay-shadow flex flex-col"
+        className="absolute inset-y-0 left-0 w-full max-w-[460px] bg-surface-container-lowest border-e border-surface-container-high overlay-shadow flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between px-space-lg py-space-md border-b border-surface-container-high">
-          <h2 className="font-headline-2 text-headline-2 text-primary font-medium">{title}</h2>
-          <button onClick={onClose} className="text-secondary hover:text-primary">
+        <div className="flex items-center justify-between gap-space-md px-space-lg py-space-md border-b border-surface-container-high shrink-0">
+          <h2 className="font-headline-2 text-headline-2 text-on-surface font-semibold">{title}</h2>
+          <button
+            onClick={onClose}
+            aria-label="إغلاق"
+            className="w-8 h-8 -me-space-xs rounded-lg flex items-center justify-center text-secondary hover:bg-surface-container-low hover:text-on-surface transition-colors"
+          >
             <Icon name="close" size={20} />
           </button>
         </div>

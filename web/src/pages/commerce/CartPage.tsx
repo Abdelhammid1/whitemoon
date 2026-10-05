@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
-import { Button, Spinner, EmptyState, InlineError } from '../../components/ui'
+import { Button, Spinner, EmptyState, InlineError, Pill, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/Overlay'
@@ -91,7 +91,8 @@ export function CartPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
           {/* Main ledger */}
-          <div className="lg:col-span-8 flex flex-col">
+          <div className="lg:col-span-8 flex flex-col gap-space-lg">
+            <Card padded={false} className="overflow-hidden">
             <DataTable
               rows={items}
               rowKey={(i) => i.item_id}
@@ -139,14 +140,9 @@ export function CartPage() {
                     <div className="flex flex-col items-end gap-0.5">
                       <Mono className="text-primary">{formatMoney(i.locked_unit_price)} ج.م</Mono>
                       {i.price_locked_until ? (
-                        <span className="inline-flex items-center gap-1 font-mono-body text-[11px] text-[#0F6B3E] bg-[#0F6B3E]/10 px-1.5 py-0.5 rounded-full">
-                          <span className="w-1 h-1 rounded-full bg-[#0F6B3E]" />
-                          سعر مثبّت
-                        </span>
+                        <Pill tone="signal">سعر مثبّت</Pill>
                       ) : (
-                        <span className="font-mono-body text-[11px] text-secondary bg-surface-container px-1.5 py-0.5 rounded-full">
-                          محدث لحظياً
-                        </span>
+                        <Pill tone="neutral">محدث لحظياً</Pill>
                       )}
                     </div>
                   ),
@@ -174,9 +170,10 @@ export function CartPage() {
                 },
               ]}
             />
+            </Card>
 
             {/* Neutral-fulfillment / privacy disclosure */}
-            <div className="mt-space-lg p-space-md bg-surface-container-low flex items-start gap-space-sm">
+            <div className="p-space-md rounded-xl bg-surface-container-low flex items-start gap-space-sm">
               <Icon name="verified_user" size={18} className="text-secondary shrink-0 mt-0.5" />
               <div className="flex flex-col font-small text-small text-secondary leading-relaxed">
                 <span className="font-small-medium text-small-medium text-primary">
@@ -191,8 +188,8 @@ export function CartPage() {
           </div>
 
           {/* Order summary panel */}
-          <div className="lg:col-span-4 flex flex-col gap-space-md">
-            <div className="bg-surface-container-lowest border border-surface-container-high p-space-lg flex flex-col">
+          <div className="lg:col-span-4 flex flex-col gap-space-md lg:sticky lg:top-space-lg">
+            <Card className="flex flex-col">
               <span className="font-mono-body text-mono-body text-secondary mb-space-xs" dir="ltr">
                 SUMMARY
               </span>
@@ -237,9 +234,9 @@ export function CartPage() {
                   EGP
                 </span>
               </div>
-            </div>
+            </Card>
 
-            <div className="p-space-md bg-surface-container-low flex flex-col gap-space-xs font-small text-small text-secondary">
+            <div className="p-space-md rounded-xl bg-surface-container-low flex flex-col gap-space-xs font-small text-small text-secondary">
               <div className="flex items-center gap-1.5 text-primary font-body-medium">
                 <Icon name="info" size={16} />
                 <span>تثبيت السعر</span>
@@ -263,7 +260,7 @@ export function CartPage() {
       >
         {confirm === 'deferred' ? (
           <div className="flex flex-col gap-space-md">
-            <div className="p-space-sm bg-surface-container-low flex items-start gap-space-xs font-small text-small text-secondary">
+            <div className="p-space-sm rounded-lg bg-surface-container-low flex items-start gap-space-xs font-small text-small text-secondary">
               <Icon name="smart_toy" size={16} className="text-on-surface-variant shrink-0 mt-0.5" />
               <span>
                 الشروط المالية للآجل (السعر، الخصم، الموعد) تُحتسب على الخادم تلقائيًا بناءً على تقييمك

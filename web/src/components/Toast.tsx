@@ -37,7 +37,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             className={`pointer-events-auto overlay-shadow rounded-full bg-surface-container-lowest border px-space-md py-space-sm font-mono-body text-mono-body ${
-              t.kind === 'error' ? 'border-[#B3261E]/40 text-[#B3261E]' : 'border-surface-container-high text-on-surface'
+              t.kind === 'error' ? 'border-danger/40 text-danger' : 'border-surface-container-high text-on-surface'
             }`}
           >
             {t.message}

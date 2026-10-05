@@ -41,6 +41,21 @@ if TYPE_CHECKING:
 
 USER_KINDS = ("customer", "supplier", "agent", "branch", "staff", "admin")
 USER_STATUSES = ("pending", "active", "suspended", "locked")
+# Arabic labels — single source for the UI (served by GET /admin/user-kinds, /user-statuses).
+USER_KIND_LABELS = {
+    "customer": "عميل",
+    "supplier": "مورد",
+    "agent": "وكيل",
+    "branch": "فرع",
+    "staff": "موظف",
+    "admin": "مدير",
+}
+USER_STATUS_LABELS = {
+    "pending": "قيد الانتظار",
+    "active": "نشط",
+    "suspended": "موقوف",
+    "locked": "مقفل",
+}
 LOCALES = ("ar", "en")
 OTP_CHANNELS = ("sms", "whatsapp", "email")
 PARTNER_TYPES = ("agent", "branch")

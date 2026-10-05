@@ -11,8 +11,8 @@
   }
   body {
     overscroll-behavior: none;
-    background: #ffffff; /* surface-container-lowest */
-    color: #1b1c1c; /* on-surface */
+    background: #f5f7fb; /* canvas */
+    color: #1a2140; /* ink / on-surface */
   }
   /* Hide scrollbars like the export (content still scrolls). */
   ::-webkit-scrollbar {
@@ -23,12 +23,12 @@
 /* Transient overlays (modals, side-sheets, menus) — the one allowed shadow. */
 .overlay-shadow {
   box-shadow:
-    0 4px 20px -2px rgba(17, 17, 17, 0.06),
-    0 2px 6px -1px rgba(17, 17, 17, 0.04);
+    0 4px 20px -2px rgba(16, 24, 53, 0.12),
+    0 2px 6px -1px rgba(16, 24, 53, 0.08);
 }
 
 .modal-backdrop {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(16, 24, 53, 0.28);
   backdrop-filter: blur(4px);
 }
 

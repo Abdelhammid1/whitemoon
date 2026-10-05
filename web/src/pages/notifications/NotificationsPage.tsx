@@ -1,17 +1,25 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Narrow } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, Spinner, EmptyState, InlineError } from '../../components/ui'
+import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import { useAuth } from '../../auth/AuthContext'
-import { listNotifications, markAllRead, markRead, sendNotification, type Notification } from '../../api/notifications'
+import { listChannels, listNotifications, markAllRead, markRead, sendNotification, type Notification } from '../../api/notifications'
 import { ApiError } from '../../api/client'
 import { formatDate } from '../../lib/format'
 
 const CHANNEL_AR: Record<string, string> = {
   in_app: 'داخل التطبيق', sms: 'SMS', whatsapp: 'واتساب', email: 'بريد',
 }
-const CHANNELS = ['in_app', 'sms', 'whatsapp', 'email'] as const
+const CHANNEL_ICON: Record<string, string> = {
+  in_app: 'notifications', sms: 'sms', whatsapp: 'chat', email: 'mail',
+}
+// Graceful fallback used only until the backend channel list loads (or if it fails).
+const FALLBACK_CHANNELS: { code: string; label: string }[] = [
+  { code: 'in_app', label: 'داخل التطبيق' }, { code: 'sms', label: 'SMS' },
+  { code: 'whatsapp', label: 'واتساب' }, { code: 'email', label: 'بريد' },
+]
 
 export function NotificationsPage() {
   const toast = useToast()
@@ -25,6 +33,7 @@ export function NotificationsPage() {
   const [sendOpen, setSendOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [form, setForm] = useState({ user_id: '', title: '', body: '', channel: 'in_app' as string })
+  const [channels, setChannels] = useState<{ code: string; label: string }[]>(FALLBACK_CHANNELS)
 
   const load = useCallback(async () => {
     setLoading(true); setError(null)
@@ -33,6 +42,20 @@ export function NotificationsPage() {
     finally { setLoading(false) }
   }, [])
   useEffect(() => { void load() }, [load])
+
+  // Delivery channels are loaded from the backend; falls back to the seed on failure.
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      try {
+        const r = await listChannels()
+        if (alive && r.items.length) setChannels(r.items)
+      } catch {
+        /* keep FALLBACK_CHANNELS */
+      }
+    })()
+    return () => { alive = false }
+  }, [])
 
   async function readOne(id: number) {
     try { await markRead(id); await load() }
@@ -77,19 +100,28 @@ export function NotificationsPage() {
         {loading ? <Spinner /> : error ? <InlineError message={error} /> : rows.length === 0 ? (
           <EmptyState title="لا توجد إشعارات." />
         ) : (
-          <div className="flex flex-col">
+          <div className="flex flex-col gap-space-sm">
             {rows.map((n) => (
-              <button key={n.id} onClick={() => !n.is_read && readOne(n.id)}
-                className={`text-start flex flex-col gap-space-xs py-space-md border-b border-surface-container-high ${n.is_read ? 'opacity-60' : 'hover:bg-surface'}`}>
-                <div className="flex items-center justify-between gap-space-sm">
-                  <span className="font-body-medium text-body-medium text-on-surface">{n.title}</span>
-                  <div className="flex items-center gap-space-xs">
-                    <Pill tone="neutral">{CHANNEL_AR[n.channel] ?? n.channel}</Pill>
-                    {!n.is_read && <span className="w-2 h-2 rounded-full bg-[#0F6B3E]" />}
+              <button key={n.id} onClick={() => !n.is_read && readOne(n.id)} disabled={n.is_read}
+                className={`group w-full text-start rounded-2xl border p-space-md flex items-start gap-space-md transition-shadow ${
+                  n.is_read
+                    ? 'bg-surface-container-lowest border-surface-container-high opacity-70'
+                    : 'bg-surface-container-lowest border-gold/40 shadow-card hover:shadow-overlay'
+                }`}>
+                <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${n.is_read ? 'bg-surface-variant text-secondary' : 'bg-brand-weak text-primary'}`}>
+                  <Icon name={CHANNEL_ICON[n.channel] ?? 'notifications'} size={20} />
+                </span>
+                <div className="flex flex-col gap-space-xs min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-space-sm">
+                    <span className="font-body-medium text-body-medium text-on-surface truncate">{n.title}</span>
+                    <div className="flex items-center gap-space-xs shrink-0">
+                      <Pill tone="neutral">{CHANNEL_AR[n.channel] ?? n.channel}</Pill>
+                      {!n.is_read && <span className="w-2 h-2 rounded-full bg-gold" />}
+                    </div>
                   </div>
+                  {n.body && <span className="font-body text-body text-secondary">{n.body}</span>}
+                  <span className="font-mono-body text-mono-body text-secondary" dir="ltr">{formatDate(n.created_at)}</span>
                 </div>
-                {n.body && <span className="font-body text-body text-secondary">{n.body}</span>}
-                <span className="font-mono-body text-mono-body text-secondary">{formatDate(n.created_at)}</span>
               </button>
             ))}
           </div>
@@ -118,10 +150,10 @@ export function NotificationsPage() {
             <div className="flex flex-col gap-space-xs">
               <span className="font-small text-small text-secondary">القناة</span>
               <div className="flex flex-wrap gap-space-xs">
-                {CHANNELS.map((c) => (
-                  <button key={c} type="button" onClick={() => setForm({ ...form, channel: c })}
-                    className={`px-3 py-1 rounded-full font-small ${form.channel === c ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant'}`}>
-                    {CHANNEL_AR[c]}
+                {channels.map((c) => (
+                  <button key={c.code} type="button" onClick={() => setForm({ ...form, channel: c.code })}
+                    className={`px-3 py-1 rounded-full font-small ${form.channel === c.code ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant'}`}>
+                    {c.label}
                   </button>
                 ))}
               </div>

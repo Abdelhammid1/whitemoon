@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Pill, Button, Spinner, Field } from '../../components/ui'
+import { PageTitle, Pill, Button, Spinner, Field, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
@@ -68,28 +68,30 @@ export function PendingSuppliersPage() {
         {loading ? (
           <Spinner />
         ) : (
-          <DataTable
-            rows={rows}
-            rowKey={(r) => r.user_id}
-            empty="لا توجد ملفات قيد الاعتماد."
-            columns={[
-              { header: 'المعرف', width: '70px', cell: (r) => <Mono>{r.user_id}</Mono> },
-              { header: 'الاسم القانوني', cell: (r) => <span className="font-body text-body">{r.legal_name}</span> },
-              { header: 'السجل التجاري', cell: (r) => <Mono>{r.commercial_register_no}</Mono> },
-              { header: 'البطاقة الضريبية', cell: (r) => <Mono>{r.tax_card_no}</Mono> },
-              { header: 'تاريخ التقديم', cell: (r) => <Mono>{formatDate(r.created_at)}</Mono> },
-              {
-                header: 'الإجراءات',
-                align: 'end',
-                cell: (r) => (
-                  <div className="flex gap-space-sm justify-end">
-                    <Button variant="primary" onClick={() => onApprove(r.user_id)} disabled={busyId === r.user_id}>اعتماد</Button>
-                    <Button variant="destructive" onClick={() => setRejectId(r.user_id)} disabled={busyId === r.user_id}>رفض</Button>
-                  </div>
-                ),
-              },
-            ]}
-          />
+          <Card padded={false} className="overflow-hidden">
+            <DataTable
+              rows={rows}
+              rowKey={(r) => r.user_id}
+              empty="لا توجد ملفات قيد الاعتماد."
+              columns={[
+                { header: 'المعرف', width: '70px', cell: (r) => <Mono>{r.user_id}</Mono> },
+                { header: 'الاسم القانوني', cell: (r) => <span className="font-body text-body">{r.legal_name}</span> },
+                { header: 'السجل التجاري', cell: (r) => <Mono>{r.commercial_register_no}</Mono> },
+                { header: 'البطاقة الضريبية', cell: (r) => <Mono>{r.tax_card_no}</Mono> },
+                { header: 'تاريخ التقديم', cell: (r) => <Mono>{formatDate(r.created_at)}</Mono> },
+                {
+                  header: 'الإجراءات',
+                  align: 'end',
+                  cell: (r) => (
+                    <div className="flex gap-space-sm justify-end">
+                      <Button variant="primary" onClick={() => onApprove(r.user_id)} disabled={busyId === r.user_id}>اعتماد</Button>
+                      <Button variant="destructive" onClick={() => setRejectId(r.user_id)} disabled={busyId === r.user_id}>رفض</Button>
+                    </div>
+                  ),
+                },
+              ]}
+            />
+          </Card>
         )}
       </div>
 

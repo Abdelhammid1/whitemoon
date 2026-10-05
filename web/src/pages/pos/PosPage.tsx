@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, Card } from '../../components/ui'
 import { Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import { createSale, type PosSale } from '../../api/pos'
@@ -40,7 +40,7 @@ export function PosPage() {
     <Wide>
       <PageTitle title="نقطة البيع" subtitle="بيع مباشر من مخزونك — السعر من عرض المورد الفعّال، والقيد المحاسبي يُرحَّل دفعيًا." />
 
-      <div className="mt-space-xl flex flex-col gap-space-sm max-w-[640px]">
+      <Card className="mt-space-xl flex flex-col gap-space-sm max-w-[640px]">
         {lines.map((l, i) => (
           <div key={i} className="flex gap-space-sm items-end">
             <Field label={i === 0 ? 'المنتج' : undefined} dir="ltr" mono placeholder="product id" value={l.product_id} onChange={(e) => setLine(i, 'product_id', e.target.value)} />
@@ -49,22 +49,22 @@ export function PosPage() {
           </div>
         ))}
         <button className="font-small text-primary hover:underline self-start" onClick={() => setLines((s) => [...s, { product_id: '', supplier_id: '', qty: '1' }])}>+ صنف</button>
-        <div className="flex justify-end mt-space-md">
+        <div className="flex justify-end mt-space-md pt-space-md border-t border-surface-container-high">
           <Button variant="primary" onClick={sell} disabled={busy || !lines.some((l) => l.product_id)}>إتمام البيع (نقدي)</Button>
         </div>
-      </div>
+      </Card>
 
       {last && (
-        <div className="mt-space-xl border-t border-surface-container-high pt-space-lg max-w-[640px]">
+        <Card className="mt-space-lg max-w-[640px] flex flex-col gap-space-md">
           <div className="flex items-center justify-between">
-            <span className="font-body-medium">{last.number}</span>
+            <span className="font-body-medium text-body-medium text-on-surface">{last.number}</span>
             <Pill tone={last.posted ? 'signal' : 'warning'}>{last.posted ? 'مُرحَّل' : 'غير مُرحَّل'}</Pill>
           </div>
-          <div className="mt-space-sm flex items-center justify-between">
-            <span className="font-small text-small text-secondary">الإجمالي</span>
-            <span className="font-display text-headline-1 text-primary"><Mono>{formatMoney(last.total)}</Mono> ج.م</span>
+          <div className="flex items-center justify-between pt-space-md border-t border-surface-container-high">
+            <span className="font-body text-body text-secondary">الإجمالي</span>
+            <span className="font-mono-medium text-display text-primary tracking-tight"><Mono className="text-primary">{formatMoney(last.total)}</Mono> ج.م</span>
           </div>
-        </div>
+        </Card>
       )}
     </Wide>
   )

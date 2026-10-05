@@ -45,6 +45,15 @@ def read_all():
     return jsonify({"marked": svc.mark_all_read(_uid())})
 
 
+@bp.get("/channels")
+@jwt_required()
+def list_channels():
+    """Delivery channels (code + Arabic label) — single source for the UI's picker."""
+    from .models import CHANNEL_LABELS, CHANNELS
+
+    return jsonify({"items": [{"code": c, "label": CHANNEL_LABELS.get(c, c)} for c in CHANNELS]})
+
+
 @bp.post("")
 @require_permission("notify.send")
 def send():

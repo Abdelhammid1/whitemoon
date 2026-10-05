@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, Spinner, InlineError } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, Spinner, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { SideSheet } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
@@ -97,7 +97,7 @@ export function ShortagesPage() {
         <Button variant="primary" onClick={() => { setRerror(null); setReportOpen(true) }} iconRight="add">بلاغ نقص جديد</Button>
       </div>
 
-      <div className="mt-space-xl">
+      <Card padded={false} className="mt-space-xl overflow-hidden">
         {loading ? <Spinner /> : (
           <DataTable rows={rows} rowKey={(s) => s.id} onRowClick={(s) => s.status === 'pending' && setActive(s)} empty="لا توجد بلاغات نواقص." columns={[
             { header: 'المعرف', width: '70px', cell: (s) => <Mono>{s.id}</Mono> },
@@ -109,7 +109,7 @@ export function ShortagesPage() {
             { header: 'الحالة', align: 'end', cell: (s) => <Pill tone={STATUS[s.status]?.tone ?? 'warning'}>{STATUS[s.status]?.ar ?? s.status}</Pill> },
           ]} />
         )}
-      </div>
+      </Card>
 
       <SideSheet open={active !== null} onClose={() => setActive(null)} title={`حسم نقص #${active?.id ?? ''}`}>
         <div className="flex flex-col gap-space-lg">

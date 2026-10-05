@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import {
@@ -81,21 +81,23 @@ export function LogisticsPage() {
 
       <section className="mt-space-xl">
         <SectionHeader title="إضافة موعد تسليم" />
-        <form onSubmit={addSlot} className="flex flex-wrap items-end gap-space-md">
-          <div className="w-40"><Field label="التاريخ" type="date" dir="ltr" value={sd} onChange={(e) => setSd(e.target.value)} /></div>
-          <div className="w-36"><Field label="النافذة" dir="ltr" mono value={win} onChange={(e) => setWin(e.target.value)} /></div>
-          <div className="w-24"><Field label="السعة" dir="ltr" mono value={cap} onChange={(e) => setCap(e.target.value)} /></div>
-          <Button variant="primary" type="submit" disabled={busy}>إضافة</Button>
-        </form>
-        <div className="mt-space-md">
-          {loading ? <Spinner /> : error ? <InlineError message={error} /> : (
-            <DataTable rows={slots} rowKey={(s) => s.id} empty="لا توجد مواعيد متاحة." columns={[
-              { header: 'التاريخ', cell: (s) => <Mono>{s.slot_date}</Mono> },
-              { header: 'النافذة', cell: (s) => <Mono>{s.window}</Mono> },
-              { header: 'المتاح', align: 'center', cell: (s) => <Mono>{s.remaining}/{s.capacity}</Mono> },
-            ]} />
-          )}
-        </div>
+        <Card className="mt-space-md">
+          <form onSubmit={addSlot} className="flex flex-wrap items-end gap-space-md">
+            <div className="w-40"><Field label="التاريخ" type="date" dir="ltr" value={sd} onChange={(e) => setSd(e.target.value)} /></div>
+            <div className="w-36"><Field label="النافذة" dir="ltr" mono value={win} onChange={(e) => setWin(e.target.value)} /></div>
+            <div className="w-24"><Field label="السعة" dir="ltr" mono value={cap} onChange={(e) => setCap(e.target.value)} /></div>
+            <Button variant="primary" type="submit" disabled={busy}>إضافة</Button>
+          </form>
+          <div className="-mx-space-lg -mb-space-lg mt-space-md border-t border-surface-container-high overflow-hidden">
+            {loading ? <Spinner /> : error ? <InlineError message={error} /> : (
+              <DataTable rows={slots} rowKey={(s) => s.id} empty="لا توجد مواعيد متاحة." columns={[
+                { header: 'التاريخ', cell: (s) => <Mono>{s.slot_date}</Mono> },
+                { header: 'النافذة', cell: (s) => <Mono>{s.window}</Mono> },
+                { header: 'المتاح', align: 'center', cell: (s) => <Mono>{s.remaining}/{s.capacity}</Mono> },
+              ]} />
+            )}
+          </div>
+        </Card>
       </section>
 
       <section className="mt-[48px]">
@@ -105,7 +107,7 @@ export function LogisticsPage() {
           <Button variant="primary" type="submit" disabled={busy || !orderId}>عرض</Button>
         </form>
         {ship && (
-          <div className="mt-space-md flex flex-col gap-space-md">
+          <Card className="mt-space-md flex flex-col gap-space-md">
             <div className="flex items-center gap-space-sm">
               <Pill tone={ship.status === 'delivered' ? 'signal' : ship.status === 'failed' ? 'error' : 'warning'}>{STATUS_AR[ship.status] ?? ship.status}</Pill>
               <span className="font-body text-body text-secondary">{ship.carrier_type === 'internal' ? 'أسطول داخلي' : 'شحن خارجي'}</span>
@@ -129,12 +131,14 @@ export function LogisticsPage() {
               <Button type="submit" disabled={busy}>+ إضافة مسار</Button>
             </form>
             {ship.legs.length > 0 && (
-              <DataTable rows={ship.legs} rowKey={(l) => l.seq} columns={[
-                { header: 'المسار', cell: (l) => `${l.from_label ?? '—'} ← ${l.to_label ?? '—'}` },
-                { header: 'الناقل', align: 'center', cell: (l) => (l.carrier_type === 'internal' ? 'داخلي' : 'خارجي') },
-              ]} />
+              <div className="-mx-space-lg -mb-space-lg border-t border-surface-container-high overflow-hidden">
+                <DataTable rows={ship.legs} rowKey={(l) => l.seq} columns={[
+                  { header: 'المسار', cell: (l) => `${l.from_label ?? '—'} ← ${l.to_label ?? '—'}` },
+                  { header: 'الناقل', align: 'center', cell: (l) => (l.carrier_type === 'internal' ? 'داخلي' : 'خارجي') },
+                ]} />
+              </div>
             )}
-          </div>
+          </Card>
         )}
       </section>
     </Wide>

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Pill, Spinner, EmptyState, InlineError, Button, Field, SectionHeader } from '../../components/ui'
+import { PageTitle, Pill, Spinner, EmptyState, InlineError, Button, Field, SectionHeader, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import { useAuth } from '../../auth/AuthContext'
@@ -62,36 +62,41 @@ export function RfqDetailPage() {
   return (
     <Narrow>
       <PageTitle title={`طلب عرض ${rfq.number}`} subtitle="العروض معروضة بالسعر فقط — دون كشف هوية المورد." />
-      <div className="mt-space-sm flex flex-wrap items-center gap-space-sm">
+      <Card className="mt-space-md flex flex-wrap items-center gap-space-md">
         <Pill tone={rfq.status === 'open' ? 'signal' : 'neutral'}>{rfq.status === 'open' ? 'مفتوح' : rfq.status}</Pill>
         <span className="font-body text-body text-secondary">المنتج <Mono>#{rfq.product_id}</Mono> — كمية <Mono>{rfq.qty}</Mono></span>
         {rfq.deadline && <span className="font-mono-body text-mono-body text-secondary">حتى {formatDate(rfq.deadline)}</span>}
-      </div>
+      </Card>
 
-      <div className="mt-space-xl">
-        {offers.length === 0 ? (
-          <EmptyState title="لم تصل عروض بعد." />
-        ) : (
-          <DataTable
-            rows={offers}
-            rowKey={(o) => o.offer_id}
-            columns={[
-              { header: 'العرض', cell: (o) => <Mono>عرض #{o.offer_id}</Mono> },
-              { header: 'سعر الوحدة', align: 'end', cell: (o) => <Mono>{formatMoney(o.unit_price)}</Mono> },
-              { header: 'أدنى كمية', align: 'end', cell: (o) => <Mono>{o.moq}</Mono> },
-              { header: 'التاريخ', align: 'end', cell: (o) => <Mono>{formatDate(o.submitted_at)}</Mono> },
-            ]}
-          />
-        )}
-      </div>
+      <section className="mt-space-xl">
+        <SectionHeader title="العروض الواردة" />
+        <div className="mt-space-md">
+          {offers.length === 0 ? (
+            <EmptyState title="لم تصل عروض بعد." />
+          ) : (
+            <Card padded={false} className="overflow-hidden">
+              <DataTable
+                rows={offers}
+                rowKey={(o) => o.offer_id}
+                columns={[
+                  { header: 'العرض', cell: (o) => <Mono>عرض #{o.offer_id}</Mono> },
+                  { header: 'سعر الوحدة', align: 'end', cell: (o) => <Mono>{formatMoney(o.unit_price)}</Mono> },
+                  { header: 'أدنى كمية', align: 'end', cell: (o) => <Mono>{o.moq}</Mono> },
+                  { header: 'التاريخ', align: 'end', cell: (o) => <Mono>{formatDate(o.submitted_at)}</Mono> },
+                ]}
+              />
+            </Card>
+          )}
+        </div>
+      </section>
 
       {isSupplier && rfq.status === 'open' && (
-        <form onSubmit={submitOffer} className="mt-space-xl flex flex-col gap-space-md">
+        <Card className="mt-space-xl flex flex-col gap-space-md">
           <SectionHeader title="تقديم عرض" />
           <p className="font-small text-small text-secondary">
             عرضك يُعرض على العميل بالسعر فقط — دون كشف هويتك.
           </p>
-          <div className="flex flex-wrap items-end gap-space-md">
+          <form onSubmit={submitOffer} className="flex flex-wrap items-end gap-space-md">
             <div className="w-48">
               <Field
                 label="سعر الوحدة (ج.م)"
@@ -115,8 +120,8 @@ export function RfqDetailPage() {
             <Button type="submit" variant="primary" disabled={submitting} iconRight="send">
               إرسال العرض
             </Button>
-          </div>
-        </form>
+          </form>
+        </Card>
       )}
     </Narrow>
   )

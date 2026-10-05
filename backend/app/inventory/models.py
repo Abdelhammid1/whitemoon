@@ -61,6 +61,13 @@ CATEGORY_LABELS = {
     "other": "أخرى",
 }
 LOCATION_TYPES = ("supplier", "channel_partner", "in_transit", "customer_hold")
+# Arabic labels — single source for the UI (served by GET /inventory/location-types).
+LOCATION_TYPE_LABELS = {
+    "supplier": "مخزن المورد",
+    "channel_partner": "عهدة وكيل/فرع",
+    "in_transit": "في الطريق",
+    "customer_hold": "حجز عميل",
+}
 TRANSFER_STATUSES = ("draft", "issued", "received", "cancelled")
 SHORTAGE_STATUSES = ("pending", "resolved", "rejected")
 RESPONSIBLE_PARTY_TYPES = ("supplier", "channel_partner", "unallocated")

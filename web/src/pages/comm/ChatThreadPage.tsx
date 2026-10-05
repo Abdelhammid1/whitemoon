@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import { Narrow } from '../../layouts/AppShell'
-import { Button, Spinner, InlineError } from '../../components/ui'
+import { Button, Card, Pill, Spinner, InlineError } from '../../components/ui'
 import { Icon } from '../../components/Icon'
 import { useToast } from '../../components/Toast'
 import { listMessages, sendMessage, type Message } from '../../api/comm'
@@ -17,20 +17,22 @@ function MessageRow({ m }: { m: Message }) {
   if (m.status === 'blocked') {
     return (
       <div className="flex flex-col items-end self-end max-w-[85%] w-full">
-        <div className="flex items-center gap-space-xs mb-1">
-          <span className="font-mono-body text-mono-body text-error" dir="ltr">
+        <div className="flex items-center gap-space-sm mb-space-xs">
+          <Pill tone="error">رسالة محجوبة آلياً</Pill>
+          <span className="font-mono-body text-mono-body text-secondary" dir="ltr">
             {formatDate(m.created_at)}
           </span>
-          <span className="font-small-medium text-small-medium text-error">رسالة محجوبة آلياً</span>
         </div>
-        <div className="p-space-md rounded bg-error-container text-on-error-container w-full max-w-[620px]">
+        <div className="w-full max-w-[620px] rounded-xl border border-danger/25 bg-danger-weak p-space-md">
           <div className="flex items-start gap-space-sm">
-            <Icon name="block" size={20} className="text-error shrink-0 mt-0.5" />
-            <div className="flex flex-col gap-1 w-full">
-              <span className="font-body-medium text-body-medium text-error">
+            <span className="w-9 h-9 rounded-xl bg-error-container flex items-center justify-center shrink-0">
+              <Icon name="block" size={20} className="text-danger" />
+            </span>
+            <div className="flex flex-col gap-space-xs w-full">
+              <span className="font-body-medium text-body-medium text-danger">
                 حُجبت: محاولة تبادل بيانات اتصال
               </span>
-              <p className="font-body text-body text-on-error-container leading-relaxed">
+              <p className="font-body text-body text-on-surface-variant leading-relaxed">
                 لم يتم تسليم الرسالة للطرف الآخر وفق سياسات المنصة، وسُجِّل التنبيه في سجل الامتثال.
               </p>
             </div>
@@ -43,13 +45,13 @@ function MessageRow({ m }: { m: Message }) {
   if (m.mine) {
     return (
       <div className="flex flex-col items-end self-end max-w-[78%]">
-        <div className="flex items-center gap-space-xs mb-1">
+        <div className="flex items-center gap-space-sm mb-space-xs">
           <span className="font-mono-body text-mono-body text-secondary" dir="ltr">
             {formatDate(m.created_at)}
           </span>
           <span className="font-small-medium text-small-medium text-primary">أنا</span>
         </div>
-        <div className="p-space-md rounded bg-primary text-on-primary font-body text-body leading-relaxed whitespace-pre-wrap">
+        <div className="px-space-md py-space-sm rounded-xl rounded-tr-sm bg-primary text-on-primary shadow-card-sm font-body text-body leading-relaxed whitespace-pre-wrap">
           {m.body}
           {m.image_url && (
             <div className="mt-space-sm flex items-center gap-1.5 font-mono-body text-mono-body opacity-80">
@@ -58,9 +60,9 @@ function MessageRow({ m }: { m: Message }) {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-1 mt-1 text-secondary font-mono-body text-mono-body">
-          <Icon name="done_all" size={14} />
-          <span className="text-[11px]">مُرسل عبر بوابة الوساطة</span>
+        <div className="flex items-center gap-1 mt-space-xs text-secondary font-mono-body text-mono-body">
+          <Icon name="done_all" size={14} className="text-signal" />
+          <span>مُرسل عبر بوابة الوساطة</span>
         </div>
       </div>
     )
@@ -68,22 +70,25 @@ function MessageRow({ m }: { m: Message }) {
 
   return (
     <div className="flex flex-col items-start max-w-[78%]">
-      <div className="flex items-center gap-space-xs mb-1">
-        <span className="font-small-medium text-small-medium text-primary">{roleLabel(m.sender_role)}</span>
+      <div className="flex items-center gap-space-sm mb-space-xs">
+        <span className="inline-flex items-center gap-1.5 font-small-medium text-small-medium text-primary">
+          <Icon name="shield_person" size={14} className="text-secondary" />
+          {roleLabel(m.sender_role)}
+        </span>
         <span className="font-mono-body text-mono-body text-secondary" dir="ltr">
           {formatDate(m.created_at)}
         </span>
       </div>
-      <div className="p-space-md rounded bg-surface-container-low text-on-surface font-body text-body leading-relaxed whitespace-pre-wrap">
+      <div className="px-space-md py-space-sm rounded-xl rounded-tl-sm border border-surface-container-high bg-surface-container text-on-surface shadow-card-sm font-body text-body leading-relaxed whitespace-pre-wrap">
         {m.body}
         {m.image_url && (
-          <div className="mt-space-sm flex items-center gap-1.5 p-space-sm bg-surface-container-lowest rounded border-b border-surface-container-highest font-mono-body text-mono-body text-secondary">
+          <div className="mt-space-sm flex items-center gap-1.5 p-space-sm bg-surface-container-lowest rounded-lg border border-surface-container-high font-mono-body text-mono-body text-secondary">
             <Icon name="description" size={18} className="text-primary" />
             <span>صورة مرفقة — تم التحقق آلياً من المحتوى</span>
           </div>
         )}
       </div>
-      <span className="font-small text-small text-secondary mt-1">مُسلَّمة عبر بوابة الوساطة</span>
+      <span className="font-small text-small text-secondary mt-space-xs">مُسلَّمة عبر بوابة الوساطة</span>
     </div>
   )
 }
@@ -125,10 +130,10 @@ export function ChatThreadPage() {
     return (
       <Narrow>
         <div className="mt-space-xl flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-12 h-12 rounded bg-error-container text-error flex items-center justify-center mb-space-md">
+          <div className="w-12 h-12 rounded-xl bg-error-container text-danger flex items-center justify-center mb-space-md">
             <Icon name="wifi_off" size={28} />
           </div>
-          <h2 className="font-headline-1 text-headline-1 text-primary">تعذّر تحميل المحادثة</h2>
+          <h2 className="font-headline-1 text-headline-1 text-primary font-medium">تعذّر تحميل المحادثة</h2>
           <div className="mt-space-md w-full max-w-[480px]"><InlineError message={error} /></div>
         </div>
       </Narrow>
@@ -150,9 +155,9 @@ export function ChatThreadPage() {
       </div>
 
       {/* Mandatory mediation banner */}
-      <div className="mt-space-md p-space-md bg-surface-container-low rounded flex items-start gap-space-sm border-r-2 border-primary">
+      <div className="mt-space-md p-space-md bg-brand-weak rounded-xl flex items-start gap-space-sm border-r-2 border-primary">
         <Icon name="policy" size={20} className="text-primary shrink-0 mt-0.5" />
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-space-xs">
           <span className="font-body-medium text-body-medium text-primary">
             كل الرسائل تمر عبر الشركة وتخضع للرقابة الآلية
           </span>
@@ -165,12 +170,12 @@ export function ChatThreadPage() {
 
       {/* Masked peer header */}
       <div className="mt-space-md p-space-md flex items-center gap-space-md border-b border-surface-container-highest">
-        <div className="w-12 h-12 rounded bg-surface-container flex items-center justify-center text-primary font-mono-medium text-[16px] font-medium">
+        <div className="w-12 h-12 rounded-xl bg-brand-weak flex items-center justify-center text-primary">
           <Icon name="shield_person" size={22} />
         </div>
         <div className="flex flex-col">
-          <h1 className="font-headline-1 text-headline-1 text-primary">الطرف الآخر</h1>
-          <span className="font-small text-small text-secondary mt-0.5">
+          <h1 className="font-headline-1 text-headline-1 text-primary font-medium">الطرف الآخر</h1>
+          <span className="font-small text-small text-secondary mt-space-xs">
             هوية الطرف محجوبة — تظهر الصفة فقط مع كل رسالة
           </span>
         </div>
@@ -179,7 +184,10 @@ export function ChatThreadPage() {
       {/* Messages canvas */}
       <div className="flex flex-col gap-space-lg py-space-lg min-h-[40vh]">
         {msgs.length === 0 ? (
-          <div className="flex items-center justify-center py-16">
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <span className="w-10 h-10 rounded-xl bg-surface-container flex items-center justify-center mb-space-sm">
+              <Icon name="forum" size={20} className="text-secondary" />
+            </span>
             <span className="font-body text-body text-secondary">لا توجد رسائل بعد.</span>
           </div>
         ) : (
@@ -189,24 +197,26 @@ export function ChatThreadPage() {
       </div>
 
       {/* Composer */}
-      <form onSubmit={send} className="mt-space-lg pt-space-md border-t border-surface-container-highest flex flex-col gap-space-sm">
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          rows={3}
-          placeholder="اكتب رسالتك التنسيقية هنا… (تجنّب ذكر أرقام الهواتف أو قنوات التواصل الخارجية)"
-          className="w-full bg-transparent border-0 border-b border-surface-container-highest focus:border-primary focus:border-b-2 focus:outline-none py-space-sm px-0 font-body text-body text-on-surface placeholder:text-outline transition-colors resize-none"
-        />
-        <div className="flex items-center justify-between pt-space-xs">
-          <div className="flex items-center gap-1.5 text-secondary font-small text-small">
-            <Icon name="shield" size={14} />
-            <span>يُفحص النص والصور آلياً لمنع تسريب بيانات الاتصال.</span>
+      <Card className="mt-space-lg flex flex-col gap-space-sm">
+        <form onSubmit={send} className="flex flex-col gap-space-sm">
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={3}
+            placeholder="اكتب رسالتك التنسيقية هنا… (تجنّب ذكر أرقام الهواتف أو قنوات التواصل الخارجية)"
+            className="w-full bg-transparent border-0 border-b border-surface-container-high focus:border-primary focus:border-b-2 focus:outline-none py-space-sm px-0 font-body text-body text-on-surface placeholder:text-outline transition-colors resize-none"
+          />
+          <div className="flex items-center justify-between gap-space-md pt-space-xs">
+            <div className="flex items-center gap-1.5 text-secondary font-small text-small">
+              <Icon name="shield" size={14} />
+              <span>يُفحص النص والصور آلياً لمنع تسريب بيانات الاتصال.</span>
+            </div>
+            <Button variant="primary" type="submit" iconRight="send" disabled={busy || !body.trim()}>
+              إرسال الرسالة
+            </Button>
           </div>
-          <Button variant="primary" type="submit" iconRight="send" disabled={busy || !body.trim()}>
-            إرسال الرسالة
-          </Button>
-        </div>
-      </form>
+        </form>
+      </Card>
     </Narrow>
   )
 }

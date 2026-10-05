@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Pill, Button, Field, Spinner, EmptyState, InlineError } from '../../components/ui'
+import { PageTitle, Pill, Button, Field, Card, Spinner, EmptyState, InlineError } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
+import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import { listConversations, startConversation, type Conversation } from '../../api/comm'
@@ -59,30 +60,52 @@ export function ChatPage() {
 
   return (
     <Wide>
-      <div className="flex items-start justify-between gap-space-md">
+      <div className="flex flex-wrap items-start justify-between gap-space-md">
         <PageTitle title="المحادثات" subtitle="قناة موجّهة عبر الشركة — هوية الطرف الآخر مخفية. كل الرسائل تمر عبر الخادم." />
-        {isMod && <Button variant="primary" onClick={() => setNewOpen(true)}>محادثة جديدة</Button>}
+        {isMod && (
+          <Button variant="primary" onClick={() => setNewOpen(true)} iconRight="add">
+            محادثة جديدة
+          </Button>
+        )}
       </div>
+
       {isMod && (
-        <label className="mt-space-md flex items-center gap-space-sm font-body text-body">
-          <input type="checkbox" checked={flagged} onChange={(e) => setFlagged(e.target.checked)} /> المحظورة فقط
+        <label className="mt-space-lg inline-flex items-center gap-space-sm cursor-pointer select-none rounded-lg border border-surface-container-high bg-surface-container-lowest px-space-md py-space-sm font-body-medium text-body-medium text-on-surface shadow-card-sm transition-colors hover:bg-surface-container-low">
+          <input
+            type="checkbox"
+            checked={flagged}
+            onChange={(e) => setFlagged(e.target.checked)}
+            className="h-4 w-4 accent-primary"
+          />
+          <Icon name="flag" size={16} className="text-danger" />
+          المحظورة فقط
         </label>
       )}
+
       <div className="mt-space-lg">
         {loading ? <Spinner /> : error ? <InlineError message={error} /> : rows.length === 0 ? (
-          <EmptyState title="لا توجد محادثات." />
+          <Card>
+            <EmptyState title="لا توجد محادثات." description="لم تُفتح أي قناة وساطة بعد." />
+          </Card>
         ) : (
-          <DataTable rows={rows} rowKey={(c) => c.id} onRowClick={(c) => navigate(`/chat/${c.id}`)} columns={[
-            { header: 'المحادثة', cell: (c) => <Mono>#{c.id}</Mono> },
-            { header: 'الموضوع', cell: (c) => c.subject ?? (c.order_id ? `طلب #${c.order_id}` : '—') },
-            {
-              header: 'الطرف الآخر',
-              cell: (c) => isMod
-                ? <span className="font-mono-body text-mono-body">عميل {c.customer_id} ↔ مورد {c.supplier_id}</span>
-                : (c.counterpart_role === 'supplier' ? 'المورد' : 'العميل'),
-            },
-            { header: 'الحالة', align: 'center', cell: (c) => <Pill tone={c.flagged ? 'error' : c.status === 'open' ? 'signal' : 'neutral'}>{c.flagged ? 'محظورة' : c.status === 'open' ? 'مفتوحة' : 'مغلقة'}</Pill> },
-          ]} />
+          <Card padded={false} className="overflow-hidden">
+            <DataTable rows={rows} rowKey={(c) => c.id} onRowClick={(c) => navigate(`/chat/${c.id}`)} columns={[
+              { header: 'المحادثة', cell: (c) => <Mono>#{c.id}</Mono> },
+              { header: 'الموضوع', cell: (c) => c.subject ?? (c.order_id ? `طلب #${c.order_id}` : '—') },
+              {
+                header: 'الطرف الآخر',
+                cell: (c) => isMod
+                  ? <span className="font-mono-body text-mono-body" dir="ltr">عميل {c.customer_id} ↔ مورد {c.supplier_id}</span>
+                  : (
+                      <span className="inline-flex items-center gap-1.5 font-body-medium text-body-medium text-on-surface">
+                        <Icon name="shield_person" size={16} className="text-secondary" />
+                        {c.counterpart_role === 'supplier' ? 'المورد' : 'العميل'}
+                      </span>
+                    ),
+              },
+              { header: 'الحالة', align: 'center', cell: (c) => <Pill tone={c.flagged ? 'error' : c.status === 'open' ? 'signal' : 'neutral'}>{c.flagged ? 'محظورة' : c.status === 'open' ? 'مفتوحة' : 'مغلقة'}</Pill> },
+            ]} />
+          </Card>
         )}
       </div>
 
@@ -98,9 +121,9 @@ export function ChatPage() {
         }
       >
         <div className="flex flex-col gap-space-md">
-          <div className="flex gap-space-md">
-            <div className="flex-1"><Field label="رقم العميل" dir="ltr" mono inputMode="numeric" value={nc.customer_id} onChange={(e) => setNc({ ...nc, customer_id: e.target.value })} /></div>
-            <div className="flex-1"><Field label="رقم المورد" dir="ltr" mono inputMode="numeric" value={nc.supplier_id} onChange={(e) => setNc({ ...nc, supplier_id: e.target.value })} /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+            <Field label="رقم العميل" dir="ltr" mono inputMode="numeric" value={nc.customer_id} onChange={(e) => setNc({ ...nc, customer_id: e.target.value })} />
+            <Field label="رقم المورد" dir="ltr" mono inputMode="numeric" value={nc.supplier_id} onChange={(e) => setNc({ ...nc, supplier_id: e.target.value })} />
           </div>
           <Field label="رقم الطلب (اختياري)" dir="ltr" mono inputMode="numeric" value={nc.order_id} onChange={(e) => setNc({ ...nc, order_id: e.target.value })} />
           <Field label="الموضوع (اختياري)" value={nc.subject} onChange={(e) => setNc({ ...nc, subject: e.target.value })} />

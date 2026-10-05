@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError, Card } from '../../components/ui'
+import { Icon } from '../../components/Icon'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
@@ -18,6 +20,35 @@ function ledgerLabel(e: LedgerEntry): string {
   if (e.kind === 'payment_made') return 'دفعنا له (نقد خارج)'
   if (e.kind === 'payment_received') return 'استلمنا منه (نقد داخل)'
   return e.direction > 0 ? 'تعديل يدوي — تحميل عليه' : 'تعديل يدوي — زيادة لصالحه'
+}
+
+/** Summary KPI tile (matches the executive dashboard): icon chip, large mono value, label. */
+function KpiTile({ label, value, hint, icon, tone = 'brand' }: {
+  label: string; value: ReactNode; hint?: string; icon: string
+  tone?: 'brand' | 'gold' | 'signal' | 'warning'
+}) {
+  const chip: Record<string, string> = {
+    brand: 'bg-brand-weak text-primary', gold: 'bg-gold-weak text-gold',
+    signal: 'bg-signal-weak text-signal', warning: 'bg-warning-weak text-warning',
+  }
+  const valueCls: Record<string, string> = {
+    brand: 'text-on-surface', gold: 'text-gold', signal: 'text-signal', warning: 'text-warning',
+  }
+  return (
+    <Card className="flex flex-col gap-space-md min-h-[142px]">
+      <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${chip[tone]}`}>
+        <Icon name={icon} size={20} />
+      </span>
+      <div className="flex items-baseline gap-space-xs" dir="ltr">
+        <span className={`font-mono-medium text-display tracking-tight ${valueCls[tone]}`}>{value}</span>
+        <span className="font-small text-small text-secondary">ج.م</span>
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <span className="font-body-medium text-body-medium text-on-surface">{label}</span>
+        {hint && <span className="font-small text-small text-secondary">{hint}</span>}
+      </div>
+    </Card>
+  )
 }
 
 export function PartnerDetailPage() {
@@ -93,28 +124,28 @@ export function PartnerDetailPage() {
   if (loading) return <Narrow><Spinner /></Narrow>
   if (error || !terms) return <Narrow><div className="mt-space-xl"><InlineError message={error ?? 'غير موجود'} /></div></Narrow>
 
+  const depositsHeld = deposits.filter((d) => d.status === 'held').reduce((s, d) => s + Number(d.amount), 0)
+  const commissionAccrued = accruals.filter((a) => a.kind === 'commission').reduce((s, a) => s + Number(a.amount), 0)
+  const balanceTone = ledger?.owed_by === 'management' ? 'warning' : ledger?.owed_by === 'settled' ? 'signal' : 'brand'
+  const balanceLabel = ledger?.owed_by === 'partner' ? 'عليه للإدارة' : ledger?.owed_by === 'management' ? 'له عند الإدارة' : 'الحساب متزن'
+
   return (
     <Narrow>
       <PageTitle title={`شريك #${pid}`} subtitle="الحساب الجاري والشروط والتأمينات والاستحقاقات." />
 
+      {/* Summary KPI tiles */}
+      <section className="mt-space-xl grid grid-cols-1 sm:grid-cols-3 gap-space-md">
+        <KpiTile icon="account_balance" tone={balanceTone} label="الرصيد الجاري" hint={balanceLabel}
+          value={formatMoney(ledger?.abs_balance ?? 0)} />
+        <KpiTile icon="savings" tone="brand" label="التأمينات المحتجزة" hint="الودائع القائمة غير المستردة"
+          value={formatMoney(depositsHeld)} />
+        <KpiTile icon="percent" tone="gold" label="إجمالي العمولة المحتسبة" hint="عبر كل الفترات"
+          value={formatMoney(commissionAccrued)} />
+      </section>
+
       {/* الحساب الجاري — current account */}
       <section className="mt-space-xl">
         <SectionHeader title="الحساب الجاري" action={ledger ? <span className="font-small text-small text-secondary">{ledger.count} حركة</span> : undefined} />
-
-        {/* Balance banner */}
-        {ledger && (
-          <div className="mt-space-md p-space-lg bg-surface-container-low rounded-xl flex items-center justify-between gap-space-md">
-            <span className="font-body text-body text-secondary">
-              {ledger.owed_by === 'partner' ? 'عليه للإدارة' : ledger.owed_by === 'management' ? 'له عند الإدارة' : 'الحساب متزن'}
-            </span>
-            <div className="flex items-baseline gap-space-xs" dir="ltr">
-              <span className={`font-mono-medium text-display ${ledger.owed_by === 'management' ? 'text-[#A8650C]' : ledger.owed_by === 'settled' ? 'text-[#0F6B3E]' : 'text-primary'}`}>
-                {formatMoney(ledger.abs_balance)}
-              </span>
-              <span className="font-small text-small text-secondary">ج.م</span>
-            </div>
-          </div>
-        )}
 
         {/* Money-movement forms */}
         <div className="mt-space-md grid grid-cols-1 md:grid-cols-3 gap-space-md">
@@ -151,7 +182,7 @@ export function PartnerDetailPage() {
         </div>
 
         {/* كل الحركات */}
-        <div className="mt-space-md">
+        <Card padded={false} className="mt-space-md overflow-hidden">
           <DataTable rows={ledger?.items ?? []} rowKey={(e) => e.id} empty="لا توجد حركات." columns={[
             { header: 'التاريخ', cell: (e) => <Mono>{e.created_at ? formatDate(e.created_at) : '—'}</Mono> },
             { header: 'البيان', cell: (e) => (
@@ -165,12 +196,12 @@ export function PartnerDetailPage() {
             ) },
             { header: 'المبلغ', align: 'end', cell: (e) => <Mono>{formatMoney(e.amount)}</Mono> },
           ]} />
-        </div>
+        </Card>
       </section>
 
       <section className="mt-[48px]">
         <SectionHeader title="الشروط" />
-        <div className="flex flex-wrap items-end gap-space-md">
+        <Card className="mt-space-md flex flex-wrap items-end gap-space-md">
           <label className="flex items-center gap-space-sm font-body text-body">
             <input type="checkbox" checked={terms.earns_commission} onChange={(e) => setTermsState({ ...terms, earns_commission: e.target.checked })} /> يستحق عمولة
           </label>
@@ -183,32 +214,34 @@ export function PartnerDetailPage() {
             earns_commission: terms.earns_commission, commission_rate_pct: Number(terms.commission_rate_pct),
             earns_investment_return: terms.earns_investment_return, investment_return_rate_pct: Number(terms.investment_return_rate_pct),
           }), 'حُفظت الشروط.')}>حفظ</Button>
-        </div>
+        </Card>
       </section>
 
       <section className="mt-[48px]">
         <SectionHeader title="التأمينات" />
-        <div className="flex flex-wrap items-end gap-space-md mb-space-md">
+        <div className="mt-space-md flex flex-wrap items-end gap-space-md mb-space-md">
           <div className="w-36"><Field label="المبلغ (ج.م)" dir="ltr" mono value={dep.amount} onChange={(e) => setDep({ ...dep, amount: e.target.value })} /></div>
           <div className="flex-1 min-w-[200px]"><Field label="شروط الاسترداد" value={dep.recovery_conditions} onChange={(e) => setDep({ ...dep, recovery_conditions: e.target.value })} /></div>
           <Button disabled={busy || !dep.amount || dep.recovery_conditions.length < 5}
             onClick={() => run(() => recordDeposit(pid, { amount: Number(dep.amount), deposit_date: todayIso(), recovery_conditions: dep.recovery_conditions }), 'سُجِّل التأمين.')}>تسجيل تأمين</Button>
         </div>
-        <DataTable rows={deposits} rowKey={(d) => d.id} empty="لا توجد تأمينات." columns={[
-          { header: 'المبلغ', align: 'end', cell: (d) => <Mono>{formatMoney(d.amount)}</Mono> },
-          { header: 'التاريخ', cell: (d) => <Mono>{d.deposit_date}</Mono> },
-          { header: 'الحالة', align: 'center', cell: (d) => <Pill tone={d.status === 'held' ? 'signal' : 'neutral'}>{d.status === 'held' ? 'محتجز' : 'مُسترد'}</Pill> },
-          { header: '', align: 'end', cell: (d) => d.status === 'held'
-            ? <button className="text-[#ba1a1a] font-small hover:underline" disabled={busy} onClick={() => run(() => refundDeposit(d.id, 'استرداد عند إنهاء التعاقد'), 'رُدّ التأمين.')}>رد</button>
-            : null },
-        ]} />
+        <Card padded={false} className="overflow-hidden">
+          <DataTable rows={deposits} rowKey={(d) => d.id} empty="لا توجد تأمينات." columns={[
+            { header: 'المبلغ', align: 'end', cell: (d) => <Mono>{formatMoney(d.amount)}</Mono> },
+            { header: 'التاريخ', cell: (d) => <Mono>{d.deposit_date}</Mono> },
+            { header: 'الحالة', align: 'center', cell: (d) => <Pill tone={d.status === 'held' ? 'signal' : 'neutral'}>{d.status === 'held' ? 'محتجز' : 'مُسترد'}</Pill> },
+            { header: '', align: 'end', cell: (d) => d.status === 'held'
+              ? <button className="text-danger font-small hover:underline" disabled={busy} onClick={() => run(() => refundDeposit(d.id, 'استرداد عند إنهاء التعاقد'), 'رُدّ التأمين.')}>رد</button>
+              : null },
+          ]} />
+        </Card>
       </section>
 
       <section className="mt-[48px]">
         <SectionHeader title="الاستحقاقات" />
 
         {/* Attribute a realized order to this partner (feeds the accrual basis) */}
-        <div className="flex flex-wrap items-end gap-space-md mb-space-md">
+        <div className="mt-space-md flex flex-wrap items-end gap-space-md mb-space-md">
           <div className="w-36"><Field label="رقم الطلب" dir="ltr" mono value={attrOrderId} onChange={(e) => setAttrOrderId(e.target.value)} /></div>
           <Button disabled={busy || !attrOrderId} onClick={() => void attribute()}>نسب طلبًا لهذا الشريك</Button>
           <span className="font-small text-small text-secondary">يُسنِد طلبًا مُنفَّذًا لهذا الشريك ليدخل ضمن أساس احتساب العمولة والعائد.</span>
@@ -227,16 +260,18 @@ export function PartnerDetailPage() {
           <div className="w-20"><Field label="الشهر" dir="ltr" mono value={acc.month} onChange={(e) => setAcc({ ...acc, month: e.target.value })} /></div>
           <Button disabled={busy} onClick={() => run(() => computeAccrual(pid, acc.kind, Number(acc.year), Number(acc.month)), 'احتُسب الاستحقاق.')}>احتساب</Button>
         </div>
-        <DataTable rows={accruals} rowKey={(a) => a.id} empty="لا توجد استحقاقات." columns={[
-          { header: 'النوع', cell: (a) => (a.kind === 'commission' ? 'عمولة' : 'عائد') },
-          { header: 'الفترة', cell: (a) => <Mono>{a.period}</Mono> },
-          { header: 'الأساس', align: 'end', cell: (a) => <Mono>{formatMoney(a.basis_amount)}</Mono> },
-          { header: 'النسبة %', align: 'end', cell: (a) => <Mono>{a.rate_pct}</Mono> },
-          { header: 'المبلغ', align: 'end', cell: (a) => <Mono>{formatMoney(a.amount)}</Mono> },
-          { header: '', align: 'end', cell: (a) => (
-            <button className="font-small text-small text-primary hover:underline" onClick={() => void openStatement(a)}>عرض الأساس</button>
-          ) },
-        ]} />
+        <Card padded={false} className="overflow-hidden">
+          <DataTable rows={accruals} rowKey={(a) => a.id} empty="لا توجد استحقاقات." columns={[
+            { header: 'النوع', cell: (a) => (a.kind === 'commission' ? 'عمولة' : 'عائد') },
+            { header: 'الفترة', cell: (a) => <Mono>{a.period}</Mono> },
+            { header: 'الأساس', align: 'end', cell: (a) => <Mono>{formatMoney(a.basis_amount)}</Mono> },
+            { header: 'النسبة %', align: 'end', cell: (a) => <Mono>{a.rate_pct}</Mono> },
+            { header: 'المبلغ', align: 'end', cell: (a) => <Mono>{formatMoney(a.amount)}</Mono> },
+            { header: '', align: 'end', cell: (a) => (
+              <button className="font-small text-small text-primary hover:underline" onClick={() => void openStatement(a)}>عرض الأساس</button>
+            ) },
+          ]} />
+        </Card>
       </section>
 
       {/* Accrual basis statement (US-6.2) */}

@@ -24,11 +24,11 @@ export function Button({
     'inline-flex items-center justify-center gap-space-sm rounded-lg py-2 px-4 transition-all active:scale-[0.99] disabled:opacity-40 disabled:cursor-not-allowed'
   const variants: Record<ButtonVariant, string> = {
     primary:
-      'bg-primary text-on-primary font-body-medium text-body-medium hover:bg-neutral-800',
+      'bg-primary text-on-primary font-body-medium text-body-medium shadow-card-sm hover:bg-primary-container',
     secondary:
-      'bg-surface-container-lowest border border-surface-container-high text-primary font-body-medium text-body-medium hover:bg-surface',
+      'bg-surface-container-lowest border border-surface-container-high text-primary font-body-medium text-body-medium shadow-card-sm hover:bg-surface-container-low',
     destructive:
-      'bg-surface-container-lowest border border-surface-container-high text-[#B3261E] font-body-medium text-body-medium hover:bg-surface',
+      'bg-surface-container-lowest border border-surface-container-high text-danger font-body-medium text-body-medium shadow-card-sm hover:bg-surface-container-low',
   }
   return (
     <button type={type} className={`${base} ${variants[variant]} ${className}`} {...rest}>
@@ -40,19 +40,21 @@ export function Button({
 
 /* ---------------------------------------------------------------- Pill */
 
-type PillTone = 'signal' | 'warning' | 'error' | 'neutral'
+type PillTone = 'signal' | 'warning' | 'error' | 'neutral' | 'gold' | 'brand'
 
 const PILL_TONE: Record<PillTone, string> = {
-  signal: 'bg-[#0F6B3E]/10 text-[#0F6B3E]',
-  warning: 'bg-[#A8650C]/10 text-[#A8650C]',
-  error: 'bg-[#B3261E]/10 text-[#B3261E]',
+  signal: 'bg-signal-weak text-signal',
+  warning: 'bg-warning-weak text-warning',
+  error: 'bg-danger-weak text-danger',
   neutral: 'bg-surface-variant text-on-surface-variant',
+  gold: 'bg-gold-weak text-gold',
+  brand: 'bg-brand-weak text-brand',
 }
 
 export function Pill({ tone = 'neutral', children }: { tone?: PillTone; children: ReactNode }) {
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded-full font-mono-body text-small ${PILL_TONE[tone]}`}
+      className={`inline-flex items-center px-2 py-0.5 rounded-full font-small text-small ${PILL_TONE[tone]}`}
     >
       {children}
     </span>
@@ -63,10 +65,12 @@ export function Pill({ tone = 'neutral', children }: { tone?: PillTone; children
 
 export function Dot({ tone = 'neutral' }: { tone?: PillTone }) {
   const color: Record<PillTone, string> = {
-    signal: 'bg-[#0F6B3E]',
-    warning: 'bg-[#A8650C]',
-    error: 'bg-[#B3261E]',
+    signal: 'bg-signal',
+    warning: 'bg-warning',
+    error: 'bg-danger',
     neutral: 'bg-secondary',
+    gold: 'bg-gold',
+    brand: 'bg-brand',
   }
   return <span className={`inline-block shrink-0 w-2 h-2 rounded-full ${color[tone]}`} />
 }
@@ -87,7 +91,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
   const inputId = id ?? rest.name
   const fontClass = mono ? 'font-mono-body text-mono-body' : 'font-body text-body'
   const borderClass = error
-    ? 'border-[#B3261E] focus:border-[#B3261E]'
+    ? 'border-danger focus:border-danger'
     : 'border-surface-container-high focus:border-primary'
   return (
     <div className="w-full flex flex-col">
@@ -103,7 +107,7 @@ export const Field = forwardRef<HTMLInputElement, FieldProps>(function Field(
         {...rest}
       />
       {error ? (
-        <span className="mt-1 font-small text-small text-[#B3261E]">{error}</span>
+        <span className="mt-1 font-small text-small text-danger">{error}</span>
       ) : hint ? (
         <span className="mt-1 font-small text-small text-outline">{hint}</span>
       ) : null}
@@ -167,8 +171,32 @@ export function EmptyState({
 
 export function InlineError({ message }: { message: string }) {
   return (
-    <div className="font-small text-small text-[#B3261E] border-b border-[#B3261E]/30 pb-space-xs">
+    <div className="font-small text-small text-danger border-b border-danger/30 pb-space-xs">
       {message}
+    </div>
+  )
+}
+
+/* ---------------------------------------------------------------- Card */
+
+/** Elevated surface panel — the new design uses tasteful depth to group
+ *  content (the old austere flat system is gone). */
+export function Card({
+  children,
+  className = '',
+  padded = true,
+}: {
+  children: ReactNode
+  className?: string
+  padded?: boolean
+}) {
+  return (
+    <div
+      className={`bg-surface-container-lowest border border-surface-container-high rounded-2xl shadow-card ${
+        padded ? 'p-space-lg' : ''
+      } ${className}`}
+    >
+      {children}
     </div>
   )
 }

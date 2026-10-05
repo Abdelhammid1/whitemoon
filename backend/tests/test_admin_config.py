@@ -22,6 +22,24 @@ def test_list_roles_from_db(client) -> None:
     assert {"admin.high", "admin", "staff", "customer", "supplier", "agent", "branch"} <= codes
 
 
+def test_list_user_kinds_from_backend(client) -> None:
+    h = _high(client)
+    r = client.get("/admin/user-kinds", headers=h)
+    assert r.status_code == 200
+    items = r.get_json()["items"]
+    codes = {x["code"] for x in items}
+    assert {"customer", "supplier", "agent", "branch", "staff", "admin"} <= codes
+    assert all(x.get("label") for x in items)
+
+
+def test_list_user_statuses_from_backend(client) -> None:
+    h = _high(client)
+    r = client.get("/admin/user-statuses", headers=h)
+    assert r.status_code == 200
+    codes = {x["code"] for x in r.get_json()["items"]}
+    assert {"pending", "active", "suspended", "locked"} <= codes
+
+
 def test_admin_creates_user_with_role(client) -> None:
     h = _high(client)
     r = client.post(

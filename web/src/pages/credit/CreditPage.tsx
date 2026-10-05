@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, type ReactNode } from 'react'
 import { Narrow } from '../../layouts/AppShell'
-import { Button, Field, Pill, Spinner, EmptyState } from '../../components/ui'
+import { Button, Field, Pill, Dot, Card, Spinner, EmptyState } from '../../components/ui'
 import { Icon } from '../../components/Icon'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
@@ -14,32 +14,54 @@ import { customerStatement, type CustomerStatement } from '../../api/commerce'
 import { ApiError } from '../../api/client'
 import { formatDate, formatMoney, todayIso } from '../../lib/format'
 
+type Tone = 'signal' | 'warning' | 'error' | 'neutral'
+
 /* due status → Arabic label + pill tone */
-const DUE_STATUS: Record<string, { ar: string; tone: 'signal' | 'warning' | 'error' | 'neutral' }> = {
+const DUE_STATUS: Record<string, { ar: string; tone: Tone }> = {
   open: { ar: 'مفتوحة', tone: 'warning' },
   paid: { ar: 'مسدّدة', tone: 'signal' },
   defaulted: { ar: 'متعثّرة', tone: 'error' },
 }
 
-/* four-colour tier system → Arabic label + dot/tint classes (signals only) */
-const TIER: Record<string, { ar: string; dot: string; tint: string }> = {
-  green: { ar: 'أخضر (ممتاز)', dot: 'bg-[#0F6B3E]', tint: 'bg-[rgba(15,107,62,0.08)] text-[#0F6B3E]' },
-  white: { ar: 'أبيض (تجريبي)', dot: 'bg-outline-variant', tint: 'bg-surface-container text-secondary' },
-  yellow: { ar: 'أصفر (مراقبة)', dot: 'bg-[#A8650C]', tint: 'bg-[rgba(168,101,12,0.08)] text-[#A8650C]' },
-  red: { ar: 'أحمر (محظور آجل)', dot: 'bg-[#ba1a1a]', tint: 'bg-[rgba(186,26,26,0.08)] text-[#ba1a1a]' },
+/* four-colour tier system → Arabic label + signal tone (green→signal,
+ * yellow→warning, red→error, white/new→neutral). */
+const TIER_TONE: Record<string, Tone> = { green: 'signal', white: 'neutral', yellow: 'warning', red: 'error' }
+const TIER_AR: Record<string, string> = {
+  green: 'أخضر (ممتاز)', white: 'أبيض (تجريبي)', yellow: 'أصفر (مراقبة)', red: 'أحمر (محظور آجل)',
 }
 
-/** Stitch-style metric card: label + icon, large mono value, unit. */
-function StatCard({ label, value, icon, tone = 'primary', unit = 'ج.م' }: { label: string; value: string; icon: string; tone?: 'primary' | 'error'; unit?: string }) {
+/** KPI tile: icon chip, large mono value + unit, label. */
+function StatCard({ label, value, icon, tone = 'neutral', unit = 'ج.م' }: {
+  label: string; value: string; icon: string; tone?: 'neutral' | 'error'; unit?: string
+}) {
+  const chip = tone === 'error' ? 'bg-danger-weak text-danger' : 'bg-brand-weak text-primary'
   return (
-    <div className="p-space-md bg-surface-container-low rounded-lg flex flex-col justify-between min-h-[108px]">
-      <div className="flex items-center justify-between text-secondary">
-        <span className="font-small text-small">{label}</span>
-        <Icon name={icon} size={16} />
+    <Card className="flex flex-col gap-space-md min-h-[128px]">
+      <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${chip}`}>
+        <Icon name={icon} size={20} />
+      </span>
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-baseline gap-1" dir="ltr">
+          <span className={`font-mono-medium text-display tracking-tight ${tone === 'error' ? 'text-danger' : 'text-on-surface'}`}>{value}</span>
+          <span className="font-small text-small text-secondary">{unit}</span>
+        </div>
+        <span className="font-small text-small text-secondary">{label}</span>
       </div>
-      <div className="mt-space-sm flex items-baseline gap-1" dir="ltr">
-        <span className={`font-mono-medium text-display ${tone === 'error' ? 'text-[#ba1a1a]' : 'text-primary'}`}>{value}</span>
-        <span className="font-mono-body text-mono-body text-secondary">{unit}</span>
+    </Card>
+  )
+}
+
+/** Tier-coloured alert banner (token tints only). */
+function Banner({ tone, icon, title, children }: { tone: 'error' | 'warning'; icon: string; title: string; children: ReactNode }) {
+  const cls = tone === 'error'
+    ? 'bg-danger-weak text-danger border-danger/30'
+    : 'bg-warning-weak text-warning border-warning/30'
+  return (
+    <div className={`flex items-start gap-space-sm rounded-2xl border p-space-md mb-space-xl ${cls}`}>
+      <Icon name={icon} size={20} className="shrink-0 mt-0.5" />
+      <div className="flex flex-col">
+        <span className="font-body-medium text-body-medium">{title}</span>
+        <span className="font-small text-small">{children}</span>
       </div>
     </div>
   )
@@ -87,7 +109,8 @@ export function CreditPage() {
     finally { setBusy(false); setModal(null); setReason(''); setLimit('') }
   }
 
-  const t = tier ? (TIER[tier.tier] ?? { ar: tier.tier, dot: 'bg-secondary', tint: 'bg-surface-container text-secondary' }) : null
+  const tierTone = tier ? (TIER_TONE[tier.tier] ?? 'neutral') : 'neutral'
+  const tierAr = tier ? (TIER_AR[tier.tier] ?? tier.tier) : ''
 
   return (
     <Narrow>
@@ -104,13 +127,13 @@ export function CreditPage() {
                 </>
               )}
             </div>
-            <h1 className="font-display text-display text-primary tracking-tight mt-space-xs">التصنيف والرقابة الائتمانية</h1>
+            <h1 className="font-display text-display text-primary font-medium tracking-tight mt-space-xs">التصنيف والرقابة الائتمانية</h1>
             <p className="font-body text-body text-secondary mt-space-xs max-w-[620px]">
               استعرض الملف الائتماني لعميل: التصنيف اللوني، الدرجة، السقف، ونسبة الآجل والمستحق. كل القيم بالجنيه المصري.
             </p>
           </div>
           <form onSubmit={onLookup} className="flex items-center gap-space-sm w-full md:w-auto">
-            <div className="relative flex-1 md:w-60 bg-surface-container-low px-space-md py-1.5 rounded flex items-center">
+            <div className="relative flex-1 md:w-60 bg-surface-container-low px-space-md py-1.5 rounded-lg flex items-center">
               <Icon name="search" size={18} className="text-secondary ml-space-xs shrink-0" />
               <input
                 dir="ltr"
@@ -126,43 +149,31 @@ export function CreditPage() {
         </div>
       </section>
 
-      {loading ? <div className="mt-space-xl"><Spinner /></div> : tier && t && (
+      {loading ? <div className="mt-space-xl"><Spinner /></div> : tier && (
         <>
           {/* Red block banner (only for this customer when red) */}
           {tier.tier === 'red' && (
-            <div className="bg-[#ffdad6] text-[#93000a] p-space-md rounded-lg flex items-center gap-space-sm mb-space-xl">
-              <Icon name="emergency_home" size={20} className="shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-body-medium text-body-medium">حظر البيع الآجل مفعّل لهذا العميل</span>
-                <span className="font-small text-small">يمنع النظام تلقائياً إصدار أي أمر بيع آجل. التعامل نقدي أو إيداع مسبق فقط.</span>
-              </div>
-            </div>
+            <Banner tone="error" icon="emergency_home" title="حظر البيع الآجل مفعّل لهذا العميل">
+              يمنع النظام تلقائياً إصدار أي أمر بيع آجل. التعامل نقدي أو إيداع مسبق فقط.
+            </Banner>
           )}
 
           {/* Automatic overdue-escalation banner (independent of tier) */}
           {tier.order_block_level >= 4 ? (
-            <div className="bg-[#ffdad6] text-[#93000a] p-space-md rounded-lg flex items-center gap-space-sm mb-space-xl">
-              <Icon name="block" size={20} className="shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-body-medium text-body-medium">تجميد الطلبات — تصعيد المستوى ٤</span>
-                <span className="font-small text-small">يرفض النظام أي طلب جديد (نقدي أو آجل) حتى تسوية المتأخرات ولو جزئياً.</span>
-              </div>
-            </div>
+            <Banner tone="error" icon="block" title="تجميد الطلبات — تصعيد المستوى ٤">
+              يرفض النظام أي طلب جديد (نقدي أو آجل) حتى تسوية المتأخرات ولو جزئياً.
+            </Banner>
           ) : tier.order_block_level >= 2 ? (
-            <div className="bg-[rgba(168,101,12,0.08)] text-[#A8650C] p-space-md rounded-lg flex items-center gap-space-sm mb-space-xl">
-              <Icon name="warning" size={20} className="shrink-0" />
-              <div className="flex flex-col">
-                <span className="font-body-medium text-body-medium">تخفيض السقف — تصعيد المستوى ٢</span>
-                <span className="font-small text-small">خُفض السقف الفعّال ٥٠٪ ومُنع البيع الآجل الجديد بسبب تأخر السداد. يُرفع تلقائياً عند التسوية.</span>
-              </div>
-            </div>
+            <Banner tone="warning" icon="warning" title="تخفيض السقف — تصعيد المستوى ٢">
+              خُفض السقف الفعّال ٥٠٪ ومُنع البيع الآجل الجديد بسبب تأخر السداد. يُرفع تلقائياً عند التسوية.
+            </Banner>
           ) : null}
 
           {/* Tier + score */}
           <section className="flex flex-wrap items-center gap-space-md mb-space-lg">
-            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-mono-medium text-mono-medium ${t.tint}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${t.dot}`} />
-              <span>{t.ar}</span>
+            <span className="inline-flex items-center gap-space-xs">
+              <Dot tone={tierTone} />
+              <Pill tone={tierTone}>{tierAr}</Pill>
             </span>
             <span className="font-small text-small text-secondary">التقييم</span>
             <span className="font-mono-medium text-mono-medium text-primary bg-surface-container px-2 py-0.5 rounded" dir="ltr">
@@ -188,59 +199,59 @@ export function CreditPage() {
 
           {/* Dues ledger */}
           <section className="mb-[48px]">
-            <div className="flex items-center justify-between pb-space-sm mb-space-xs">
+            <div className="flex items-center justify-between pb-space-sm mb-space-md">
               <div className="flex flex-col">
                 <span className="font-headline-2 text-headline-2 text-primary">الذمم</span>
                 <span className="font-small text-small text-secondary">أرصدة البيع الآجل القائمة والمسوّاة لهذا العميل</span>
               </div>
             </div>
             {dues.length === 0 ? <EmptyState title="لا توجد ذمم." /> : (
-              <DataTable rows={dues} rowKey={(d) => d.id} columns={[
-                { header: 'التاريخ', cell: (d) => <Mono>{formatDate(d.due_date)}</Mono> },
-                { header: 'الطلب', cell: (d) => (d.order_id != null ? <Mono>#{d.order_id}</Mono> : <span className="text-secondary">—</span>) },
-                { header: 'المبلغ', align: 'end', cell: (d) => <span dir="ltr"><Mono>{formatMoney(d.amount)}</Mono> ج.م</span> },
-                {
-                  header: 'الحالة',
-                  align: 'center',
-                  cell: (d) => {
-                    const s = DUE_STATUS[d.status] ?? { ar: d.status, tone: 'neutral' as const }
-                    return <Pill tone={s.tone}>{s.ar}</Pill>
+              <Card padded={false} className="overflow-hidden">
+                <DataTable rows={dues} rowKey={(d) => d.id} columns={[
+                  { header: 'التاريخ', cell: (d) => <Mono>{formatDate(d.due_date)}</Mono> },
+                  { header: 'الطلب', cell: (d) => (d.order_id != null ? <Mono>#{d.order_id}</Mono> : <span className="text-secondary">—</span>) },
+                  { header: 'المبلغ', align: 'end', cell: (d) => <span dir="ltr"><Mono>{formatMoney(d.amount)}</Mono> ج.م</span> },
+                  {
+                    header: 'الحالة',
+                    align: 'center',
+                    cell: (d) => {
+                      const s = DUE_STATUS[d.status] ?? { ar: d.status, tone: 'neutral' as const }
+                      return <Pill tone={s.tone}>{s.ar}</Pill>
+                    },
                   },
-                },
-                {
-                  header: '',
-                  align: 'end',
-                  cell: (d) => (d.status === 'open'
-                    ? <Button disabled={busy} onClick={() => { setPayDueId(d.id); setPaidOn(todayIso()); setModal('pay') }}>تسجيل سداد</Button>
-                    : null),
-                },
-              ]} />
+                  {
+                    header: '',
+                    align: 'end',
+                    cell: (d) => (d.status === 'open'
+                      ? <Button disabled={busy} onClick={() => { setPayDueId(d.id); setPaidOn(todayIso()); setModal('pay') }}>تسجيل سداد</Button>
+                      : null),
+                  },
+                ]} />
+              </Card>
             )}
           </section>
 
           {/* Escalation / exception log */}
           <section>
-            <div className="flex items-center justify-between pb-space-sm mb-space-xs">
+            <div className="flex items-center justify-between pb-space-sm mb-space-md">
               <div className="flex flex-col">
                 <span className="font-headline-2 text-headline-2 text-primary">سجل قرارات الاستثناء والتصعيد</span>
                 <span className="font-small text-small text-secondary">مسار التدقيق المالي المعتمد لقرارات مسؤولي الائتمان</span>
               </div>
             </div>
             {escs.length === 0 ? <EmptyState title="لا يوجد تصعيد." /> : (
-              <DataTable rows={escs} rowKey={(e) => e.id} columns={[
-                {
-                  header: 'المستوى',
-                  align: 'center',
-                  cell: (e) => (
-                    <span className={`font-mono-medium text-mono-medium px-1.5 py-0.5 rounded ${e.level >= 5 ? 'bg-[#ffdad6] text-[#ba1a1a]' : e.level >= 3 ? 'bg-[rgba(168,101,12,0.1)] text-[#A8650C]' : 'bg-surface-container text-primary'}`} dir="ltr">
-                      L{e.level}
-                    </span>
-                  ),
-                },
-                { header: 'نوع الإجراء / المسوغ', cell: (e) => e.trigger_reason },
-                { header: 'تلقائي', align: 'center', cell: (e) => (e.is_automatic ? 'آلي' : 'يدوي') },
-                { header: 'التاريخ', align: 'end', cell: (e) => <Mono>{formatDate(e.triggered_at)}</Mono> },
-              ]} />
+              <Card padded={false} className="overflow-hidden">
+                <DataTable rows={escs} rowKey={(e) => e.id} columns={[
+                  {
+                    header: 'المستوى',
+                    align: 'center',
+                    cell: (e) => <Pill tone={e.level >= 5 ? 'error' : e.level >= 3 ? 'warning' : 'brand'}>مستوى {e.level}</Pill>,
+                  },
+                  { header: 'نوع الإجراء / المسوغ', cell: (e) => e.trigger_reason },
+                  { header: 'تلقائي', align: 'center', cell: (e) => (e.is_automatic ? <Pill tone="neutral">آلي</Pill> : <Pill tone="gold">يدوي</Pill>) },
+                  { header: 'التاريخ', align: 'end', cell: (e) => <Mono>{formatDate(e.triggered_at)}</Mono> },
+                ]} />
+              </Card>
             )}
           </section>
         </>
@@ -266,24 +277,24 @@ export function CreditPage() {
       <Modal open={modal === 'statement'} onClose={() => setModal(null)} title="كشف حساب العميل"
         footer={<Button onClick={() => setModal(null)}>إغلاق</Button>}>
         {stmtLoading ? <Spinner /> : !statement ? <EmptyState title="لا توجد بيانات." /> : (
-          <div className="flex flex-col gap-space-lg">
-            <div className="flex flex-wrap items-center gap-space-md">
+          <div className="flex flex-col gap-space-md">
+            <Card className="flex flex-wrap items-center gap-space-md">
               <span className="font-body-medium text-body-medium text-primary">
                 {statement.profile.display_name ?? `عميل #${statement.customer_id}`}
               </span>
               {statement.profile.geo_area && (
                 <span className="font-small text-small text-secondary">{statement.profile.geo_area}</span>
               )}
-              <span className="ml-auto inline-flex items-baseline gap-1 font-mono-medium text-mono-medium text-[#ba1a1a]" dir="ltr">
+              <span className="ml-auto inline-flex items-baseline gap-1 font-mono-medium text-mono-medium text-danger" dir="ltr">
                 <Mono>{formatMoney(statement.outstanding)}</Mono>
                 <span className="text-secondary">ج.م مستحق</span>
               </span>
-            </div>
+            </Card>
 
-            <div>
+            <Card className="flex flex-col gap-space-sm">
               <span className="font-small-medium text-small-medium text-secondary">الطلبات</span>
               {statement.orders.length === 0 ? (
-                <p className="mt-space-xs font-small text-small text-secondary">لا توجد طلبات.</p>
+                <p className="font-small text-small text-secondary">لا توجد طلبات.</p>
               ) : (
                 <DataTable rows={statement.orders} rowKey={(o) => o.id} columns={[
                   { header: 'الطلب', cell: (o) => <Mono>{o.number}</Mono> },
@@ -292,12 +303,12 @@ export function CreditPage() {
                   { header: 'نقدي', align: 'end', cell: (o) => <span dir="ltr"><Mono>{formatMoney(o.total_cash)}</Mono> ج.م</span> },
                 ]} />
               )}
-            </div>
+            </Card>
 
-            <div>
+            <Card className="flex flex-col gap-space-sm">
               <span className="font-small-medium text-small-medium text-secondary">الذمم</span>
               {statement.dues.length === 0 ? (
-                <p className="mt-space-xs font-small text-small text-secondary">لا توجد ذمم.</p>
+                <p className="font-small text-small text-secondary">لا توجد ذمم.</p>
               ) : (
                 <DataTable rows={statement.dues} rowKey={(d) => d.id} columns={[
                   { header: 'الاستحقاق', cell: (d) => <Mono>{formatDate(d.due_date)}</Mono> },
@@ -309,7 +320,7 @@ export function CreditPage() {
                   { header: 'تأخّر', align: 'end', cell: (d) => <Mono>{d.days_late != null ? `${d.days_late} يوم` : '—'}</Mono> },
                 ]} />
               )}
-            </div>
+            </Card>
           </div>
         )}
       </Modal>

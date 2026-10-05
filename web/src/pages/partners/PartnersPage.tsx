@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, Spinner, InlineError } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, Spinner, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
@@ -47,13 +47,15 @@ export function PartnersPage() {
       </div>
       <div className="mt-space-xl">
         {loading ? <Spinner /> : error ? <InlineError message={error} /> : (
-          <DataTable rows={rows} rowKey={(p) => p.partner_id} onRowClick={(p) => navigate(`/partners/${p.partner_id}`)}
-            empty="لا يوجد شركاء." columns={[
-              { header: 'المعرف', width: '70px', cell: (p) => <Mono>{p.partner_id}</Mono> },
-              { header: 'الاسم', cell: (p) => p.display_name },
-              { header: 'النوع', cell: (p) => <Pill tone="neutral">{p.type === 'agent' ? 'وكيل' : 'فرع'}</Pill> },
-              { header: 'النطاق', cell: (p) => p.geo_scope ?? '—' },
-            ]} />
+          <Card padded={false} className="overflow-hidden">
+            <DataTable rows={rows} rowKey={(p) => p.partner_id} onRowClick={(p) => navigate(`/partners/${p.partner_id}`)}
+              empty="لا يوجد شركاء." columns={[
+                { header: 'المعرف', width: '70px', cell: (p) => <Mono>{p.partner_id}</Mono> },
+                { header: 'الاسم', cell: (p) => <span className="font-body-medium text-body-medium text-on-surface">{p.display_name}</span> },
+                { header: 'النوع', align: 'center', cell: (p) => <Pill tone={p.type === 'agent' ? 'brand' : 'neutral'}>{p.type === 'agent' ? 'وكيل' : 'فرع'}</Pill> },
+                { header: 'النطاق', cell: (p) => p.geo_scope ?? '—' },
+              ]} />
+          </Card>
         )}
       </div>
 
@@ -61,13 +63,16 @@ export function PartnersPage() {
         footer={<><Button onClick={() => setOpen(false)}>إلغاء</Button>
           <Button variant="primary" disabled={busy || !form.display_name || !form.password} onClick={create}>إنشاء</Button></>}>
         <div className="flex flex-col gap-space-md">
-          <div className="flex gap-space-sm">
-            {(['agent', 'branch'] as const).map((t) => (
-              <button key={t} onClick={() => setForm((s) => ({ ...s, type: t }))}
-                className={`px-3 py-1 rounded-full font-small ${form.type === t ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant'}`}>
-                {t === 'agent' ? 'وكيل' : 'فرع'}
-              </button>
-            ))}
+          <div className="flex flex-col gap-space-sm">
+            <p className="font-small-medium text-small-medium text-secondary">النوع</p>
+            <div className="flex gap-space-sm">
+              {(['agent', 'branch'] as const).map((t) => (
+                <button key={t} onClick={() => setForm((s) => ({ ...s, type: t }))}
+                  className={`px-3 py-1 rounded-full font-small ${form.type === t ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant'}`}>
+                  {t === 'agent' ? 'وكيل' : 'فرع'}
+                </button>
+              ))}
+            </div>
           </div>
           <Field label="الاسم الظاهر" value={form.display_name} onChange={f('display_name')} />
           <Field label="النطاق الجغرافي" value={form.geo_scope} onChange={f('geo_scope')} />

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Pill, Spinner, EmptyState, InlineError } from '../../components/ui'
+import { PageTitle, Pill, Spinner, EmptyState, InlineError, Card } from '../../components/ui'
 import { Icon } from '../../components/Icon'
 import { Mono } from '../../components/DataTable'
 import { ShipmentMap } from '../../components/ShipmentMap'
@@ -132,7 +132,7 @@ export function TrackingPage() {
           <button
             onClick={() => void load()}
             disabled={refreshing}
-            className="inline-flex items-center gap-1 px-space-md py-2 bg-surface-container-low text-primary hover:bg-surface-container font-body-medium text-body-medium transition-colors disabled:opacity-40"
+            className="inline-flex items-center gap-1 px-space-md py-2 rounded-lg bg-surface-container-low text-primary hover:bg-surface-container font-body-medium text-body-medium transition-colors disabled:opacity-40"
           >
             <Icon name="sync" size={18} className={refreshing ? 'animate-spin' : ''} />
             <span>تحديث لحظي</span>
@@ -140,7 +140,7 @@ export function TrackingPage() {
         </header>
 
         {/* Metadata strip — only fields the backend actually provides */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-space-md py-space-md bg-surface-container-low px-space-md">
+        <Card className="grid grid-cols-2 md:grid-cols-3 gap-space-md">
           <div className="flex flex-col">
             <span className="font-small text-small text-secondary">الناقل اللوجستي</span>
             <span className="font-body-medium text-body-medium text-primary mt-1">
@@ -159,11 +159,11 @@ export function TrackingPage() {
               {ship.location_updated_at ? formatDate(ship.location_updated_at) : '—'}
             </span>
           </div>
-        </div>
+        </Card>
 
         {/* Secure delivery confirmation key card */}
         {ship.confirmation_code && (
-          <div className="bg-surface-container-lowest border border-surface-container-high p-space-lg flex flex-col md:flex-row items-center justify-between gap-space-lg">
+          <Card className="flex flex-col md:flex-row items-center justify-between gap-space-lg">
             <div className="flex flex-col gap-1 max-w-xl text-right">
               <div className="flex items-center gap-space-xs text-primary font-headline-2 text-headline-2">
                 <Icon name="verified_user" size={20} />
@@ -183,12 +183,12 @@ export function TrackingPage() {
                 <span>ORDER #{ship.order_id} ONLY</span>
               </div>
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Live location map (US-9.2) — free OpenStreetMap, polled above */}
         {ship.current_lat && ship.current_lng && (
-          <div className="flex flex-col gap-space-sm">
+          <Card className="flex flex-col gap-space-sm">
             <div className="flex items-center justify-between">
               <h2 className="font-headline-2 text-headline-2 text-primary">الموقع الحي للمندوب</h2>
               {ship.location_updated_at && (
@@ -198,11 +198,11 @@ export function TrackingPage() {
               )}
             </div>
             <ShipmentMap lat={Number(ship.current_lat)} lng={Number(ship.current_lng)} />
-          </div>
+          </Card>
         )}
 
         {/* Chronological timeline */}
-        <div className="bg-surface-container-lowest border border-surface-container-high p-space-lg flex flex-col gap-space-md">
+        <Card className="flex flex-col gap-space-md">
           <h2 className="font-headline-2 text-headline-2 text-primary pb-space-xs">المسار اللوجستي والخط الزمني</h2>
           <div className="relative flex flex-col gap-0 pr-2">
             {STEPS.map((s, i) => {
@@ -240,11 +240,11 @@ export function TrackingPage() {
               )
             })}
           </div>
-        </div>
+        </Card>
 
         {/* Route legs (external hops) — real data only */}
         {ship.legs.length > 0 && (
-          <div className="bg-surface-container-lowest border border-surface-container-high p-space-lg flex flex-col gap-space-sm">
+          <Card className="flex flex-col gap-space-sm">
             <h2 className="font-headline-2 text-headline-2 text-primary pb-space-xs">مسارات النقل الخارجية</h2>
             <div className="flex flex-col divide-y divide-surface-container">
               {ship.legs.map((leg) => (
@@ -264,12 +264,12 @@ export function TrackingPage() {
                 </div>
               ))}
             </div>
-          </div>
+          </Card>
         )}
 
         {/* Reported shortages / damage — real data only (failed/partial deliveries) */}
         {ship.shortages.length > 0 && (
-          <div className="bg-surface-container-lowest border border-surface-container-high p-space-lg flex flex-col gap-space-sm">
+          <Card className="flex flex-col gap-space-sm">
             <div className="flex items-center gap-space-xs text-error font-headline-2 text-headline-2 pb-space-xs">
               <Icon name="report" size={18} />
               <span>نواقص أو تلف مُبلّغ عنه</span>
@@ -296,7 +296,7 @@ export function TrackingPage() {
                 )
               })}
             </div>
-          </div>
+          </Card>
         )}
       </div>
     </Narrow>

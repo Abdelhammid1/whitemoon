@@ -1,18 +1,25 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Pill, Field, Spinner, Button } from '../../components/ui'
+import { PageTitle, Pill, Field, Spinner, Button, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
+import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import { useAuth } from '../../auth/AuthContext'
-import { adjustStock, reorderCheck, stockBalances, type StockBalance } from '../../api/inventory'
+import { adjustStock, listLocationTypes, reorderCheck, stockBalances, type Category, type StockBalance } from '../../api/inventory'
 import { ApiError } from '../../api/client'
 
 const LOC_AR: Record<string, string> = {
   supplier: 'مخزن المورد', channel_partner: 'عهدة وكيل/فرع', in_transit: 'في الطريق', customer_hold: 'حجز عميل',
 }
 
-const LOC_TYPES = ['supplier', 'channel_partner', 'in_transit', 'customer_hold']
+// Static fallback so the select never empties; overwritten by the backend list on mount.
+const LOC_TYPES_FALLBACK: Category[] = [
+  { code: 'supplier', label: 'مخزن المورد' },
+  { code: 'channel_partner', label: 'عهدة وكيل/فرع' },
+  { code: 'in_transit', label: 'في الطريق' },
+  { code: 'customer_hold', label: 'حجز عميل' },
+]
 
 const EMPTY_ADJUST = {
   supplier_id: '', product_id: '', location_type: 'supplier', location_id: '', delta: '', reorder_point: '',
@@ -29,6 +36,13 @@ export function StockPage() {
   const [adjustOpen, setAdjustOpen] = useState(false)
   const [adjust, setAdjust] = useState(EMPTY_ADJUST)
   const [busy, setBusy] = useState(false)
+  const [locTypes, setLocTypes] = useState<Category[]>(LOC_TYPES_FALLBACK)
+
+  useEffect(() => {
+    listLocationTypes()
+      .then((r) => { if (r.items.length) setLocTypes(r.items) })
+      .catch(() => { /* keep the static fallback */ })
+  }, [])
 
   async function load() {
     setLoading(true)
@@ -79,10 +93,12 @@ export function StockPage() {
   }
 
   const chip = (active: boolean) =>
-    `px-2 py-0.5 rounded-full font-mono-body text-small transition-colors ${active ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant hover:text-primary'}`
+    `px-2 py-0.5 rounded-full font-small text-small transition-colors ${active ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant hover:text-primary'}`
 
   const selectCls =
     'bg-transparent border-b border-surface-container-high py-2 font-body text-body focus:outline-none focus:border-primary'
+
+  const lowCount = rows.filter((b) => b.low).length
 
   return (
     <Wide>
@@ -106,7 +122,28 @@ export function StockPage() {
         {isAdmin && <Button onClick={load}>تطبيق</Button>}
       </div>
 
-      <div className="mt-space-lg">
+      <section className="mt-space-lg grid grid-cols-2 sm:grid-cols-3 gap-space-md">
+        <Card className="flex items-center gap-space-md">
+          <span className="w-10 h-10 rounded-xl bg-brand-weak text-primary flex items-center justify-center shrink-0">
+            <Icon name="inventory_2" size={20} />
+          </span>
+          <div className="flex flex-col">
+            <span className="font-mono-medium text-headline-1 text-on-surface" dir="ltr">{rows.length}</span>
+            <span className="font-small text-small text-secondary">إجمالي الأرصدة</span>
+          </div>
+        </Card>
+        <Card className="flex items-center gap-space-md">
+          <span className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${lowCount > 0 ? 'bg-warning-weak text-warning' : 'bg-surface-variant text-secondary'}`}>
+            <Icon name="warning" size={20} />
+          </span>
+          <div className="flex flex-col">
+            <span className={`font-mono-medium text-headline-1 ${lowCount > 0 ? 'text-warning' : 'text-on-surface'}`} dir="ltr">{lowCount}</span>
+            <span className="font-small text-small text-secondary">أصناف منخفضة المخزون</span>
+          </div>
+        </Card>
+      </section>
+
+      <Card padded={false} className="mt-space-md overflow-hidden">
         {loading ? <Spinner /> : (
           <DataTable rows={rows} rowKey={(b) => b.id} empty="لا توجد أرصدة." columns={[
             { header: 'المنتج', cell: (b) => <Mono>{b.product_id}</Mono> },
@@ -117,7 +154,7 @@ export function StockPage() {
             { header: '', align: 'end', cell: (b) => (b.low ? <Pill tone="warning">منخفض</Pill> : null) },
           ]} />
         )}
-      </div>
+      </Card>
 
       {isAdmin && (
         <Modal open={adjustOpen} onClose={() => setAdjustOpen(false)} title="تعديل رصيد المخزون" footer={
@@ -135,7 +172,7 @@ export function StockPage() {
               <div className="flex flex-col">
                 <label className="font-small text-small text-secondary mb-1">الموقع</label>
                 <select className={selectCls} value={adjust.location_type} onChange={(e) => setAdjust({ ...adjust, location_type: e.target.value })}>
-                  {LOC_TYPES.map((l) => <option key={l} value={l}>{LOC_AR[l]}</option>)}
+                  {locTypes.map((l) => <option key={l.code} value={l.code}>{LOC_AR[l.code] ?? l.label}</option>)}
                 </select>
               </div>
               <Field label="رقم الموقع (اختياري)" dir="ltr" mono inputMode="numeric" value={adjust.location_id} onChange={(e) => setAdjust({ ...adjust, location_id: e.target.value })} />

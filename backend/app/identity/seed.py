@@ -156,7 +156,9 @@ def seed_bootstrap_admin() -> User | None:
     if existing is not None:
         return None
 
-    email = os.getenv("BOOTSTRAP_ADMIN_EMAIL", "admin@whitemoon.local")
+    # Not a .local/.test address: those are special-use TLDs the email
+    # validator rejects, which would make the seeded admin unable to log in.
+    email = os.getenv("BOOTSTRAP_ADMIN_EMAIL", "admin@whitemoon.eg")
     password = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", "ChangeMeNow!2026")
 
     admin = User(

@@ -18,7 +18,7 @@ export function Brand({ size = 24, withWordmark = true }: Props) {
         <path
           d="M15.5 2a10 10 0 1 0 6.5 17.3A8 8 0 0 1 15.5 2Z"
           fill="currentColor"
-          className="text-primary"
+          className="text-gold"
         />
       </svg>
       {withWordmark && (

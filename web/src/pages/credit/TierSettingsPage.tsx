@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Spinner, InlineError } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, Dot, Card, Spinner, InlineError } from '../../components/ui'
 import { useToast } from '../../components/Toast'
 import { listTierSettings, setTierSetting, runEscalation, type TierSetting } from '../../api/credit'
 import { ApiError } from '../../api/client'
 
+type Tone = 'signal' | 'warning' | 'error' | 'neutral'
 const TIER_AR: Record<string, string> = { green: 'أخضر', white: 'أبيض', yellow: 'أصفر', red: 'أحمر' }
+const TIER_TONE: Record<string, Tone> = { green: 'signal', white: 'neutral', yellow: 'warning', red: 'error' }
 
 export function TierSettingsPage() {
   const toast = useToast()
@@ -34,23 +36,34 @@ export function TierSettingsPage() {
 
   return (
     <Narrow>
-      <div className="flex items-center justify-between gap-space-md">
+      <div className="flex flex-wrap items-center justify-between gap-space-md">
         <PageTitle title="سقوف التصنيف الائتماني" subtitle="عدّل السقف الافتراضي ونسبة الآجل لكل لون — يُسجَّل في التدقيق." />
-        <Button onClick={async () => { const r = await runEscalation(); toast.success(`فُتح ${r.opened} تصعيد.`) }}>
+        <Button onClick={async () => { const r = await runEscalation(); toast.success(`فُتح ${r.opened} تصعيد.`) }} iconRight="sync">
           تشغيل فحص التصعيد
         </Button>
       </div>
       <div className="mt-space-xl">
         {loading ? <Spinner /> : error ? <InlineError message={error} /> : (
-          <div className="flex flex-col gap-space-md">
-            {rows.map((r) => (
-              <div key={r.tier} className="flex flex-wrap items-end gap-space-md border-b border-surface-container-high pb-space-md">
-                <div className="w-20 font-body-medium text-body-medium">{TIER_AR[r.tier] ?? r.tier}</div>
-                <div className="w-40"><Field label="السقف (ج.م)" dir="ltr" mono value={r.credit_limit} onChange={(e) => edit(r.tier, 'credit_limit', e.target.value)} /></div>
-                <div className="w-28"><Field label="الآجل %" dir="ltr" mono value={r.deferred_pct} onChange={(e) => edit(r.tier, 'deferred_pct', e.target.value)} /></div>
-                <Button variant="primary" onClick={() => save(r)} disabled={busy === r.tier}>حفظ</Button>
-              </div>
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
+            {rows.map((r) => {
+              const tone = TIER_TONE[r.tier] ?? 'neutral'
+              return (
+                <Card key={r.tier} className="flex flex-col gap-space-md">
+                  <div className="flex items-center justify-between pb-space-sm border-b border-surface-container-high">
+                    <span className="inline-flex items-center gap-space-sm">
+                      <Dot tone={tone} />
+                      <span className="font-headline-2 text-headline-2 text-primary">{TIER_AR[r.tier] ?? r.tier}</span>
+                    </span>
+                    <Pill tone={tone}>{r.tier}</Pill>
+                  </div>
+                  <Field label="السقف (ج.م)" dir="ltr" mono value={r.credit_limit} onChange={(e) => edit(r.tier, 'credit_limit', e.target.value)} />
+                  <Field label="الآجل %" dir="ltr" mono value={r.deferred_pct} onChange={(e) => edit(r.tier, 'deferred_pct', e.target.value)} />
+                  <div className="flex justify-end">
+                    <Button variant="primary" onClick={() => save(r)} disabled={busy === r.tier}>حفظ</Button>
+                  </div>
+                </Card>
+              )
+            })}
           </div>
         )}
       </div>

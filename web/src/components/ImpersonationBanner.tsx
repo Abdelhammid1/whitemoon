@@ -31,8 +31,8 @@ export function ImpersonationBanner() {
   }
 
   return (
-    <div className="h-10 px-[32px] flex items-center justify-between border-b border-surface-container-high bg-surface-container-lowest">
-      <span className="font-small-medium text-small-medium text-[#B3261E]">
+    <div className="h-10 px-[32px] flex items-center justify-between border-b border-danger/30 bg-danger-weak">
+      <span className="font-small-medium text-small-medium text-danger">
         ⚠ تعمل الآن بصفة المستخدم{' '}
         <bdi dir="ltr" className="font-mono-medium">
           #{state.acting_as_user_id}
@@ -41,7 +41,7 @@ export function ImpersonationBanner() {
       </span>
       <button
         onClick={onEnd}
-        className="font-small-medium text-small-medium text-[#B3261E] hover:underline underline-offset-4"
+        className="font-small-medium text-small-medium text-danger hover:underline underline-offset-4"
       >
         إنهاء الجلسة والعودة ↗
       </button>

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, SectionHeader, EmptyState } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, SectionHeader, EmptyState, Card } from '../../components/ui'
 import { Icon } from '../../components/Icon'
 import { Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
@@ -104,63 +104,63 @@ export function DeliveryConfirmPage() {
       <PageTitle title="تأكيد التسليم" subtitle="للمندوب — أكّد تسليم الشحنة برمز العميل أو بالتوقيع، وسجّل أي نواقص." />
 
       {/* Lookup */}
-      <section className="mt-space-xl flex items-end gap-space-sm">
+      <Card className="mt-space-xl flex items-end gap-space-sm">
         <div className="w-48"><Field label="رقم الطلب" dir="ltr" mono value={orderId} inputMode="numeric" onChange={(e) => setOrderId(e.target.value)} /></div>
         <Button variant="primary" disabled={busy || !orderId} onClick={() => void lookup()}>استدعاء الشحنة</Button>
-      </section>
+      </Card>
 
       {shipment && (
         <>
-          <section className="mt-space-xl flex items-center gap-space-sm">
+          <Card className="mt-space-lg flex flex-wrap items-center gap-space-sm">
             <Mono className="text-secondary">#{shipment.order_id}</Mono>
             <Pill tone={shipment.status === 'delivered' ? 'signal' : shipment.status === 'failed' ? 'error' : 'warning'}>
               {STATUS_AR[shipment.status] ?? shipment.status}
             </Pill>
             {shipment.status !== 'delivered' && (
-              <Button disabled={busy} onClick={() => updateLocation()} iconRight="my_location">تحديث موقعي</Button>
+              <Button className="ms-auto" disabled={busy} onClick={() => updateLocation()} iconRight="my_location">تحديث موقعي</Button>
             )}
-          </section>
+          </Card>
 
           {shipment.status === 'delivered' ? (
-            <div className="mt-space-md"><EmptyState title="تم تسليم هذه الشحنة بالفعل." /></div>
+            <Card className="mt-space-md"><EmptyState title="تم تسليم هذه الشحنة بالفعل." /></Card>
           ) : (
             <>
               {/* Method */}
               <section className="mt-space-lg">
                 <SectionHeader title="طريقة التأكيد" />
-                <div className="mt-space-md flex gap-space-xs">
+                <Card className="mt-space-md flex flex-col gap-space-md">
+                <div className="flex gap-space-xs">
                   {([['code', 'رمز العميل'], ['signature', 'توقيع']] as const).map(([m, lbl]) => (
                     <button key={m} type="button" onClick={() => setMethod(m)}
                       className={`px-3 py-1 rounded-full font-small ${method === m ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant'}`}>{lbl}</button>
                   ))}
                 </div>
-                <div className="mt-space-md">
+                <div>
                   {method === 'code' ? (
                     <Field label="رمز التأكيد" dir="ltr" mono value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="XXXXXXXX" />
                   ) : (
                     <Field label="اسم المستلِم / التوقيع" value={signature} onChange={(e) => setSignature(e.target.value)} />
                   )}
                 </div>
+                </Card>
               </section>
 
               {/* Shortages */}
               <section className="mt-space-lg">
-                <div className="flex items-center justify-between">
-                  <SectionHeader title="نواقص أو تلف (اختياري)" />
-                </div>
-                <div className="mt-space-md flex flex-col gap-space-sm">
+                <SectionHeader title="نواقص أو تلف (اختياري)" />
+                <Card className="mt-space-md flex flex-col gap-space-sm">
                   {shortages.map((r, i) => (
                     <div key={i} className="flex items-end gap-space-sm">
                       <div className="w-28"><Field label="رقم المنتج" dir="ltr" mono value={r.product_id} onChange={(e) => setShortage(i, { product_id: e.target.value })} /></div>
                       <div className="w-24"><Field label="الكمية" dir="ltr" mono value={r.qty} onChange={(e) => setShortage(i, { qty: e.target.value })} /></div>
                       <div className="flex-1 min-w-0"><Field label="ملاحظة" value={r.note} onChange={(e) => setShortage(i, { note: e.target.value })} /></div>
-                      <button type="button" className="text-[#B3261E] p-2" onClick={() => removeShortage(i)} aria-label="حذف"><Icon name="close" size={18} /></button>
+                      <button type="button" className="text-danger p-2" onClick={() => removeShortage(i)} aria-label="حذف"><Icon name="close" size={18} /></button>
                     </div>
                   ))}
                   <button type="button" onClick={addShortage} className="self-start font-small text-small text-primary hover:underline flex items-center gap-1">
                     <Icon name="add" size={16} /> إضافة نقص
                   </button>
-                </div>
+                </Card>
               </section>
 
               <section className="mt-space-xl flex justify-end">

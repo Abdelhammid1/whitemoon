@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Pill, Spinner } from '../../components/ui'
+import { PageTitle, Pill, Spinner, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import { supplierOrders, type SupplierOrderRow } from '../../api/commerce'
@@ -48,16 +48,18 @@ export function SupplierOrdersPage() {
 
       <div className="mt-space-xl">
         {loading ? <Spinner /> : (
-          <DataTable rows={rows} rowKey={(r) => r.sub_order_id} empty="لا توجد طلبات واردة." columns={[
-            { header: 'رقم الطلب', cell: (r) => <Mono>{r.order_number}</Mono> },
-            { header: 'حالة طلبك', cell: (r) => statusPill(r.sub_order_status) },
-            { header: 'الأصناف', cell: (r) => (
-              <span className="font-body text-body">
-                {r.lines?.length ? `${r.lines.length} صنف` : '—'}
-              </span>
-            ) },
-            { header: 'الإجمالي', align: 'end', cell: (r) => <Mono>{r.subtotal ? `${r.subtotal} ج.م` : '—'}</Mono> },
-          ]} />
+          <Card padded={false} className="overflow-hidden">
+            <DataTable rows={rows} rowKey={(r) => r.sub_order_id} empty="لا توجد طلبات واردة." columns={[
+              { header: 'رقم الطلب', cell: (r) => <Mono>{r.order_number}</Mono> },
+              { header: 'حالة طلبك', cell: (r) => statusPill(r.sub_order_status) },
+              { header: 'الأصناف', cell: (r) => (
+                <span className="font-body text-body">
+                  {r.lines?.length ? `${r.lines.length} صنف` : '—'}
+                </span>
+              ) },
+              { header: 'الإجمالي', align: 'end', cell: (r) => <Mono>{r.subtotal ? `${r.subtotal} ج.م` : '—'}</Mono> },
+            ]} />
+          </Card>
         )}
       </div>
     </Wide>

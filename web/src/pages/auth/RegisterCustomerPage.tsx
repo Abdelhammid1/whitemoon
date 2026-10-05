@@ -41,7 +41,7 @@ export function RegisterCustomerPage() {
       subtitle="يُفعَّل حسابك فور التحقق من رقم الهاتف."
       footerLinks={<Link to="/login" className="hover:text-on-surface">لديك حساب؟ تسجيل الدخول</Link>}
     >
-      <form onSubmit={onSubmit} className="w-full flex flex-col gap-5">
+      <form onSubmit={onSubmit} className="w-full flex flex-col gap-space-md">
         <Field label="الاسم الظاهر" value={displayName} onChange={(e) => setDisplayName(e.target.value)} required maxLength={200} />
         <Field label="رقم الهاتف" dir="ltr" mono type="tel" placeholder="+20 100 000 0000" value={phone} onChange={(e) => setPhone(e.target.value)} hint="اكتب الهاتف أو البريد — الأفضل الاثنين." />
         <Field label="البريد الإلكتروني (اختياري)" dir="ltr" type="email" placeholder="you@domain.com.eg" value={email} onChange={(e) => setEmail(e.target.value)} />

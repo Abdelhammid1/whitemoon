@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Wide } from '../../../layouts/AppShell'
-import { PageTitle, Pill } from '../../../components/ui'
+import { PageTitle, Pill, Card } from '../../../components/ui'
+import { Icon } from '../../../components/Icon'
 import { ReportFilterForm } from '../../../components/ReportFilterForm'
 import { DataTable, Mono } from '../../../components/DataTable'
 import { balanceSheet, type ReportFilterBody, type BalanceSheetResponse } from '../../../api/accounting'
@@ -8,6 +9,20 @@ import { ReportExport } from '../../../components/ReportExport'
 import { ApiError } from '../../../api/client'
 import { useToast } from '../../../components/Toast'
 import { formatMoney } from '../../../lib/format'
+
+/** KPI tile matching the executive dashboard: icon chip, large mono value, label. */
+function Kpi({ icon, label, value, accent = false }: { icon: string; label: string; value: ReactNode; accent?: boolean }) {
+  const chip = accent ? 'bg-gold-weak text-gold' : 'bg-brand-weak text-primary'
+  return (
+    <Card className="flex flex-col gap-space-md">
+      <span className={`w-10 h-10 rounded-xl flex items-center justify-center ${chip}`}>
+        <Icon name={icon} size={20} />
+      </span>
+      <span className="font-mono-medium text-display tracking-tight text-on-surface" dir="ltr">{value}</span>
+      <span className="font-body-medium text-body-medium text-on-surface">{label}</span>
+    </Card>
+  )
+}
 
 export function BalanceSheetPage() {
   const toast = useToast()
@@ -17,36 +32,56 @@ export function BalanceSheetPage() {
 
   const cols = [
     { header: 'الكود', width: '80px', cell: (r: { code: string }) => <Mono>{r.code}</Mono> },
-    { header: 'الاسم', cell: (r: { name_ar: string }) => <span className="font-body text-body">{r.name_ar}</span> },
+    { header: 'الاسم', cell: (r: { name_ar: string }) => <span className="font-body text-body text-on-surface">{r.name_ar}</span> },
     { header: 'القيمة', align: 'end' as const, cell: (r: { amount: string }) => <Mono>{formatMoney(r.amount)}</Mono> },
   ]
 
   return (
     <Wide>
-      <div className="flex items-center justify-between">
-        <PageTitle title="المركز المالي (الميزانية العمومية)" />
+      <div className="flex items-center justify-between gap-space-md">
+        <PageTitle title="المركز المالي (الميزانية العمومية)" subtitle="الأصول والالتزامات وحقوق الملكية كما في تاريخ." />
         <ReportExport path="/accounting/reports/balance-sheet" name="المركز-المالي" body={filter} disabled={!data || !filter} />
       </div>
-      <div className="mt-space-xl">
+
+      <Card className="mt-space-xl">
         <ReportFilterForm busy={busy} showAccountPrefix={false} showPartner={false} onRun={async (f) => {
           setBusy(true)
           try { setData(await balanceSheet(f)); setFilter(f) }
           catch (err) { toast.error(err instanceof ApiError ? err.message : 'فشل التشغيل') }
           finally { setBusy(false) }
         }} />
-      </div>
+      </Card>
+
       {data && (
         <>
-          <div className="mt-space-lg flex flex-wrap items-center gap-space-xl border-y border-surface-container-high py-space-md">
-            <span className="font-body text-body text-secondary">الأصول: <Mono className="font-mono-medium">{formatMoney(data.totals.assets)}</Mono></span>
-            <span className="font-body text-body text-secondary">الالتزامات: <Mono className="font-mono-medium">{formatMoney(data.totals.liabilities)}</Mono></span>
-            <span className="font-body text-body text-secondary">حقوق الملكية: <Mono className="font-mono-medium">{formatMoney(data.totals.equity)}</Mono></span>
-            <Pill tone={data.totals.balances ? 'signal' : 'error'}>A = L + E</Pill>
-          </div>
-          <div className="mt-space-lg grid grid-cols-1 md:grid-cols-3 gap-space-lg">
-            <div><h3 className="font-headline-2 text-headline-2 text-primary font-medium pb-space-sm border-b border-surface-container-high">الأصول</h3><div className="mt-space-sm"><DataTable rows={data.assets} rowKey={(r) => r.code} columns={cols} /></div></div>
-            <div><h3 className="font-headline-2 text-headline-2 text-primary font-medium pb-space-sm border-b border-surface-container-high">الالتزامات</h3><div className="mt-space-sm"><DataTable rows={data.liabilities} rowKey={(r) => r.code} columns={cols} /></div></div>
-            <div><h3 className="font-headline-2 text-headline-2 text-primary font-medium pb-space-sm border-b border-surface-container-high">حقوق الملكية</h3><div className="mt-space-sm"><DataTable rows={data.equity} rowKey={(r) => r.code} columns={cols} /></div></div>
+          <section className="mt-space-xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+            <Kpi icon="account_balance" label="الأصول" value={formatMoney(data.totals.assets)} />
+            <Kpi icon="receipt_long" label="الالتزامات" value={formatMoney(data.totals.liabilities)} />
+            <Kpi icon="savings" label="حقوق الملكية" value={formatMoney(data.totals.equity)} />
+            <Card className="flex flex-col gap-space-md justify-between">
+              <span className="w-10 h-10 rounded-xl flex items-center justify-center bg-brand-weak text-primary">
+                <Icon name="balance" size={20} />
+              </span>
+              <div className="flex flex-col gap-space-sm items-start">
+                <Pill tone={data.totals.balances ? 'signal' : 'error'}>A = L + E</Pill>
+                <span className="font-body-medium text-body-medium text-on-surface">معادلة الميزانية</span>
+              </div>
+            </Card>
+          </section>
+
+          <div className="mt-space-xl grid grid-cols-1 md:grid-cols-3 gap-space-md">
+            <Card className="flex flex-col">
+              <h3 className="font-headline-2 text-headline-2 text-on-surface pb-space-sm mb-space-sm border-b border-surface-container-high">الأصول</h3>
+              <DataTable rows={data.assets} rowKey={(r) => r.code} columns={cols} />
+            </Card>
+            <Card className="flex flex-col">
+              <h3 className="font-headline-2 text-headline-2 text-on-surface pb-space-sm mb-space-sm border-b border-surface-container-high">الالتزامات</h3>
+              <DataTable rows={data.liabilities} rowKey={(r) => r.code} columns={cols} />
+            </Card>
+            <Card className="flex flex-col">
+              <h3 className="font-headline-2 text-headline-2 text-on-surface pb-space-sm mb-space-sm border-b border-surface-container-high">حقوق الملكية</h3>
+              <DataTable rows={data.equity} rowKey={(r) => r.code} columns={cols} />
+            </Card>
           </div>
         </>
       )}

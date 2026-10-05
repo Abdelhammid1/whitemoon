@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Spinner, Pill, InlineError } from '../../components/ui'
+import { PageTitle, Button, Field, Spinner, Pill, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
@@ -14,6 +14,16 @@ const TYPE_AR: Record<string, string> = {
   revenue: 'إيرادات',
   expense: 'مصروفات',
   contra: 'حساب مقابل',
+}
+
+type PillTone = 'signal' | 'warning' | 'error' | 'neutral' | 'gold' | 'brand'
+const TYPE_TONE: Record<string, PillTone> = {
+  asset: 'brand',
+  liability: 'warning',
+  equity: 'gold',
+  revenue: 'signal',
+  expense: 'neutral',
+  contra: 'neutral',
 }
 
 /** Depth from the parent_code chain, to indent the tree. */
@@ -140,6 +150,7 @@ export function ChartOfAccountsPage() {
         ) : error ? (
           <InlineError message={error} />
         ) : (
+          <Card padded={false} className="overflow-hidden">
           <DataTable
             rows={rows}
             rowKey={(a) => a.code}
@@ -163,7 +174,7 @@ export function ChartOfAccountsPage() {
               },
               {
                 header: 'النوع',
-                cell: (a) => <Pill tone="neutral">{TYPE_AR[a.type] ?? a.type}</Pill>,
+                cell: (a) => <Pill tone={TYPE_TONE[a.type] ?? 'neutral'}>{TYPE_AR[a.type] ?? a.type}</Pill>,
               },
               {
                 header: 'قابل للترحيل',
@@ -194,6 +205,7 @@ export function ChartOfAccountsPage() {
               },
             ]}
           />
+          </Card>
         )}
       </div>
 

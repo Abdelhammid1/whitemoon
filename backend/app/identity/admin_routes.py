@@ -259,6 +259,28 @@ def list_roles():
     )
 
 
+@bp.get("/user-kinds")
+@require_permission("user.read")
+def list_user_kinds():
+    """User kinds (code + Arabic label) — single source for the UI's pickers."""
+    from .models import USER_KIND_LABELS, USER_KINDS
+
+    return jsonify(
+        {"items": [{"code": k, "label": USER_KIND_LABELS.get(k, k)} for k in USER_KINDS]}
+    )
+
+
+@bp.get("/user-statuses")
+@require_permission("user.read")
+def list_user_statuses():
+    """Account statuses (code + Arabic label) — single source for the UI's filters."""
+    from .models import USER_STATUS_LABELS, USER_STATUSES
+
+    return jsonify(
+        {"items": [{"code": s, "label": USER_STATUS_LABELS.get(s, s)} for s in USER_STATUSES]}
+    )
+
+
 @bp.get("/audit")
 @require_permission("admin.high")
 def list_audit():

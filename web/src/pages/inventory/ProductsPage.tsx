@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { Wide } from '../../layouts/AppShell'
-import { PageTitle, Button, Field, Pill, Spinner } from '../../components/ui'
+import { PageTitle, Button, Field, Pill, Spinner, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import {
-  addVariant, createProduct, listCategories, listProducts, PRODUCT_CATEGORIES,
+  addVariant, bestPrice, createProduct, listCategories, listProducts, PRODUCT_CATEGORIES,
   type Category, type Product,
 } from '../../api/inventory'
 import { ApiError } from '../../api/client'
@@ -33,6 +33,8 @@ export function ProductsPage() {
   // Variant manager
   const [variantFor, setVariantFor] = useState<Product | null>(null)
   const [variant, setVariant] = useState(EMPTY_VARIANT)
+  // Best-price lookup (per-row); tracks which product is being queried.
+  const [priceBusy, setPriceBusy] = useState<number | null>(null)
 
   async function load() {
     setLoading(true)
@@ -104,8 +106,24 @@ export function ProductsPage() {
     }
   }
 
+  async function onBestPrice(p: Product) {
+    setPriceBusy(p.id)
+    try {
+      const r = await bestPrice(p.id)
+      if (r.best) {
+        toast.info(`أفضل سعر لـ ${p.name_ar}: ${r.best.best_price} ج.م (حد أدنى ${r.best.moq})`)
+      } else {
+        toast.info(`${p.name_ar}: لا يوجد عرض`)
+      }
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'تعذّر جلب أفضل سعر')
+    } finally {
+      setPriceBusy(null)
+    }
+  }
+
   const chip = (active: boolean) =>
-    `px-2 py-0.5 rounded-full font-mono-body text-small transition-colors ${active ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant hover:text-primary'}`
+    `px-2 py-0.5 rounded-full font-small text-small transition-colors ${active ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant hover:text-primary'}`
 
   const selectCls =
     'bg-transparent border-b border-surface-container-high py-2 font-body text-body focus:outline-none focus:border-primary'
@@ -129,7 +147,7 @@ export function ProductsPage() {
         </div>
       </div>
 
-      <div className="mt-space-lg">
+      <Card padded={false} className="mt-space-lg overflow-hidden">
         {loading ? <Spinner /> : (
           <DataTable rows={rows} rowKey={(p) => p.id} empty="لا توجد منتجات." columns={[
             { header: 'SKU', cell: (p) => <Mono>{p.sku}</Mono> },
@@ -146,10 +164,15 @@ export function ProductsPage() {
                 {(p.variants?.length ?? 0) > 0 ? `${p.variants!.length} متغيّر` : 'إضافة'}
               </button>
             ) },
+            { header: 'أفضل سعر', align: 'center', cell: (p) => (
+              <button className="font-small text-small text-primary hover:underline disabled:opacity-40" disabled={priceBusy === p.id} onClick={() => void onBestPrice(p)}>
+                {priceBusy === p.id ? '...' : 'أفضل سعر'}
+              </button>
+            ) },
             { header: 'الحالة', align: 'end', cell: (p) => <Pill tone={p.is_active ? 'signal' : 'neutral'}>{p.is_active ? 'نشط' : 'موقوف'}</Pill> },
           ]} />
         )}
-      </div>
+      </Card>
 
       {/* Create product */}
       <Modal open={open} onClose={() => setOpen(false)} title="إضافة منتج جديد" footer={

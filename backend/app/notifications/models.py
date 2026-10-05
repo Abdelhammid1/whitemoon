@@ -20,6 +20,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ..common.base_model import Base
 
 CHANNELS = ("in_app", "sms", "whatsapp", "email")
+# Arabic labels — single source for the UI (served by GET /notifications/channels).
+CHANNEL_LABELS = {
+    "in_app": "داخل التطبيق",
+    "sms": "رسالة نصية",
+    "whatsapp": "واتساب",
+    "email": "بريد إلكتروني",
+}
 
 
 class Notification(Base):

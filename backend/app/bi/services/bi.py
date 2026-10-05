@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 
@@ -14,7 +16,9 @@ from ...inventory.models import StockBalance
 from ...logistics.models import Shipment
 from ...pos.models import PosSale
 from ...production.models import ManufacturingOrder
-from ...sales.models import CustomerDue
+from ...sales.models import CustomerCreditTier, CustomerDue
+
+_CAIRO = ZoneInfo("Africa/Cairo")
 
 
 def _count_by(column: Any) -> dict[str, int]:
@@ -47,17 +51,42 @@ def dashboard() -> dict[str, Any]:
         select(func.count()).select_from(Conversation).where(Conversation.status == "open")
     ).scalar_one()
 
+    # Open (not yet fulfilled/cancelled) orders — the "الطلبات المفتوحة" tile.
+    open_orders = db.session.execute(
+        select(func.count())
+        .select_from(Order)
+        .where(Order.status.in_(("pending", "confirmed")))
+    ).scalar_one()
+
+    # Daily sales for the last 7 days (Africa/Cairo), oldest → today. Cancelled
+    # orders excluded. The last element's total is "today's sales".
+    today = datetime.now(_CAIRO).date()
+    days = [today - timedelta(days=i) for i in range(6, -1, -1)]
+    rows = db.session.execute(
+        select(func.date(Order.placed_at), func.coalesce(func.sum(Order.total_cash), 0))
+        .where(Order.status != "cancelled")
+        .group_by(func.date(Order.placed_at))
+    ).all()
+    by_date = {str(d): Decimal(str(v)) for d, v in rows}
+    weekly = [{"date": d.isoformat(), "total": str(by_date.get(d.isoformat(), Decimal(0)))} for d in days]
+    today_sales = by_date.get(today.isoformat(), Decimal(0))
+
     return {
         "currency": "EGP",
         "sales": {
             "orders_by_status": _count_by(Order.status),
             "realized_revenue": str(_sum(Order.total_cash, Order.status.in_(realized))),
+            "today": str(today_sales),
+            "open_orders": int(open_orders),
+            "weekly": weekly,
         },
         "collection": {
             "dues_by_status": _count_by(CustomerDue.status),
             "outstanding": str(_sum(CustomerDue.amount, CustomerDue.status == "open")),
             "defaulted": str(_sum(CustomerDue.amount, CustomerDue.status == "defaulted")),
+            "overdue": str(_sum(CustomerDue.amount, CustomerDue.status == "overdue")),
         },
+        "credit": {"tier_distribution": _count_by(CustomerCreditTier.tier)},
         "inventory": {"low_stock_slots": int(low_stock)},
         "pos": {
             "unposted_total": str(

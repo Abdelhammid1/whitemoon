@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Narrow } from '../../layouts/AppShell'
-import { PageTitle, Pill, Button, Spinner, InlineError, SectionHeader, EmptyState } from '../../components/ui'
+import { PageTitle, Pill, Button, Spinner, InlineError, SectionHeader, EmptyState, Card } from '../../components/ui'
 import { Icon } from '../../components/Icon'
 import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
@@ -73,7 +73,7 @@ export function OrderDetailPage() {
   return (
     <Narrow>
       <PageTitle title={`طلب ${order.number}`} />
-      <div className="mt-space-sm flex items-center gap-space-sm">
+      <div className="mt-space-sm flex flex-wrap items-center gap-space-sm">
         <Pill tone={order.status === 'cancelled' ? 'error' : order.status === 'pending' ? 'warning' : 'signal'}>
           {STATUS_AR[order.status] ?? order.status}
         </Pill>
@@ -81,26 +81,45 @@ export function OrderDetailPage() {
         <span className="font-mono-body text-mono-body text-secondary">{formatDate(order.placed_at)}</span>
       </div>
 
-      <div className="mt-space-xl">
-        <DataTable
-          rows={order.lines ?? []}
-          rowKey={(l) => `${l.product_id}`}
-          empty="لا توجد بنود."
-          columns={[
-            { header: 'المنتج', cell: (l) => <Mono>#{l.product_id}</Mono> },
-            { header: 'الكمية', align: 'end', cell: (l) => <Mono>{l.qty}</Mono> },
-            { header: 'سعر الوحدة', align: 'end', cell: (l) => <Mono>{formatMoney(l.unit_price)}</Mono> },
-            { header: 'الإجمالي', align: 'end', cell: (l) => <Mono>{formatMoney(l.line_total)}</Mono> },
-          ]}
-        />
-      </div>
+      {/* Order KPI tiles */}
+      <section className="mt-space-xl grid grid-cols-1 sm:grid-cols-3 gap-space-md">
+        <Card className="flex flex-col gap-space-xs">
+          <span className="font-small text-small text-secondary">الإجمالي</span>
+          <div className="flex items-baseline gap-space-xs" dir="ltr">
+            <span className="font-mono-medium text-display text-primary tracking-tight">
+              {formatMoney(order.payment_mode === 'deferred' ? order.total_deferred : order.total_cash)}
+            </span>
+            <span className="font-small text-small text-secondary">ج.م</span>
+          </div>
+        </Card>
+        <Card className="flex flex-col gap-space-xs">
+          <span className="font-small text-small text-secondary">طريقة الدفع</span>
+          <span className="font-body-medium text-body-medium text-on-surface">
+            {order.payment_mode === 'deferred' ? 'بيع آجل' : 'نقدي فوري'}
+          </span>
+        </Card>
+        <Card className="flex flex-col gap-space-xs">
+          <span className="font-small text-small text-secondary">عدد البنود</span>
+          <Mono className="text-display text-primary tracking-tight">{order.lines?.length ?? 0}</Mono>
+        </Card>
+      </section>
 
-      <div className="mt-space-lg flex items-center justify-between border-t border-surface-container-high pt-space-md">
-        <span className="font-body-medium text-body-medium">الإجمالي</span>
-        <span className="font-display text-headline-1 text-primary">
-          <Mono>{formatMoney(order.payment_mode === 'deferred' ? order.total_deferred : order.total_cash)}</Mono> ج.م
-        </span>
-      </div>
+      <section className="mt-space-xl">
+        <SectionHeader title="بنود الطلب" />
+        <Card padded={false} className="mt-space-md overflow-hidden">
+          <DataTable
+            rows={order.lines ?? []}
+            rowKey={(l) => `${l.product_id}`}
+            empty="لا توجد بنود."
+            columns={[
+              { header: 'المنتج', cell: (l) => <Mono>#{l.product_id}</Mono> },
+              { header: 'الكمية', align: 'end', cell: (l) => <Mono>{l.qty}</Mono> },
+              { header: 'سعر الوحدة', align: 'end', cell: (l) => <Mono>{formatMoney(l.unit_price)}</Mono> },
+              { header: 'الإجمالي', align: 'end', cell: (l) => <Mono>{formatMoney(l.line_total)}</Mono> },
+            ]}
+          />
+        </Card>
+      </section>
 
       {/* Delivery: track an existing shipment, or book a slot. */}
       <section className="mt-[48px]">
@@ -129,9 +148,9 @@ export function OrderDetailPage() {
         ) : (
           <div className="mt-space-md flex flex-col gap-space-sm">
             <p className="font-small text-small text-secondary">اختر موعد التسليم المناسب خلال الأيام القادمة:</p>
-            <div className="flex flex-col divide-y divide-surface-container">
+            <Card padded={false} className="px-space-lg flex flex-col divide-y divide-surface-container">
               {slots.map((s) => (
-                <div key={s.id} className="flex items-center justify-between py-space-sm gap-space-md">
+                <div key={s.id} className="flex items-center justify-between py-space-md gap-space-md">
                   <div className="flex items-center gap-space-md min-w-0">
                     <Icon name="event" size={18} className="text-secondary shrink-0" />
                     <div className="flex flex-col min-w-0">
@@ -142,7 +161,7 @@ export function OrderDetailPage() {
                   <Button variant="primary" disabled={booking || s.remaining <= 0} onClick={() => void book(s.id)}>احجز</Button>
                 </div>
               ))}
-            </div>
+            </Card>
           </div>
         )}
       </section>

@@ -46,3 +46,12 @@ def test_notifications_send_list_read(client) -> None:
 
     # A customer can't broadcast.
     assert client.post("/notifications", headers=th, json={"user_id": target.id, "title": "x"}).status_code == 403
+
+
+def test_notification_channels_from_backend(client) -> None:
+    create_user(kind="customer", email="chan@example.com", roles=("customer",))
+    h = auth_header(client, email="chan@example.com")
+    r = client.get("/notifications/channels", headers=h)
+    assert r.status_code == 200
+    codes = {x["code"] for x in r.get_json()["items"]}
+    assert {"in_app", "sms", "whatsapp", "email"} <= codes
