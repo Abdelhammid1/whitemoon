@@ -49,7 +49,8 @@ export function UsersPage() {
 
   // Picking a kind preselects the matching role.
   function setFormKind(k: string) {
-    setForm((f) => ({ ...f, kind: k, roles: f.roles.length ? f.roles : [k] }))
+    // Reset roles to the one matching the chosen kind; the admin can add more.
+    setForm((f) => ({ ...f, kind: k, roles: [k] }))
   }
   function toggleRole(code: string) {
     setForm((f) => ({

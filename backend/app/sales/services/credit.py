@@ -211,10 +211,9 @@ def active_override(customer_id: int) -> CreditOverride | None:
 
 
 # docs/04 §2 — order-blocking escalation thresholds (days overdue on open dues).
-ESC_L2_MIN_DAYS = 8  # 8–15 → 50% limit cut + block new deferred
-ESC_L4_MIN_DAYS = 31  # 31–60 → reject all new orders until settled
+ESC_L2_MIN_DAYS = 8  # L2 trigger: a due ≥8 days overdue (cumulative to L4)
+ESC_L4_MIN_DAYS = 31  # L4 trigger: ≥31 days → reject all new orders until settled
 ESC_TWO_DUES_MIN_DAYS = 7  # two open dues ≥ 7 days overdue → L2
-ESC_OVERDUE_LIMIT_FRACTION = Decimal("0.30")  # overdue > 30% of limit → L2
 ESC_LIMIT_CUT = Decimal("0.50")  # L2 halves the effective limit
 
 
@@ -228,42 +227,33 @@ def _open_dues(customer_id: int) -> list[CustomerDue]:
     )
 
 
-def _base_limit(customer_id: int) -> Decimal:
-    """Credit limit before any automatic escalation cut: an active manual
-    override wins, else the current tier's limit."""
-    ov = active_override(customer_id)
-    if ov is not None:
-        return to_money(ov.credit_limit)
-    return to_money(get_tier(customer_id).credit_limit)
-
-
 def order_block_level(customer_id: int) -> int:
-    """How far the customer's *current* overdue standing blocks new orders
-    (docs/04 §2), computed from live open dues — not from recorded escalation
-    events — so it clears automatically once the dues are settled:
+    """How far the customer's *current* overdue standing blocks new orders,
+    computed from live open dues (not recorded escalation events) so it clears
+    automatically once the dues are settled:
 
       4 → reject all new orders (cash or deferred) until settled  [≥31 days]
-      2 → block new deferred + 50% limit cut  [8–30 days, or two dues ≥7 days
-          overdue, or total overdue > 30% of the base limit]
+      2 → block new deferred + 50% limit cut  [a due ≥8 days overdue, or two
+          dues ≥7 days overdue]
       0 → no block.
+
+    docs/04 §2 puts the L2 actions (cut + deferred block) at 8–15 days and the
+    16–30-day band at L3 (a one-step colour downgrade). Until that forced
+    downgrade and the daily scan are implemented, the L2 block is applied
+    cumulatively from 8 days through 30 — a worsening delinquency never regains
+    deferred access it already lost. A manual override (a deliberate admin
+    exception) lifts the L2 actions, but never the L4 freeze.
     """
     today = _today()
-    open_dues = _open_dues(customer_id)
-    overdue_days = [(today - d.due_date).days for d in open_dues]
-    overdue_days = [n for n in overdue_days if n > 0]
+    overdue_days = [n for n in ((today - d.due_date).days for d in _open_dues(customer_id)) if n > 0]
     if not overdue_days:
         return 0
     if max(overdue_days) >= ESC_L4_MIN_DAYS:
-        return 4
+        return 4  # freeze all orders — not lifted by an override
     two_dues = sum(1 for n in overdue_days if n >= ESC_TWO_DUES_MIN_DAYS) >= 2
-    overdue_amount = sum(
-        (to_money(d.amount) for d in open_dues if (today - d.due_date).days > 0),
-        start=Decimal("0"),
-    )
-    base = _base_limit(customer_id)
-    over_30pct = base > 0 and overdue_amount > to_money(base * ESC_OVERDUE_LIMIT_FRACTION)
-    if max(overdue_days) >= ESC_L2_MIN_DAYS or two_dues or over_30pct:
-        return 2
+    if max(overdue_days) >= ESC_L2_MIN_DAYS or two_dues:
+        # An active override lifts the L2 auto-actions (but not the L4 freeze).
+        return 0 if active_override(customer_id) is not None else 2
     return 0
 
 
@@ -297,8 +287,8 @@ def check_credit(*, customer_id: int, order_amount: Decimal, deferred: bool) -> 
     dues (`order_block_level`), so it lifts automatically on settlement:
       • Level 4 (≥31 days overdue) rejects ALL new orders — cash or deferred —
         until the dues are settled.
-      • Level 2 (8–30 days, or two dues ≥7 days, or overdue >30% of limit)
-        blocks new deferred orders and halves the effective limit.
+      • Level 2 (a due ≥8 days overdue, or two dues ≥7 days) blocks new
+        deferred orders and halves the effective limit.
     A red tier can never defer. A manual override lifts the L2 auto-actions
     (it is a deliberate admin exception) but not the L4 freeze.
 
@@ -318,8 +308,9 @@ def check_credit(*, customer_id: int, order_amount: Decimal, deferred: bool) -> 
     tier = recompute(customer_id)
     if tier.tier == "red":
         raise Forbidden("التصنيف الأحمر لا يسمح بالبيع الآجل — نقدي فقط", code="deferred_blocked_red")
-    has_override = active_override(customer_id) is not None
-    if block >= 2 and not has_override:
+    # order_block_level already returns 0 for a customer with an active override,
+    # so this only fires when the L2 block is genuinely in effect.
+    if block >= 2:
         raise Forbidden(
             "البيع الآجل موقوف مؤقتًا بسبب تأخر السداد (تصعيد المستوى ٢)",
             code="deferred_blocked_escalation",

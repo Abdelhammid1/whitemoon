@@ -61,11 +61,13 @@ def test_l2_two_dues_over_7_days(client) -> None:
     assert cs.order_block_level(c.id) == 2  # two dues ≥7 days, even if <8
 
 
-def test_l2_overdue_over_30pct_of_limit(client) -> None:
+def test_low_days_large_overdue_is_not_an_l2_block(client) -> None:
+    # A due only 5 days late (L1 reminder window) does not block deferred,
+    # regardless of amount — large overdue exposure is an L3 downgrade trigger
+    # per docs/04 §2, not an L2 order block.
     c = _cust("e_30@example.com")
-    # white base 250k; 80k overdue (>30% of 250k = 75k) at only 5 days late.
     _open_due(c.id, days_overdue=5, amount="80000")
-    assert cs.order_block_level(c.id) == 2
+    assert cs.order_block_level(c.id) == 0
 
 
 def test_l4_blocks_all_orders(client) -> None:
@@ -84,6 +86,10 @@ def test_override_lifts_l2_not_the_cut_target(client) -> None:
     cs.set_override(customer_id=c.id, credit_limit=Decimal("300000"), reason="استثناء معتمد من الإدارة", set_by=1)
     # Override wins the limit — no 50% auto-cut on top of it.
     assert cs.effective_limit(c.id) == Decimal("300000.0000")
+    # The block level itself reads 0 for an override customer, so the UI banner
+    # does not claim an enforcement that is not in effect.
+    assert cs.order_block_level(c.id) == 0
+    assert cs.serialize_tier(c.id)["order_block_level"] == 0
     # Deferred is allowed again (the override lifts the L2 block).
     cs.check_credit(customer_id=c.id, order_amount=Decimal("10"), deferred=True)
 

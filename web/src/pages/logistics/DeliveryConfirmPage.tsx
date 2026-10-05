@@ -46,7 +46,7 @@ export function DeliveryConfirmPage() {
     setBusy(true)
     try {
       const lines = shortages
-        .filter((r) => r.product_id && r.qty)
+        .filter((r) => Number(r.product_id) > 0 && Number(r.qty) > 0)
         .map((r) => ({ product_id: Number(r.product_id), qty: Number(r.qty), note: r.note || undefined }))
       const s = await confirmDelivery(shipment.id, {
         confirmation_code: method === 'code' ? code.trim() : undefined,

@@ -251,23 +251,26 @@ export function TrackingPage() {
               <span>نواقص أو تلف مُبلّغ عنه</span>
             </div>
             <div className="flex flex-col divide-y divide-surface-container">
-              {ship.shortages.map((sh, i) => (
-                <div key={i} className="flex items-center justify-between py-space-sm gap-space-md font-small text-small">
-                  <div className="flex items-center gap-space-sm min-w-0">
-                    <span className="text-on-surface">صنف</span>
-                    <Mono className="text-secondary">#{sh.product_id}</Mono>
-                    {sh.note && <span className="text-secondary truncate">— {sh.note}</span>}
+              {ship.shortages.map((sh, i) => {
+                const photo = safeHttpUrl(sh.photo_url)
+                return (
+                  <div key={i} className="flex items-center justify-between py-space-sm gap-space-md font-small text-small">
+                    <div className="flex items-center gap-space-sm min-w-0">
+                      <span className="text-on-surface">صنف</span>
+                      <Mono className="text-secondary">#{sh.product_id}</Mono>
+                      {sh.note && <span className="text-secondary truncate">— {sh.note}</span>}
+                    </div>
+                    <div className="flex items-center gap-space-sm shrink-0">
+                      <Mono className="text-error">{sh.qty}</Mono>
+                      {photo && (
+                        <a href={photo} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+                          <Icon name="image" size={14} /> صورة
+                        </a>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-space-sm shrink-0">
-                    <Mono className="text-error">{sh.qty}</Mono>
-                    {safeHttpUrl(sh.photo_url) && (
-                      <a href={safeHttpUrl(sh.photo_url)!} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
-                        <Icon name="image" size={14} /> صورة
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}

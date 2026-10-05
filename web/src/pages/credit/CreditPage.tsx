@@ -29,7 +29,7 @@ const TIER: Record<string, { ar: string; dot: string; tint: string }> = {
 }
 
 /** Stitch-style metric card: label + icon, large mono value, unit. */
-function StatCard({ label, value, icon, tone = 'primary' }: { label: string; value: string; icon: string; tone?: 'primary' | 'error' }) {
+function StatCard({ label, value, icon, tone = 'primary', unit = 'ج.م' }: { label: string; value: string; icon: string; tone?: 'primary' | 'error'; unit?: string }) {
   return (
     <div className="p-space-md bg-surface-container-low rounded-lg flex flex-col justify-between min-h-[108px]">
       <div className="flex items-center justify-between text-secondary">
@@ -38,7 +38,7 @@ function StatCard({ label, value, icon, tone = 'primary' }: { label: string; val
       </div>
       <div className="mt-space-sm flex items-baseline gap-1" dir="ltr">
         <span className={`font-mono-medium text-display ${tone === 'error' ? 'text-[#ba1a1a]' : 'text-primary'}`}>{value}</span>
-        <span className="font-mono-body text-mono-body text-secondary">ج.م</span>
+        <span className="font-mono-body text-mono-body text-secondary">{unit}</span>
       </div>
     </div>
   )
@@ -164,7 +164,7 @@ export function CreditPage() {
           <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md mb-space-xl">
             <StatCard label="السقف الافتراضي" value={formatMoney(tier.credit_limit_default)} icon="account_balance_wallet" />
             <StatCard label="السقف الفعّال" value={formatMoney(tier.effective_limit)} icon="verified" />
-            <StatCard label="نسبة الآجل %" value={formatMoney(tier.deferred_pct)} icon="pie_chart" />
+            <StatCard label="نسبة الآجل" value={tier.deferred_pct} icon="pie_chart" unit="%" />
             <StatCard label="المستحق القائم" value={formatMoney(tier.outstanding)} icon="hourglass_top" tone="error" />
           </section>
 
