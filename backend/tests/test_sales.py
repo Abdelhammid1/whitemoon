@@ -165,4 +165,25 @@ def test_list_dues_returns_customer_dues(client) -> None:
     assert set(s.keys()) >= {"id", "amount", "due_date", "status", "days_late", "order_id", "paid_date"}
 
 
+def test_dunning_list_orders_by_worst_overdue(client) -> None:
+    c1 = create_user(kind="customer", email="dun1@example.com", roles=("customer",))
+    c2 = create_user(kind="customer", email="dun2@example.com", roles=("customer",))
+    db.session.commit()
+    credit_svc.record_due(customer_id=c1.id, order_id=None, amount=Decimal("500"), due_date=date.today() - timedelta(days=10))
+    credit_svc.record_due(customer_id=c2.id, order_id=None, amount=Decimal("300"), due_date=date.today() - timedelta(days=40))
+    db.session.commit()
+    rows = credit_svc.dunning_list()
+    ids = [r["customer_id"] for r in rows]
+    assert c1.id in ids and c2.id in ids
+    # Worst overdue first: c2 (40 days) ranks before c1 (10 days).
+    assert ids.index(c2.id) < ids.index(c1.id)
+    r2 = next(r for r in rows if r["customer_id"] == c2.id)
+    assert r2["worst_overdue_days"] == 40
+    assert r2["order_block_level"] == 4  # ≥31 days → freeze
+    # min_days filter drops the 10-day customer.
+    filtered = credit_svc.dunning_list(min_days=30)
+    assert all(r["worst_overdue_days"] >= 30 for r in filtered)
+    assert c1.id not in [r["customer_id"] for r in filtered]
+
+
 _ = CustomerDue

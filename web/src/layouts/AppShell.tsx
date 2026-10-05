@@ -26,6 +26,7 @@ const GROUPS: NavGroup[] = [
       { to: '/admin/users', label: 'المستخدمون' },
       { to: '/admin/suppliers/pending', label: 'الموردون المعلقون' },
       { to: '/admin/audit', label: 'سجل التدقيق' },
+      { to: '/comm/moderation', label: 'مراقبة المحادثات' },
       { to: '/admin/impersonation', label: 'الدخول كمستخدم' },
     ],
   },
@@ -46,6 +47,7 @@ const GROUPS: NavGroup[] = [
     roles: ['admin', 'staff'],
     items: [
       { to: '/credit', label: 'التصنيف الائتماني' },
+      { to: '/credit/dunning', label: 'المتابعة والتحصيل' },
       { to: '/credit/payments', label: 'اعتماد السداد' },
       { to: '/credit/tiers', label: 'سقوف التصنيف' },
       { to: '/compliance', label: 'جاهزية ETA' },

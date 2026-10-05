@@ -62,6 +62,14 @@ def list_conversations():
     return jsonify({"items": [svc.serialize_conversation(c, viewer_id=uid, is_admin=is_mod) for c in convs]})
 
 
+@bp.get("/flagged")
+@require_permission("comm.moderate")
+def flagged_conversations():
+    return jsonify(
+        {"items": [svc.serialize_flagged(c, n) for (c, n) in svc.flagged_conversations()]}
+    )
+
+
 @bp.get("/conversations/<int:conversation_id>/messages")
 @jwt_required()
 def list_messages(conversation_id: int):

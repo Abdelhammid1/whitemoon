@@ -28,6 +28,18 @@ export async function listConversations(params: { status?: string; flagged?: boo
     query: { status: params.status, flagged: params.flagged ? 'true' : undefined },
   })
 }
+export interface FlaggedConversation {
+  id: number
+  order_id: number | null
+  subject: string | null
+  status: string
+  customer_id: number
+  supplier_id: number
+  blocked_count: number
+}
+export async function listFlagged() {
+  return api<{ items: FlaggedConversation[] }>('/comm/flagged')
+}
 export async function startConversation(body: { customer_id: number; supplier_id: number; order_id?: number; subject?: string }) {
   return api<Conversation>('/comm/conversations', { method: 'POST', body })
 }

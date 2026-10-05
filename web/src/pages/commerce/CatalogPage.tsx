@@ -1,15 +1,19 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, Spinner, EmptyState, InlineError } from '../../components/ui'
 import { Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import { addCartItem, browseCatalog, type CatalogProduct } from '../../api/commerce'
+import { PRODUCT_CATEGORIES } from '../../api/inventory'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
 
-const CATS = ['', 'food', 'clothing']
-const CAT_AR: Record<string, string> = { '': 'الكل', food: 'غذائية', clothing: 'ملابس' }
+const CATS = ['', ...PRODUCT_CATEGORIES.map((c) => c.code)]
+const CAT_AR: Record<string, string> = {
+  '': 'الكل',
+  ...Object.fromEntries(PRODUCT_CATEGORIES.map((c) => [c.code, c.label])),
+}
 
 export function CatalogPage() {
   const toast = useToast()
@@ -84,7 +88,7 @@ export function CatalogPage() {
             {rows.map((p) => (
               <div key={p.product_id} className="flex flex-col gap-space-sm rounded-xl bg-surface-container-lowest border border-surface-container-high p-space-md">
                 <div className="flex items-start justify-between gap-space-sm">
-                  <span className="font-body-medium text-body-medium text-on-surface">{p.name_ar}</span>
+                  <Link to={`/catalog/${p.product_id}`} className="font-body-medium text-body-medium text-on-surface hover:text-primary hover:underline">{p.name_ar}</Link>
                   <Pill tone="neutral">{CAT_AR[p.category] ?? p.category}</Pill>
                 </div>
                 <span className="font-mono-body text-mono-body text-secondary">{p.sku}</span>

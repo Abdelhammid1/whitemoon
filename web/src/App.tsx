@@ -24,6 +24,7 @@ import { BalanceSheetPage } from './pages/accounting/reports/BalanceSheetPage'
 import { CashFlowPage } from './pages/accounting/reports/CashFlowPage'
 import { GeneralLedgerPage } from './pages/accounting/reports/GeneralLedgerPage'
 import { CatalogPage } from './pages/commerce/CatalogPage'
+import { ProductDetailPage } from './pages/commerce/ProductDetailPage'
 import { CartPage } from './pages/commerce/CartPage'
 import { OrdersPage } from './pages/commerce/OrdersPage'
 import { OrderDetailPage } from './pages/commerce/OrderDetailPage'
@@ -32,6 +33,7 @@ import { RfqDetailPage } from './pages/commerce/RfqDetailPage'
 import { CreditPage } from './pages/credit/CreditPage'
 import { TierSettingsPage } from './pages/credit/TierSettingsPage'
 import { PaymentsPage } from './pages/credit/PaymentsPage'
+import { DunningPage } from './pages/credit/DunningPage'
 import { CompliancePage } from './pages/compliance/CompliancePage'
 import { PartnersPage } from './pages/partners/PartnersPage'
 import { PartnerDetailPage } from './pages/partners/PartnerDetailPage'
@@ -45,6 +47,7 @@ import { TrackingPage } from './pages/logistics/TrackingPage'
 import { DeliveryConfirmPage } from './pages/logistics/DeliveryConfirmPage'
 import { ChatPage } from './pages/comm/ChatPage'
 import { ChatThreadPage } from './pages/comm/ChatThreadPage'
+import { ModerationPage } from './pages/comm/ModerationPage'
 import { BiDashboardPage } from './pages/bi/BiDashboardPage'
 import { NotificationsPage } from './pages/notifications/NotificationsPage'
 import { ProductsPage } from './pages/inventory/ProductsPage'
@@ -68,6 +71,7 @@ export function App() {
         <Route path="/2fa" element={<TotpEnrollPage />} />
 
         <Route path="/catalog" element={<CatalogPage />} />
+        <Route path="/catalog/:id" element={<ProductDetailPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/orders/:id" element={<OrderDetailPage />} />
@@ -99,6 +103,7 @@ export function App() {
         <Route path="/inventory/shortages" element={<ProtectedRoute roles={FINANCE}><ShortagesPage /></ProtectedRoute>} />
 
         <Route path="/credit" element={<ProtectedRoute roles={FINANCE}><CreditPage /></ProtectedRoute>} />
+        <Route path="/credit/dunning" element={<ProtectedRoute roles={FINANCE}><DunningPage /></ProtectedRoute>} />
         <Route path="/credit/tiers" element={<ProtectedRoute roles={FINANCE}><TierSettingsPage /></ProtectedRoute>} />
         <Route path="/credit/payments" element={<ProtectedRoute roles={FINANCE}><PaymentsPage /></ProtectedRoute>} />
         <Route path="/compliance" element={<ProtectedRoute roles={FINANCE}><CompliancePage /></ProtectedRoute>} />
@@ -118,6 +123,7 @@ export function App() {
 
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/chat/:id" element={<ChatThreadPage />} />
+        <Route path="/comm/moderation" element={<ProtectedRoute roles={FINANCE}><ModerationPage /></ProtectedRoute>} />
 
         <Route path="/dashboard" element={<ProtectedRoute roles={FINANCE}><BiDashboardPage /></ProtectedRoute>} />
         <Route path="/notifications" element={<NotificationsPage />} />

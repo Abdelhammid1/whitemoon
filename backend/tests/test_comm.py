@@ -87,6 +87,22 @@ def test_blocked_message_not_delivered_but_kept(client) -> None:
     assert {blocked.id, ok.id} <= {m.id for m in admin_view}
 
 
+def test_flagged_conversations_counts_blocked(client) -> None:
+    cust = _user("customer")
+    sup = _user("supplier")
+    conv = svc.start_conversation(customer_id=cust.id, supplier_id=sup.id)
+    svc.send_message(conversation_id=conv.id, sender_id=cust.id, body="رقمي 01012345678")  # blocked
+    svc.send_message(conversation_id=conv.id, sender_id=cust.id, body="أهلاً")  # sent
+    flagged = svc.flagged_conversations()
+    assert len(flagged) == 1
+    c, n = flagged[0]
+    assert c.id == conv.id and n == 1
+    ser = svc.serialize_flagged(c, n)
+    assert ser["customer_id"] == cust.id
+    assert ser["supplier_id"] == sup.id
+    assert ser["blocked_count"] == 1
+
+
 def test_identity_hidden_from_participants(client) -> None:
     cust = _user("customer")
     sup = _user("supplier")

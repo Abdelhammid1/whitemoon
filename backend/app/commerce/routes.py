@@ -57,6 +57,15 @@ def catalog_products():
     return jsonify({"items": items})
 
 
+@bp.get("/catalog/products/<int:product_id>")
+@jwt_required()
+def catalog_product(product_id: int):
+    item = catalog_svc.get_product(product_id)
+    if item is None:
+        raise NotFound("المنتج غير متاح", code="product_not_available")
+    return jsonify(item)
+
+
 @bp.get("/catalog/products/<int:product_id>/related")
 @jwt_required()
 def catalog_related(product_id: int):

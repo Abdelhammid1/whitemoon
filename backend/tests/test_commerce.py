@@ -30,6 +30,17 @@ def _setup_two_suppliers(category: str = "food", price_a="100", price_b="90"):
     return product, (a, oa), (b, ob)
 
 
+def test_catalog_get_product_hides_supplier(client) -> None:
+    product, _a, _b = _setup_two_suppliers(price_a="100", price_b="90")
+    item = catalog_svc.get_product(product.id)
+    assert item is not None
+    assert item["best_price"] == "90.0000"  # lowest active offer
+    assert item["best_offer_id"] is not None
+    assert "supplier_id" not in item and "supplier" not in item
+    # No active offer / unknown product → not available.
+    assert catalog_svc.get_product(999999) is None
+
+
 # ---------------------------------------------------------------- US-1.1
 
 

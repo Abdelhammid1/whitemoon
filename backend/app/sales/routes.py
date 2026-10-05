@@ -89,6 +89,17 @@ def create_override():
     return jsonify({"id": ov.id, "customer_id": ov.customer_id, "credit_limit": str(ov.credit_limit)}), 201
 
 
+@bp.get("/dunning")
+@require_permission("user.read")
+def dunning():
+    try:
+        min_days = int(request.args.get("min_days", "0"))
+    except ValueError:
+        min_days = 0
+    tier = request.args.get("tier")
+    return jsonify({"items": credit_svc.dunning_list(min_days=min_days, tier=tier)})
+
+
 @bp.get("/customers/<int:customer_id>/dues")
 @require_permission("user.read")
 def list_dues(customer_id: int):

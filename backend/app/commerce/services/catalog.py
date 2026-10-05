@@ -62,6 +62,34 @@ def browse(*, q: str | None = None, category: str | None = None, limit: int = 10
     ]
 
 
+def get_product(product_id: int) -> dict[str, Any] | None:
+    """One product for the customer detail page (M2) — rich fields + best
+    price, never a supplier. Returns None when the product is inactive or has
+    no active offer (nothing the customer can buy)."""
+    best = _best_offer_subq()
+    row = db.session.execute(
+        select(Product, best.c.best_price, best.c.offer_id)
+        .join(best, best.c.pid == Product.id)
+        .where(Product.id == product_id, Product.is_active.is_(True))
+    ).first()
+    if row is None:
+        return None
+    product, best_price, offer_id = row
+    return {
+        "product_id": product.id,
+        "sku": product.sku,
+        "name_ar": product.name_ar,
+        "category": product.category,
+        "subcategory": product.subcategory,
+        "brand": product.brand,
+        "description": product.description,
+        "unit": product.unit,
+        "image_url": product.image_url,
+        "best_price": str(best_price),
+        "best_offer_id": offer_id,  # opaque — no supplier revealed
+    }
+
+
 def related_products(product_id: int, *, limit: int = 8) -> list[dict[str, Any]]:
     """Cross-sell suggestions (US-4.5, T-03): other active products in the same
     category, with a best price and no supplier identity."""

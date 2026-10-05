@@ -67,6 +67,24 @@ export interface Due {
 export async function listDues(customerId: number) {
   return api<{ items: Due[] }>(`/credit/customers/${customerId}/dues`)
 }
+
+export interface DunningRow {
+  customer_id: number
+  display_name: string | null
+  tier: string
+  outstanding: string
+  open_due_count: number
+  worst_overdue_days: number
+  order_block_level: number
+}
+export async function listDunning(params: { min_days?: number; tier?: string } = {}) {
+  return api<{ items: DunningRow[] }>('/credit/dunning', {
+    query: {
+      min_days: params.min_days != null ? String(params.min_days) : undefined,
+      tier: params.tier,
+    },
+  })
+}
 export async function payDue(dueId: number, paid_on: string) {
   return api<{ id: number; status: string; days_late: number }>(`/credit/dues/${dueId}/pay`, { method: 'POST', body: { paid_on } })
 }

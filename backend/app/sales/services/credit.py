@@ -13,12 +13,12 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 from ...common.errors import BadRequest, Forbidden, NotFound
 from ...common.money import to_money
 from ...extensions import db
-from ...identity.models import User
+from ...identity.models import CustomerProfile, User
 from ..models import CreditOverride, CreditTierSetting, CustomerCreditTier, CustomerDue
 
 # tier -> (default credit limit EGP, deferred % allowed). These are the coded
@@ -376,6 +376,48 @@ def list_dues(customer_id: int) -> list[CustomerDue]:
             .order_by(CustomerDue.due_date.desc(), CustomerDue.id.desc())
         ).scalars().all()
     )
+
+
+def dunning_list(*, min_days: int = 0, tier: str | None = None) -> list[dict[str, Any]]:
+    """Customers with open dues for the collections/dunning board (C4), worst
+    overdue first. Reuses the live order_block_level / tier / outstanding
+    helpers so the board matches what checkout enforces."""
+    today = _today()
+    rows = db.session.execute(
+        select(
+            CustomerDue.customer_id,
+            func.count().label("open_count"),
+            func.coalesce(func.sum(CustomerDue.amount), 0).label("outstanding"),
+            func.min(CustomerDue.due_date).label("oldest_due"),
+        )
+        .where(CustomerDue.status == "open")
+        .group_by(CustomerDue.customer_id)
+    ).all()
+
+    out: list[dict[str, Any]] = []
+    for customer_id, open_count, outstanding_sum, oldest_due in rows:
+        worst = max(0, (today - oldest_due).days) if oldest_due else 0
+        if worst < min_days:
+            continue
+        t = get_tier(customer_id)
+        if tier and t.tier != tier:
+            continue
+        cp = db.session.execute(
+            select(CustomerProfile).where(CustomerProfile.user_id == customer_id)
+        ).scalar_one_or_none()
+        out.append(
+            {
+                "customer_id": customer_id,
+                "display_name": cp.display_name if cp else None,
+                "tier": t.tier,
+                "outstanding": str(to_money(outstanding_sum)),
+                "open_due_count": open_count,
+                "worst_overdue_days": worst,
+                "order_block_level": order_block_level(customer_id),
+            }
+        )
+    out.sort(key=lambda r: r["worst_overdue_days"], reverse=True)
+    return out
 
 
 def serialize_due(d: CustomerDue) -> dict[str, Any]:

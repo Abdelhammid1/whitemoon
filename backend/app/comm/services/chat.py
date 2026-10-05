@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from ...common.errors import BadRequest, Forbidden, NotFound
 from ...extensions import db
@@ -133,6 +133,33 @@ def list_conversations(
     if flagged_only:
         convs = [c for c in convs if any(m.status == "blocked" for m in c.messages)]
     return convs
+
+
+def flagged_conversations() -> list[tuple[Conversation, int]]:
+    """Conversations holding ≥1 blocked message, with the blocked count, newest
+    activity first — for the moderation console (moderator-only). A grouped
+    query, so it avoids loading every conversation's whole message list."""
+    rows = db.session.execute(
+        select(Conversation, func.count(Message.id).label("blocked_count"))
+        .join(Message, Message.conversation_id == Conversation.id)
+        .where(Message.status == "blocked")
+        .group_by(Conversation.id)
+        .order_by(func.max(Message.id).desc())
+    ).all()
+    return [(c, int(n)) for (c, n) in rows]
+
+
+def serialize_flagged(c: Conversation, blocked_count: int) -> dict[str, Any]:
+    """Moderator-only flagged-conversation row (ids are allowed for moderators)."""
+    return {
+        "id": c.id,
+        "order_id": c.order_id,
+        "subject": c.subject,
+        "status": c.status,
+        "customer_id": c.customer_id,
+        "supplier_id": c.supplier_id,
+        "blocked_count": blocked_count,
+    }
 
 
 def serialize_message(m: Message, *, viewer_id: int, is_admin: bool) -> dict[str, Any]:

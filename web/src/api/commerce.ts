@@ -21,6 +21,15 @@ export async function relatedProducts(productId: number) {
   return api<{ items: CatalogProduct[] }>(`/catalog/products/${productId}/related`)
 }
 
+export interface ProductDetail extends CatalogProduct {
+  subcategory: string | null
+  brand: string | null
+  description: string | null
+}
+export async function getProduct(productId: number) {
+  return api<ProductDetail>(`/catalog/products/${productId}`)
+}
+
 // ---------------------------------------------------------------- cart
 
 export interface CartItem {
