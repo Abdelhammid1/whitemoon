@@ -9,6 +9,9 @@ interface NavEntry {
   to: string
   label: string
   end?: boolean
+  /** Optional per-item gate, narrower than the group's roles (e.g. an
+   *  admin-only action inside a group the whole staff can see). */
+  roles?: string[]
 }
 interface NavGroup {
   label: string
@@ -61,7 +64,7 @@ const GROUPS: NavGroup[] = [
       { to: '/inventory/stock', label: 'أرصدة المخزون' },
       { to: '/inventory/reorder', label: 'تنبيهات إعادة الطلب' },
       { to: '/inventory/transfers', label: 'إذون التحويل' },
-      { to: '/inventory/shortages', label: 'النواقص والمرتجعات' },
+      { to: '/inventory/shortages', label: 'النواقص والمرتجعات', roles: ['admin'] },
     ],
   },
   {
@@ -98,6 +101,7 @@ const GROUPS: NavGroup[] = [
     roles: ['supplier'],
     items: [
       { to: '/', label: 'لوحة التحكم', end: true },
+      { to: '/supplier/orders', label: 'طلبات واردة' },
       { to: '/inventory/offers', label: 'عروضي' },
       { to: '/inventory/stock', label: 'مخزوني' },
     ],
@@ -149,7 +153,7 @@ export function AppShell() {
                 <div className="px-space-lg pt-space-md pb-space-xs font-small text-small text-secondary tracking-wider">
                   {g.label}
                 </div>
-                {g.items.map((it) => (
+                {g.items.filter((it) => !it.roles || it.roles.includes(role)).map((it) => (
                   <NavLink
                     key={it.to}
                     to={it.to}

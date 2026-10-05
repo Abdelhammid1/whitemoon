@@ -5,7 +5,8 @@ import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import {
-  addVariant, createProduct, listCategories, listProducts, type Category, type Product,
+  addVariant, createProduct, listCategories, listProducts, PRODUCT_CATEGORIES,
+  type Category, type Product,
 } from '../../api/inventory'
 import { ApiError } from '../../api/client'
 
@@ -21,7 +22,9 @@ export function ProductsPage() {
   const toast = useToast()
   const [q, setQ] = useState('')
   const [category, setCategory] = useState('')
-  const [categories, setCategories] = useState<Category[]>([])
+  // Seed with the static list as a fallback so chips/labels never vanish; the
+  // backend list (GET /inventory/categories) overrides it once it arrives.
+  const [categories, setCategories] = useState<Category[]>(PRODUCT_CATEGORIES)
   const [rows, setRows] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState(false)
@@ -44,8 +47,8 @@ export function ProductsPage() {
   useEffect(() => { void load() }, [category]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     listCategories()
-      .then((r) => setCategories(r.items))
-      .catch(() => setCategories([]))
+      .then((r) => { if (r.items.length) setCategories(r.items) })
+      .catch(() => { /* keep the static fallback */ })
   }, [])
 
   const catLabel = (code: string) => categories.find((c) => c.code === code)?.label ?? code

@@ -62,7 +62,7 @@ export function PosSalesPage() {
               {detail.batch_id != null && <Mono className="text-secondary">دفعة #{detail.batch_id}</Mono>}
               {detailLoading && <Spinner label="تحديث…" />}
             </div>
-            <DataTable rows={detail.lines} rowKey={(l) => `${l.product_id}`} empty="لا توجد أصناف." columns={[
+            <DataTable rows={detail.lines} rowKey={(l, i) => `${l.product_id}-${i}`} empty="لا توجد أصناف." columns={[
               { header: 'المنتج', cell: (l) => <Mono>{l.product_id}</Mono> },
               { header: 'الكمية', align: 'center', cell: (l) => <Mono>{l.qty}</Mono> },
               { header: 'سعر الوحدة', align: 'end', cell: (l) => <Mono>{formatMoney(l.unit_price)}</Mono> },

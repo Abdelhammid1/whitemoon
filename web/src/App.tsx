@@ -104,7 +104,7 @@ export function App() {
         <Route path="/inventory/stock" element={<StockPage />} />
         <Route path="/inventory/reorder" element={<ProtectedRoute roles={FINANCE}><ReorderAlertsPage /></ProtectedRoute>} />
         <Route path="/inventory/transfers" element={<ProtectedRoute roles={FINANCE}><TransfersPage /></ProtectedRoute>} />
-        <Route path="/inventory/shortages" element={<ProtectedRoute roles={FINANCE}><ShortagesPage /></ProtectedRoute>} />
+        <Route path="/inventory/shortages" element={<ProtectedRoute roles={['admin']}><ShortagesPage /></ProtectedRoute>} />
 
         <Route path="/credit" element={<ProtectedRoute roles={FINANCE}><CreditPage /></ProtectedRoute>} />
         <Route path="/credit/dunning" element={<ProtectedRoute roles={FINANCE}><DunningPage /></ProtectedRoute>} />

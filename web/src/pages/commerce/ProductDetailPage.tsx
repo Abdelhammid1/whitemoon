@@ -9,13 +9,9 @@ import {
   addCartItem, getProduct, relatedProducts,
   type CatalogProduct, type ProductDetail,
 } from '../../api/commerce'
-import { PRODUCT_CATEGORIES } from '../../api/inventory'
+import { listCategories, PRODUCT_CATEGORIES } from '../../api/inventory'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
-
-const CAT_LABEL: Record<string, string> = Object.fromEntries(
-  PRODUCT_CATEGORIES.map((c) => [c.code, c.label]),
-)
 
 export function ProductDetailPage() {
   const { id } = useParams()
@@ -23,6 +19,12 @@ export function ProductDetailPage() {
   const toast = useToast()
   const [product, setProduct] = useState<ProductDetail | null>(null)
   const [related, setRelated] = useState<CatalogProduct[]>([])
+  // Category labels come from the backend (GET /inventory/categories); the
+  // static list is only a fallback if that request fails, so the label never
+  // degrades to the raw English code.
+  const [catLabels, setCatLabels] = useState<Record<string, string>>(
+    () => Object.fromEntries(PRODUCT_CATEGORIES.map((c) => [c.code, c.label])),
+  )
   const [qty, setQty] = useState('1')
   const [loading, setLoading] = useState(true)
   const [missing, setMissing] = useState(false)
@@ -48,6 +50,14 @@ export function ProductDetailPage() {
     }
   }, [pid])
   useEffect(() => { void load() }, [load])
+
+  useEffect(() => {
+    let alive = true
+    listCategories()
+      .then((r) => { if (alive && r.items.length) setCatLabels(Object.fromEntries(r.items.map((c) => [c.code, c.label]))) })
+      .catch(() => { /* keep the static fallback */ })
+    return () => { alive = false }
+  }, [])
 
   async function add() {
     if (!product) return
@@ -96,7 +106,7 @@ export function ProductDetailPage() {
         <div className="flex flex-col gap-space-sm flex-1 min-w-0">
           <div className="flex items-start justify-between gap-space-sm">
             <h1 className="font-display text-headline-1 text-primary font-medium">{product.name_ar}</h1>
-            <Pill tone="neutral">{CAT_LABEL[product.category] ?? product.category}</Pill>
+            <Pill tone="neutral">{catLabels[product.category] ?? product.category}</Pill>
           </div>
           <Mono className="text-secondary">{product.sku}</Mono>
           {(product.brand || product.subcategory) && (

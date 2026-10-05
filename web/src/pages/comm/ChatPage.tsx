@@ -13,7 +13,10 @@ export function ChatPage() {
   const navigate = useNavigate()
   const toast = useToast()
   const { user } = useAuth()
-  const isMod = user?.kind === 'admin' || user?.kind === 'staff'
+  // Moderation (viewing both parties, the flagged filter, opening a
+  // conversation) is the comm.moderate permission — granted to admin only,
+  // not staff. Gating on kind keeps the UI in step with the backend decorator.
+  const isMod = user?.kind === 'admin'
   const [rows, setRows] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

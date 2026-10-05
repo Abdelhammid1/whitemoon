@@ -12,7 +12,7 @@ export interface Column<Row> {
 interface Props<Row> {
   columns: Column<Row>[]
   rows: Row[]
-  rowKey: (row: Row) => string | number
+  rowKey: (row: Row, index: number) => string | number
   onRowClick?: (row: Row) => void
   empty?: ReactNode
 }
@@ -53,9 +53,9 @@ export function DataTable<Row>({ columns, rows, rowKey, onRowClick, empty }: Pro
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <tr
-              key={rowKey(row)}
+              key={rowKey(row, index)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               className={`border-b border-surface-container-high ${
                 onRowClick ? 'cursor-pointer hover:bg-surface' : ''

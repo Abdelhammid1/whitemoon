@@ -5,7 +5,7 @@ import { PageTitle, Button, Field, Pill, Spinner, EmptyState, InlineError } from
 import { Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import { addCartItem, browseCatalog, type CatalogProduct } from '../../api/commerce'
-import { listCategories, type Category } from '../../api/inventory'
+import { listCategories, PRODUCT_CATEGORIES, type Category } from '../../api/inventory'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
 
@@ -14,7 +14,9 @@ export function CatalogPage() {
   const navigate = useNavigate()
   const [q, setQ] = useState('')
   const [cat, setCat] = useState('')
-  const [categories, setCategories] = useState<Category[]>([])
+  // Seed with the static list so the filter chips/labels never vanish; the
+  // backend list (GET /inventory/categories) overrides it once it arrives.
+  const [categories, setCategories] = useState<Category[]>(PRODUCT_CATEGORIES)
   const [rows, setRows] = useState<CatalogProduct[]>([])
   const [qty, setQty] = useState<Record<number, string>>({})
   const [loading, setLoading] = useState(true)
@@ -37,8 +39,8 @@ export function CatalogPage() {
   useEffect(() => { void load() }, [cat]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     listCategories()
-      .then((r) => setCategories(r.items))
-      .catch(() => setCategories([]))
+      .then((r) => { if (r.items.length) setCategories(r.items) })
+      .catch(() => { /* keep the static fallback */ })
   }, [])
 
   const catAr = (code: string) => (code === '' ? 'الكل' : categories.find((c) => c.code === code)?.label ?? code)
