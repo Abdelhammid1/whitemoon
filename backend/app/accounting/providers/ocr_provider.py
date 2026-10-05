@@ -18,6 +18,9 @@ from typing import Any, Protocol
 # Map Arabic-Indic and Persian digits to ASCII so parsing is uniform.
 _AR_DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
 
+# Receipts are ordinary phone photos; cap decoded pixels to bound OCR cost.
+_MAX_IMAGE_PIXELS = 25_000_000  # ~25 MP
+
 
 def parse_amount(text: str) -> Decimal | None:
     """Best-effort transfer amount from OCR text. Prefers money-formatted
@@ -54,6 +57,12 @@ def _ocr_text(image_bytes: bytes) -> str:
     if cmd:
         pytesseract.pytesseract.tesseract_cmd = cmd
     img = Image.open(io.BytesIO(image_bytes))
+    # Guard against decompression bombs: a small upload can decode to a huge
+    # pixel grid and exhaust memory/CPU in OCR. Receipts are ordinary photos,
+    # so cap the pixel count (raises → caught by extract → manual review).
+    w, h = img.size
+    if w * h > _MAX_IMAGE_PIXELS:
+        raise ValueError("image too large for OCR")
     return pytesseract.image_to_string(img, lang=os.getenv("OCR_LANG", "ara+eng"))
 
 
