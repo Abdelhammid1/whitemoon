@@ -1,0 +1,9 @@
+[Unit]
+Description=White Moon restore drill (verify the latest backup restores)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/white-moon/backup.env
+ExecStart=/opt/white-moon/scripts/restore_drill.sh

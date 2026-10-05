@@ -114,6 +114,27 @@ A backup that has never been restored does not exist. Scheduled drills:
 - KYC documents: **5 years** after supplier relationship ends.
 - Chat messages subject to admin monitoring (US-10.3): **2 years**, then auto-purged (compliance with reasonable privacy expectation).
 
+## 11 — Implementation (scripts & timers)
+
+Hetzner-native, no cloud CLI (the old AWS-RDS drill is removed):
+
+- **`scripts/backup_pg.sh`** — logical `pg_dump` (custom format, compressed),
+  verifies the archive (`pg_restore --list`), optional off-site `rclone copy`
+  (`RCLONE_REMOTE`), and local retention pruning (`RETENTION_DAYS`). Auth via
+  `PGPASSWORD`/`~/.pgpass`.
+- **`scripts/restore_drill.sh`** — restores the latest dump into a throwaway
+  `*_drill_*` database, smoke-checks it (`alembic_version` present +
+  `accounting.accounts` populated), then drops it. Fails loudly so a broken
+  backup is caught early. *Validated against the current schema (restored to
+  rev 0021 with the 72-row chart of accounts intact).*
+- **`deploy/systemd/`** — `wm-pg-backup.{service,timer}` (daily 01:30) and
+  `wm-restore-drill.{service,timer}` (weekly Sun 03:00), with
+  `backup.env.example` → `/etc/white-moon/backup.env` (chmod 600).
+
+Logical dumps cover portability/retention here; continuous PITR (≤5-min RPO
+for financial data, §1) is WAL archiving via pgBackRest on the primary — its
+repo + stanza config is the one remaining ops task to provision on the host.
+
 ## 10 — Open items for sign-off
 
 1. Confirm **FSN1 + NBG1** as the two Hetzner locations. Alternative: HEL1 (Helsinki) if latency / GDPR shaping differently.

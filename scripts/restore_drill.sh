@@ -1,43 +1,37 @@
 #!/usr/bin/env bash
-# Weekly restore drill — restores last night's RDS snapshot into a sandbox
-# instance and runs a smoke suite. See docs/05-backup-and-dr.md §6.
+# Restore drill for White Moon (Hetzner-native; no cloud CLI).
+# Restores the latest logical dump into a throwaway database, runs smoke
+# checks (schema version + key tables are populated), then drops it. Fails
+# loudly on any problem so a broken backup is caught before it's needed.
+# See docs/05-backup-and-dr.md §6. Run from a weekly systemd timer.
 #
-# Pre-reqs: AWS CLI v2, jq, psql.
-# Env: AWS_PROFILE, SANDBOX_SG, SANDBOX_SUBNET_GROUP.
+# Auth: PGPASSWORD / ~/.pgpass, and a role that may CREATE/DROP DATABASE.
 set -euo pipefail
 
-STAMP="$(date -u +%Y%m%d-%H%M)"
-SRC_INSTANCE="${SRC_INSTANCE:-wm-prod-db}"
-SANDBOX_INSTANCE="wm-drill-${STAMP}"
+PGHOST="${PGHOST:-localhost}"
+PGPORT="${PGPORT:-5432}"
+PGUSER="${PGUSER:-wm}"
+SRC_DB="${PGDATABASE:-whitemoon}"
+BACKUP_DIR="${BACKUP_DIR:-/var/backups/whitemoon}"
+export PGHOST PGPORT PGUSER
 
-echo "[drill] Looking up latest snapshot of ${SRC_INSTANCE}..."
-SNAP="$(aws rds describe-db-snapshots \
-    --db-instance-identifier "${SRC_INSTANCE}" \
-    --snapshot-type automated \
-    --query 'reverse(sort_by(DBSnapshots,&SnapshotCreateTime))[0].DBSnapshotIdentifier' \
-    --output text)"
-echo "[drill] Snapshot: ${SNAP}"
+STAMP="$(date -u +%Y%m%d%H%M%S)"
+DRILL_DB="${SRC_DB}_drill_${STAMP}"
 
-echo "[drill] Restoring to ${SANDBOX_INSTANCE}..."
-aws rds restore-db-instance-from-db-snapshot \
-    --db-instance-identifier "${SANDBOX_INSTANCE}" \
-    --db-snapshot-identifier "${SNAP}" \
-    --db-instance-class db.t4g.small \
-    --no-publicly-accessible \
-    --db-subnet-group-name "${SANDBOX_SUBNET_GROUP}" \
-    --vpc-security-group-ids "${SANDBOX_SG}" \
-    --tags Key=purpose,Value=drill Key=cleanup,Value=true
+LATEST="${DUMP_FILE:-$(ls -1t "${BACKUP_DIR}/${SRC_DB}-"*.dump 2>/dev/null | head -1 || true)}"
+[[ -n "$LATEST" ]] || { echo "[drill] FAIL: no dump found in ${BACKUP_DIR}"; exit 1; }
+echo "[drill] restoring ${LATEST} -> ${DRILL_DB}"
 
-aws rds wait db-instance-available --db-instance-identifier "${SANDBOX_INSTANCE}"
+cleanup() { psql -d postgres -c "DROP DATABASE IF EXISTS \"${DRILL_DB}\";" >/dev/null 2>&1 || true; }
+trap cleanup EXIT
 
-echo "[drill] Running smoke suite..."
-# TODO (Phase 2): point SMOKE_DATABASE_URL at the sandbox and run `pytest -m smoke`
-echo "[drill] Smoke placeholder — real tests ship with Phase 2."
+psql -d postgres -c "CREATE DATABASE \"${DRILL_DB}\";" >/dev/null
+pg_restore --no-owner --no-privileges --dbname="${DRILL_DB}" "$LATEST"
 
-echo "[drill] Deleting sandbox..."
-aws rds delete-db-instance \
-    --db-instance-identifier "${SANDBOX_INSTANCE}" \
-    --skip-final-snapshot \
-    --delete-automated-backups
+echo "[drill] smoke checks..."
+VER="$(psql -tA -d "${DRILL_DB}" -c "SELECT version_num FROM alembic_version;")"
+[[ -n "$VER" ]] || { echo "[drill] FAIL: alembic_version missing"; exit 1; }
+ACCTS="$(psql -tA -d "${DRILL_DB}" -c "SELECT count(*) FROM accounting.accounts;")"
+[[ "${ACCTS:-0}" -gt 0 ]] || { echo "[drill] FAIL: accounting.accounts is empty"; exit 1; }
 
-echo "[drill] Done."
+echo "[drill] PASS — schema=${VER}, accounts=${ACCTS} (scratch db dropped)"

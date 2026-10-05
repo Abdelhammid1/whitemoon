@@ -1,0 +1,11 @@
+[Unit]
+Description=White Moon Postgres logical backup
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/white-moon/backup.env
+ExecStart=/opt/white-moon/scripts/backup_pg.sh
+Nice=10
+IOSchedulingClass=idle
