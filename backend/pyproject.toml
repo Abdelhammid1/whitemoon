@@ -77,6 +77,9 @@ ignore = [
 # The CoA seed is tabular data; Arabic account names push many lines over
 # the width limit but splitting one row across lines would be worse.
 "app/accounting/seed.py" = ["E501"]
+# Accounting services/routes carry dense Arabic report labels (same rationale
+# as the other domains below); wrapping them hurts readability.
+"app/accounting/**/*.py" = ["E501"]
 # Commerce source has dense Arabic-labelled flows; a few lines run long but
 # wrapping them hurts readability more than it helps.
 "app/commerce/**/*.py" = ["E501"]
