@@ -35,7 +35,7 @@ def ensure_period(*, year: int, month: int) -> Period:
         ends_on=date(year, month, last_day),
     )
     db.session.add(period)
-    db.session.commit()  # persist — each request is its own transaction (T-25)
+    db.session.flush()
     return period
 
 
@@ -50,7 +50,7 @@ def close(*, year: int, month: int, closed_by: int) -> Period:
     period.is_closed = True
     period.closed_by = closed_by
     period.closed_at = datetime.now(UTC)
-    db.session.commit()  # T-25: persist the close
+    db.session.flush()
     return period
 
 
@@ -65,5 +65,5 @@ def reopen(*, year: int, month: int, reopened_by: int) -> Period:  # noqa: ARG00
     period.is_closed = False
     period.closed_by = None
     period.closed_at = None
-    db.session.commit()  # T-25: persist the reopen
+    db.session.flush()
     return period

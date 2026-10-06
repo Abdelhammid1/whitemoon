@@ -257,6 +257,7 @@ def list_deferred_terms():
 def period_ensure():
     payload = _parse(PeriodIn)
     period = periods_svc.ensure_period(year=payload.year, month=payload.month)
+    db.session.commit()  # T-25: persist (request-scoped transaction)
     return jsonify({"id": period.id, "year": period.year, "month": period.month})
 
 
@@ -274,6 +275,7 @@ def period_close():
         target_type="period",
         target_id=period.id,
     )
+    db.session.commit()  # T-25: persist the close + its audit together
     return jsonify({"id": period.id, "is_closed": period.is_closed})
 
 
@@ -292,6 +294,7 @@ def period_reopen():
         target_id=period.id,
         reason="period reopened",
     )
+    db.session.commit()  # T-25: persist the reopen + its audit together
     return jsonify({"id": period.id, "is_closed": period.is_closed})
 
 
@@ -340,6 +343,7 @@ def journal_manual():
         target_id=result.entry_id,
         reason=payload.reason,
     )
+    db.session.commit()  # persist the entry + its audit together (request-scoped txn)
     return jsonify(
         {"entry_id": result.entry_id, "entry_no": result.entry_no}
     ), 201
@@ -403,6 +407,7 @@ def receipt_file():
         target_type="receipt",
         target_id=result.receipt_id,
     )
+    db.session.commit()  # persist the receipt + its audit together (request-scoped txn)
     return jsonify(
         {
             "receipt_id": result.receipt_id,
@@ -445,6 +450,7 @@ def receipt_resolve(receipt_id: int):
         target_id=receipt.id,
         reason=f"status={payload.status}",
     )
+    db.session.commit()  # persist the resolution + its audit together (request-scoped txn)
     return jsonify({"receipt_id": receipt.id, "status": receipt.status})
 
 
@@ -469,6 +475,7 @@ def deferred_create():
         target_type="deferred_term",
         target_id=term.id,
     )
+    db.session.commit()  # persist the term + its audit together (request-scoped txn)
     return jsonify(
         {
             "id": term.id,
@@ -497,6 +504,7 @@ def deferred_apply():
         target_type="deferred_term",
         target_id=term.id,
     )
+    db.session.commit()  # persist the discount + its audit together (request-scoped txn)
     return jsonify({"id": term.id, "discount_applied": term.discount_applied})
 
 
