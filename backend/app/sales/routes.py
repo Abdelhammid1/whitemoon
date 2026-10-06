@@ -235,9 +235,15 @@ def upload_receipt():
 
     # Same storage concern as accounting receipts → S3_BUCKET_RECEIPTS in prod.
     key = storage.store(data, prefix="receipts", ext=ext)
-    row = pay_svc.upload_customer_receipt(
-        customer_id=uid, due_id=due_id, amount=amount, paid_on=paid_on, receipt_key=key
-    )
+    try:
+        row = pay_svc.upload_customer_receipt(
+            customer_id=uid, due_id=due_id, amount=amount, paid_on=paid_on, receipt_key=key
+        )
+    except Exception:
+        # Business validation (due ownership, amount, future date) failed after
+        # the blob was written — roll it back so no orphaned file accumulates.
+        storage.delete(key)
+        raise
     return jsonify(pay_svc.serialize(row)), 201
 
 

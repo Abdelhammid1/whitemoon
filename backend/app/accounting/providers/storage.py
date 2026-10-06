@@ -78,6 +78,25 @@ def store(data: bytes, *, prefix: str, ext: str) -> str:
     return key
 
 
+def delete(key: str) -> None:
+    """Best-effort removal of a stored object (used to roll back an upload whose
+    business validation then failed, so no orphaned blob is left behind)."""
+    concern = key.split("/", 1)[0]
+    bucket = _bucket_for(concern)
+    if bucket:  # pragma: no cover - needs a live bucket
+        try:
+            _s3_client().delete_object(Bucket=bucket, Key=key)
+        except Exception:
+            pass
+        return
+    path = _local_root() / key
+    try:
+        path.resolve().relative_to(_local_root().resolve())
+    except ValueError:
+        return
+    path.unlink(missing_ok=True)
+
+
 def load(key: str) -> bytes | None:
     # The concern is the first path segment of the key.
     concern = key.split("/", 1)[0]

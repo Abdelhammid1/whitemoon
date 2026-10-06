@@ -130,7 +130,7 @@ def list_rfqs(*, requester_id: int, kind: str, is_admin: bool) -> list[dict[str,
       filled when this supplier already quoted — initiator identity never shown;
     - customer → only the RFQs they opened.
     """
-    stmt = select(Rfq).order_by(Rfq.id.desc())
+    stmt = select(Rfq).order_by(Rfq.id.desc()).limit(500)
     if is_admin:
         rfqs = db.session.execute(stmt).scalars().all()
         return [serialize_rfq(r) for r in rfqs]

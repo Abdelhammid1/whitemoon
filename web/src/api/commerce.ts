@@ -210,6 +210,8 @@ export interface CustomerStatement {
   credit_limit: string
   outstanding: string
   available: string
+  /** Date the balance figures are current as of (YYYY-MM-DD). */
+  as_of?: string
   orders: Order[]
   dues: { id: number; amount: string; due_date: string; status: string; days_late: number | null }[]
   payments: { id: number; amount: string; paid_on: string; source: string }[]

@@ -168,6 +168,57 @@ def test_customer_receipt_upload_enters_queue_and_image_is_gated(client) -> None
     assert client.get(f"/credit/payments/{approval_id}/receipt", headers=oh).status_code == 403
 
 
+def test_receipt_upload_bad_due_id_is_400_not_500(client) -> None:
+    cust = _u("customer", ("customer",))
+    ch = auth_header(client, email=cust.email)
+    r = client.post(
+        "/credit/payments/upload-receipt",
+        data={"image": (io.BytesIO(_PNG), "r.png"), "amount": "10", "due_id": "abc"},
+        content_type="multipart/form-data",
+        headers=ch,
+    )
+    assert r.status_code == 400
+    assert r.get_json()["error"] == "due_id_invalid"
+
+
+def test_receipt_upload_foreign_due_rejected_without_orphan(client) -> None:
+    # A due that belongs to another customer must be refused (400), exercising
+    # the store→validate rollback path (no crash, clean 4xx).
+    from app.sales.models import CustomerDue
+    from datetime import date as _date
+
+    owner = _u("customer", ("customer",))
+    other = _u("customer", ("customer",))
+    due = CustomerDue(customer_id=owner.id, amount=Decimal("100.00"), due_date=_date.today(), status="open")
+    db.session.add(due)
+    db.session.commit()
+
+    ch = auth_header(client, email=other.email)
+    r = client.post(
+        "/credit/payments/upload-receipt",
+        data={"image": (io.BytesIO(_PNG), "r.png"), "amount": "100.00", "due_id": str(due.id)},
+        content_type="multipart/form-data",
+        headers=ch,
+    )
+    assert r.status_code == 400  # due_customer_mismatch
+
+
+def test_statement_date_filter_narrows_rows(client) -> None:
+    admin = _u("admin", ("admin",))
+    cust = _u("customer", ("customer",))
+    pid = _product(admin.id)
+    _order_with_line(cust.id, admin.id, pid)
+
+    ch = auth_header(client, email=cust.email)
+    # A window entirely in the past returns no orders/dues/payments, but the
+    # balance figures (as-of today) are still present.
+    data = client.get(
+        f"/commerce/customers/{cust.id}/statement?from=2000-01-01&to=2000-12-31", headers=ch
+    ).get_json()
+    assert data["orders"] == [] and data["dues"] == [] and data["payments"] == []
+    assert "credit_limit" in data and "as_of" in data
+
+
 def test_receipt_upload_rejects_non_image(client) -> None:
     cust = _u("customer", ("customer",))
     ch = auth_header(client, email=cust.email)

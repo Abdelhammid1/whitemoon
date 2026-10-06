@@ -137,17 +137,23 @@ export function StatementPage() {
         </div>
       ) : data ? (
         <div className="mt-space-xl flex flex-col gap-space-xl">
-          {/* KPI summary */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-space-md">
-            <Kpi label="السقف الائتماني" value={formatMoney(data.credit_limit)} />
-            <Kpi label="الرصيد المستحق" value={formatMoney(data.outstanding)} />
-            <Kpi
-              label="المتاح"
-              value={formatMoney(data.available)}
-              extra={
-                tier ? <Pill tone={TIER_TONE[tier] ?? 'neutral'}>{TIER_AR[tier] ?? tier}</Pill> : undefined
-              }
-            />
+          {/* KPI summary — balance is the current position (as of today), even
+              when a date range filters the tables below. */}
+          <div className="flex flex-col gap-space-xs">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-space-md">
+              <Kpi label="السقف الائتماني" value={formatMoney(data.credit_limit)} />
+              <Kpi label="الرصيد المستحق" value={formatMoney(data.outstanding)} />
+              <Kpi
+                label="المتاح"
+                value={formatMoney(data.available)}
+                extra={
+                  tier ? <Pill tone={TIER_TONE[tier] ?? 'neutral'}>{TIER_AR[tier] ?? tier}</Pill> : undefined
+                }
+              />
+            </div>
+            <p className="font-small text-small text-secondary">
+              الرصيد والسقف محسوبان حتى تاريخه{data.as_of ? ` (${data.as_of})` : ''}، بصرف النظر عن فلتر الفترة.
+            </p>
           </div>
 
           {/* Dues */}

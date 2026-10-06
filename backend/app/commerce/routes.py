@@ -174,43 +174,72 @@ def _build_statement(customer_id: int, date_from: Any = None, date_to: Any = Non
     """Customer statement data (T-19): profile, orders, dues, approved payments,
     outstanding balance, credit limit and available credit. Optional date range
     filters orders (placed_at), dues (due_date) and payments (paid_on)."""
+    from datetime import datetime, time
+
+    from .models import Order
     from ..identity.models import CustomerProfile
     from ..sales.models import CustomerDue, PaymentApproval
     from ..sales.services import credit as credit_svc
 
-    def _in_range(d: Any) -> bool:
-        if date_from and d < date_from:
-            return False
-        return not (date_to and d > date_to)
-
-    # A statement is a financial record, so the date filter must see the full
-    # history — not just the 50 most-recent orders the default list returns.
+    # The date range is applied in SQL (not fetch-then-filter), so a statement
+    # for an old period returns exactly its rows; the cap is only a safety bound
+    # that a date-bounded query is very unlikely to reach.
     _STMT_CAP = 5000
+    dt_from = datetime.combine(date_from, time.min) if date_from else None
+    dt_to = datetime.combine(date_to, time.max) if date_to else None
+
+    def _range(col: Any, lo: Any, hi: Any, stmt: Any) -> Any:
+        if lo is not None:
+            stmt = stmt.where(col >= lo)
+        if hi is not None:
+            stmt = stmt.where(col <= hi)
+        return stmt
+
     profile = db.session.get(CustomerProfile, customer_id)
-    orders = [o for o in orders_svc.list_orders(customer_id, limit=_STMT_CAP) if _in_range(o.placed_at.date())]
-    dues = [
-        d
-        for d in db.session.execute(
-            db.select(CustomerDue)
-            .where(CustomerDue.customer_id == customer_id)
-            .order_by(CustomerDue.id.desc())
-            .limit(_STMT_CAP)
+    orders = list(
+        db.session.execute(
+            _range(
+                Order.placed_at, dt_from, dt_to,
+                db.select(Order).where(Order.customer_id == customer_id),
+            ).order_by(Order.id.desc()).limit(_STMT_CAP)
         ).scalars()
-        if _in_range(d.due_date)
-    ]
-    payments = [
-        p
-        for p in db.session.execute(
-            db.select(PaymentApproval)
-            .where(PaymentApproval.customer_id == customer_id, PaymentApproval.status == "approved")
-            .order_by(PaymentApproval.id.desc())
-            .limit(_STMT_CAP)
+    )
+    dues = list(
+        db.session.execute(
+            _range(
+                CustomerDue.due_date, date_from, date_to,
+                db.select(CustomerDue).where(CustomerDue.customer_id == customer_id),
+            ).order_by(CustomerDue.id.desc()).limit(_STMT_CAP)
         ).scalars()
-        if _in_range(p.paid_on)
-    ]
+    )
+    payments = list(
+        db.session.execute(
+            _range(
+                PaymentApproval.paid_on, date_from, date_to,
+                db.select(PaymentApproval).where(
+                    PaymentApproval.customer_id == customer_id,
+                    PaymentApproval.status == "approved",
+                ),
+            ).order_by(PaymentApproval.id.desc()).limit(_STMT_CAP)
+        ).scalars()
+    )
     outstanding = credit_svc.outstanding(customer_id)
     limit = credit_svc.effective_limit(customer_id)
     tier = credit_svc.get_tier(customer_id)
+    # Light order rows (no sub-order/line lazy loads — the statement lists order
+    # headers only, so this avoids an N+1 over a long order history).
+    order_rows = [
+        {
+            "id": o.id,
+            "number": o.number,
+            "status": o.status,
+            "payment_mode": o.payment_mode,
+            "total_cash": str(o.total_cash),
+            "total_deferred": str(o.total_deferred),
+            "placed_at": o.placed_at.isoformat(),
+        }
+        for o in orders
+    ]
     return {
         "customer_id": customer_id,
         "profile": {
@@ -220,8 +249,11 @@ def _build_statement(customer_id: int, date_from: Any = None, date_to: Any = Non
         "tier": tier.tier,
         "credit_limit": str(limit),
         "outstanding": str(outstanding),
+        # The balance is the customer's CURRENT position (as of today), even when
+        # a date range filters the rows below — labelled as such in the UI/PDF.
         "available": str(limit - outstanding),
-        "orders": [orders_svc.serialize_order(o, for_customer=True) for o in orders],
+        "as_of": datetime.now(credit_svc.BUSINESS_TZ).date().isoformat(),
+        "orders": order_rows,
         "dues": [
             {
                 "id": d.id,
@@ -290,6 +322,7 @@ def customer_statement_pdf(customer_id: int):
         f"<div class='meta'><div><b>العميل:</b> {escape(name)}</div>{rng}</div>"
         "</div>"
         "<h1>كشف الحساب</h1>"
+        f"<p style='color:#6b7280;font-size:11px;margin:0 0 4px'>الرصيد والسقف محسوبان حتى تاريخه ({escape(s['as_of'])})، بصرف النظر عن فلتر الفترة.</p>"
         "<table class='totals'><tbody>"
         f"<tr><td>السقف الائتماني</td><td class='num'>{doc.fmt_money(s['credit_limit'])}</td></tr>"
         f"<tr><td>الرصيد المستحق</td><td class='num'>{doc.fmt_money(s['outstanding'])}</td></tr>"
