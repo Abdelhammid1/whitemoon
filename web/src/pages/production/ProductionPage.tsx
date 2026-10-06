@@ -9,6 +9,7 @@ import { createMO, listMOs, type ManufacturingOrder } from '../../api/production
 import { useAuth } from '../../auth/AuthContext'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 const STATUS: Record<string, { ar: string; tone: 'signal' | 'warning' | 'neutral' | 'error' }> = {
   draft: { ar: 'مسودة', tone: 'neutral' },
@@ -62,6 +63,7 @@ export function ProductionPage() {
         <PageTitle title="أوامر التصنيع" subtitle="من الخامة إلى المنتج النهائي عبر مراحل، مع قيد تلقائي عند الإغلاق." />
         <Button variant="primary" onClick={() => setOpen(true)}>أمر تصنيع جديد</Button>
       </div>
+      <PageHelp pageKey="production" />
       <div className="mt-space-xl">
         {loading ? <Spinner /> : error ? <InlineError message={error} /> : (
           <Card padded={false} className="overflow-hidden">

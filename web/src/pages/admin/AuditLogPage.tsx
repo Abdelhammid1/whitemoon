@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Spinner, InlineError, Pill, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
+import { PageHelp } from '../../components/PageHelp'
 import { listAudit, type AuditRow } from '../../api/admin'
 import { ApiError } from '../../api/client'
 import { formatDate } from '../../lib/format'
@@ -21,6 +22,7 @@ export function AuditLogPage() {
   return (
     <Wide>
       <PageTitle title="سجل التدقيق" subtitle="كل عملية حساسة في المنظومة موثّقة بالمنفِّذ والهدف والوقت." />
+      <PageHelp pageKey="audit" />
       <div className="mt-space-xl">
         {loading ? (
           <Spinner />

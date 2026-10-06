@@ -9,6 +9,7 @@ import { trialBalance, type ReportFilterBody, type TrialBalanceResponse } from '
 import { ApiError } from '../../../api/client'
 import { useToast } from '../../../components/Toast'
 import { formatMoney } from '../../../lib/format'
+import { PageHelp } from '../../../components/PageHelp'
 
 /** KPI tile matching the executive dashboard: icon chip, large mono value, label. */
 function Kpi({ icon, label, value, accent = false }: { icon: string; label: string; value: ReactNode; accent?: boolean }) {
@@ -36,6 +37,8 @@ export function TrialBalancePage() {
         <PageTitle title="ميزان المراجعة" subtitle="أرصدة كل الحسابات لفترة محددة مع التحقق من التوازن." />
         <ReportExport path="/accounting/reports/trial-balance" name="ميزان-المراجعة" body={filter} disabled={!data || !filter} />
       </div>
+
+      <PageHelp pageKey="report-trial-balance" />
 
       <Card className="mt-space-xl">
         <ReportFilterForm busy={busy} onRun={async (f) => {

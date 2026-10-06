@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Narrow } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, InlineError, Card, Pill } from '../../components/ui'
 import { Icon } from '../../components/Icon'
+import { PageHelp } from '../../components/PageHelp'
 import { startImpersonation } from '../../api/admin'
 import { ApiError, tokenStore } from '../../api/client'
 import { useToast } from '../../components/Toast'
@@ -48,6 +49,8 @@ export function ImpersonationPage() {
   return (
     <Narrow>
       <PageTitle title="الدخول كمستخدم (Impersonation)" subtitle="للدعم الفني فقط. كل بدء وإنهاء يُسجَّل في سجل التدقيق." />
+
+      <PageHelp pageKey="impersonation" />
 
       <Card className="mt-space-xl flex items-start gap-space-md border-warning/40">
         <span className="w-10 h-10 rounded-xl bg-warning-weak flex items-center justify-center shrink-0">

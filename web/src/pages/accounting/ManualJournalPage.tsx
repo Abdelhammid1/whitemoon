@@ -5,6 +5,7 @@ import { Icon } from '../../components/Icon'
 import { useToast } from '../../components/Toast'
 import { postManualJournal, type ManualJournalLine } from '../../api/accounting'
 import { ApiError } from '../../api/client'
+import { PageHelp } from '../../components/PageHelp'
 import { todayIso } from '../../lib/format'
 
 const emptyLine = (): ManualJournalLine => ({ account_code: '', debit: '0', credit: '0' })
@@ -48,6 +49,8 @@ export function ManualJournalPage() {
   return (
     <Narrow>
       <PageTitle title="إنشاء قيد يومية يدوي" subtitle="يتطلب صلاحية قيد يدوي — الوصف والسبب لا يقل كل منهما عن ١٠ أحرف." />
+
+      <PageHelp pageKey="manual-journal" />
 
       <form onSubmit={onSubmit} className="mt-space-xl flex flex-col gap-space-lg">
         <Card className="flex flex-col gap-space-md">

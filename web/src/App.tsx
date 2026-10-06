@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './layouts/AppShell'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { HomePage } from './pages/HomePage'
+import { OnboardingPage } from './pages/OnboardingPage'
 import { LoginPage } from './pages/auth/LoginPage'
 import { RegisterCustomerPage } from './pages/auth/RegisterCustomerPage'
 import { RegisterSupplierPage } from './pages/auth/RegisterSupplierPage'
@@ -73,6 +74,7 @@ export function App() {
 
       <Route element={<ProtectedRoute><AppShell /></ProtectedRoute>}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/start" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
         <Route path="/2fa" element={<TotpEnrollPage />} />
 
         <Route path="/catalog" element={<CatalogPage />} />

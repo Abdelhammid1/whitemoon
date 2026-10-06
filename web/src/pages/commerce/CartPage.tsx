@@ -9,6 +9,7 @@ import { useToast } from '../../components/Toast'
 import { checkout, getCart, removeCartItem, updateCartItem, type Cart } from '../../api/commerce'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 export function CartPage() {
   const toast = useToast()
@@ -81,6 +82,8 @@ export function CartPage() {
           </p>
         </div>
       </header>
+
+      <PageHelp pageKey="cart" />
 
       {loading ? (
         <Spinner />

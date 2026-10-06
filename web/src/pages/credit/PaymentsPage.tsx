@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, Card, SectionHeader, Spinner, InlineError } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
+import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import {
   approvePayment, collectPayment, listPayments, rejectPayment, type PaymentApproval,
@@ -55,6 +56,8 @@ export function PaymentsPage() {
   return (
     <Wide>
       <PageTitle title="اعتماد السداد" subtitle="تحصيل يُعتمد بمستوى واحد قبل الشركة — لا يعتمد المحصِّل تحصيله بنفسه." />
+
+      <PageHelp pageKey="payments" />
 
       <Card className="mt-space-lg flex flex-col gap-space-md">
         <span className="font-headline-2 text-headline-2 text-primary">تسجيل تحصيل جديد</span>

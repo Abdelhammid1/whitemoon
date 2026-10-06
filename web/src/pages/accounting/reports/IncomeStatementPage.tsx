@@ -9,6 +9,7 @@ import { ReportExport } from '../../../components/ReportExport'
 import { ApiError } from '../../../api/client'
 import { useToast } from '../../../components/Toast'
 import { formatMoney } from '../../../lib/format'
+import { PageHelp } from '../../../components/PageHelp'
 
 /** KPI tile matching the executive dashboard: icon chip, large mono value, label. */
 function Kpi({ icon, label, value, accent = false, tone = 'neutral' }: { icon: string; label: string; value: ReactNode; accent?: boolean; tone?: 'neutral' | 'error' }) {
@@ -45,6 +46,8 @@ export function IncomeStatementPage() {
         <PageTitle title="قائمة الدخل" subtitle="الإيرادات والمصروفات وصافي الدخل للفترة." />
         <ReportExport path="/accounting/reports/income-statement" name="قائمة-الدخل" body={filter} disabled={!data || !filter} />
       </div>
+
+      <PageHelp pageKey="report-income" />
 
       <Card className="mt-space-xl">
         <ReportFilterForm busy={busy} showAccountPrefix={false} showPartner={false} onRun={async (f) => {

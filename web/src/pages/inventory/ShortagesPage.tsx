@@ -3,6 +3,7 @@ import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, Spinner, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { SideSheet } from '../../components/Overlay'
+import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import { listShortages, reportShortage, resolveShortage, type Shortage } from '../../api/inventory'
 import { ApiError } from '../../api/client'
@@ -96,6 +97,8 @@ export function ShortagesPage() {
         <PageTitle title="النواقص والمرتجعات" subtitle="تُحسم القيمة من الطرف المسؤول، ويُرحَّل القيد تلقائيًا." />
         <Button variant="primary" onClick={() => { setRerror(null); setReportOpen(true) }} iconRight="add">بلاغ نقص جديد</Button>
       </div>
+
+      <PageHelp pageKey="shortages" />
 
       <Card padded={false} className="mt-space-xl overflow-hidden">
         {loading ? <Spinner /> : (

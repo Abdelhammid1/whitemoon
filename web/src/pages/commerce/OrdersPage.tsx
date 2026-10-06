@@ -6,6 +6,7 @@ import { DataTable, Mono } from '../../components/DataTable'
 import { listOrders, type Order } from '../../api/commerce'
 import { ApiError } from '../../api/client'
 import { formatDate, formatMoney } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 const STATUS: Record<string, { ar: string; tone: 'signal' | 'warning' | 'neutral' | 'error' }> = {
   pending: { ar: 'قيد الانتظار', tone: 'warning' },
@@ -30,6 +31,7 @@ export function OrdersPage() {
   return (
     <Wide>
       <PageTitle title="طلباتي" subtitle="كل طلباتك وحالتها اللحظية." />
+      <PageHelp pageKey="orders" />
       <div className="mt-space-xl">
         {loading ? (
           <Spinner />

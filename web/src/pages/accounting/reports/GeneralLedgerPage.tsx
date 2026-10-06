@@ -8,6 +8,7 @@ import { ReportExport } from '../../../components/ReportExport'
 import { ApiError } from '../../../api/client'
 import { useToast } from '../../../components/Toast'
 import { formatDate, formatMoney, todayIso } from '../../../lib/format'
+import { PageHelp } from '../../../components/PageHelp'
 
 export function GeneralLedgerPage() {
   const toast = useToast()
@@ -40,6 +41,8 @@ export function GeneralLedgerPage() {
           disabled={!data || !('account' in data)}
         />
       </div>
+
+      <PageHelp pageKey="report-ledger" />
 
       <Card className="mt-space-xl">
         <form onSubmit={onRun} className="flex flex-wrap items-end gap-space-md">

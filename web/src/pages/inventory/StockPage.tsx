@@ -3,6 +3,7 @@ import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Pill, Field, Spinner, Button, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Icon } from '../../components/Icon'
+import { PageHelp } from '../../components/PageHelp'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import { useAuth } from '../../auth/AuthContext'
@@ -111,6 +112,8 @@ export function StockPage() {
           </div>
         )}
       </div>
+
+      <PageHelp pageKey="stock" />
 
       <div className="mt-space-xl flex flex-wrap items-end gap-space-md">
         {isAdmin && <div className="w-40"><Field label="رقم المورد" dir="ltr" mono inputMode="numeric" value={supplierId} onChange={(e) => setSupplierId(e.target.value)} /></div>}

@@ -7,6 +7,7 @@ import { getSale, listSales, type PosSale } from '../../api/pos'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
 import { useToast } from '../../components/Toast'
+import { PageHelp } from '../../components/PageHelp'
 
 const LOC_AR: Record<string, string> = {
   supplier: 'مخزن المورد', channel_partner: 'عهدة وكيل/فرع', branch: 'فرع', warehouse: 'مستودع',
@@ -42,6 +43,7 @@ export function PosSalesPage() {
   return (
     <Wide>
       <PageTitle title="مبيعاتي" subtitle="مبيعات نقطة البيع التي سجّلتها وحالتها المحاسبية." />
+      <PageHelp pageKey="pos-sales" />
       <div className="mt-space-xl">
         {loading ? <Spinner /> : error ? <InlineError message={error} /> : (
           <Card padded={false} className="overflow-hidden">

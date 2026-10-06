@@ -6,6 +6,7 @@ import { Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import { confirmDelivery, trackShipment, updateShipmentLocation, type Shipment } from '../../api/logistics'
 import { ApiError } from '../../api/client'
+import { PageHelp } from '../../components/PageHelp'
 
 const STATUS_AR: Record<string, string> = {
   scheduled: 'مجدول', shipped: 'تم الشحن', in_transit: 'في الطريق', delivered: 'تم التسليم', failed: 'فشل التسليم',
@@ -102,6 +103,7 @@ export function DeliveryConfirmPage() {
   return (
     <Narrow>
       <PageTitle title="تأكيد التسليم" subtitle="للمندوب — أكّد تسليم الشحنة برمز العميل أو بالتوقيع، وسجّل أي نواقص." />
+      <PageHelp pageKey="delivery-confirm" />
 
       {/* Lookup */}
       <Card className="mt-space-xl flex items-end gap-space-sm">

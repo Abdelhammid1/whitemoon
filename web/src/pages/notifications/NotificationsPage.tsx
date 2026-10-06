@@ -8,6 +8,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { listChannels, listNotifications, markAllRead, markRead, sendNotification, type Notification } from '../../api/notifications'
 import { ApiError } from '../../api/client'
 import { formatDate } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 const CHANNEL_AR: Record<string, string> = {
   in_app: 'داخل التطبيق', sms: 'SMS', whatsapp: 'واتساب', email: 'بريد',
@@ -96,6 +97,7 @@ export function NotificationsPage() {
           {unread > 0 && <Button onClick={readAll}>تعليم الكل كمقروء</Button>}
         </div>
       </div>
+      <PageHelp pageKey="notifications" />
       <div className="mt-space-xl">
         {loading ? <Spinner /> : error ? <InlineError message={error} /> : rows.length === 0 ? (
           <EmptyState title="لا توجد إشعارات." />

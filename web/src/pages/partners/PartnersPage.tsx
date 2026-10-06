@@ -7,6 +7,7 @@ import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import { createPartner, listPartners, type Partner } from '../../api/partners'
 import { ApiError } from '../../api/client'
+import { PageHelp } from '../../components/PageHelp'
 
 export function PartnersPage() {
   const toast = useToast()
@@ -45,6 +46,7 @@ export function PartnersPage() {
         <PageTitle title="الوكلاء والفروع" subtitle="إدارة شركاء القناة: الشروط، التأمينات، الاستحقاقات." />
         <Button variant="primary" onClick={() => setOpen(true)}>شريك جديد</Button>
       </div>
+      <PageHelp pageKey="partners" />
       <div className="mt-space-xl">
         {loading ? <Spinner /> : error ? <InlineError message={error} /> : (
           <Card padded={false} className="overflow-hidden">

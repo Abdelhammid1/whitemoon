@@ -5,6 +5,7 @@ import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import { supplierOrders, type SupplierOrderRow } from '../../api/commerce'
 import { ApiError } from '../../api/client'
+import { PageHelp } from '../../components/PageHelp'
 
 /** Sub-order status → Arabic label + Pill tone. Customer identity stays hidden:
  *  the supplier sees only their own fulfilment slice, never the buyer. */
@@ -45,6 +46,7 @@ export function SupplierOrdersPage() {
   return (
     <Wide>
       <PageTitle title="طلبات واردة" subtitle="حصّتك من الطلبات فقط — هوية العميل غير ظاهرة." />
+      <PageHelp pageKey="supplier-orders" />
 
       <div className="mt-space-xl">
         {loading ? <Spinner /> : (

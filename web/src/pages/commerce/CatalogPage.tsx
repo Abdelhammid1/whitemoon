@@ -9,6 +9,7 @@ import { addCartItem, browseCatalog, type CatalogProduct } from '../../api/comme
 import { listCategories, PRODUCT_CATEGORIES, type Category } from '../../api/inventory'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 export function CatalogPage() {
   const toast = useToast()
@@ -71,6 +72,7 @@ export function CatalogPage() {
         <PageTitle title="الكتالوج" subtitle="تصفّح المنتجات بأفضل سعر متاح. السعر يُثبَّت للكمية عند الإضافة للسلة." />
         <Button onClick={() => navigate('/cart')}>السلة</Button>
       </div>
+      <PageHelp pageKey="catalog" />
 
       <div className="mt-space-lg flex flex-col gap-space-md">
         <form onSubmit={(e) => { e.preventDefault(); void load() }} className="max-w-[420px]">

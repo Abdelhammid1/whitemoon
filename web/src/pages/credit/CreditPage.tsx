@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react'
 import { Narrow } from '../../layouts/AppShell'
 import { Button, Field, Pill, Dot, Card, Spinner, EmptyState } from '../../components/ui'
 import { Icon } from '../../components/Icon'
+import { PageHelp } from '../../components/PageHelp'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
@@ -148,6 +149,8 @@ export function CreditPage() {
           </form>
         </div>
       </section>
+
+      <PageHelp pageKey="credit" />
 
       {loading ? <div className="mt-space-xl"><Spinner /></div> : tier && (
         <>

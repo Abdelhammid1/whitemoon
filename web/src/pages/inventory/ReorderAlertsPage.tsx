@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Pill, Spinner, Button, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
+import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import {
   reorderAlerts,
@@ -99,6 +100,8 @@ export function ReorderAlertsPage() {
           <Button onClick={onEscalate} disabled={busy} iconRight="arrow_upward">تصعيد المتأخّر</Button>
         </div>
       </div>
+
+      <PageHelp pageKey="reorder" />
 
       <div className="mt-space-xl flex gap-space-xs">
         <button className={chip(openOnly)} onClick={() => setOpenOnly(true)}>المفتوحة</button>

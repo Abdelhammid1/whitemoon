@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { Wide } from '../layouts/AppShell'
 import { Card, Pill, Spinner, InlineError } from '../components/ui'
 import { Icon } from '../components/Icon'
+import { PageHelp } from '../components/PageHelp'
 import { useAuth } from '../auth/AuthContext'
 import { listPendingSuppliers } from '../api/admin'
 import { getDashboard, type Dashboard } from '../api/bi'
@@ -179,6 +180,8 @@ function AdminDashboard() {
         </button>
       </header>
 
+      <PageHelp pageKey="home" />
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-space-md mt-space-xl">
         <Tile icon="payments" accent label="مبيعات اليوم" value={formatNumber(d.sales.today)} unit="ج.م" tone={delta != null && delta < 0 ? 'error' : 'signal'}
           hint={delta == null ? 'أول مبيعات اليوم' : `${delta >= 0 ? '▲' : '▼'} ${arNum(Math.abs(Math.round(delta * 10) / 10))}٪ عن أمس`} />
@@ -206,6 +209,7 @@ function QuickLinks({ links }: { links: { to: string; label: string; icon: strin
         <h1 className="font-display text-display text-on-surface font-medium tracking-tight">أهلاً بك في وايت مون <span className="text-gold">🌙</span></h1>
         <p className="font-body text-body text-secondary mt-space-xs">روابطك المباشرة على منصّة وايت مون.</p>
       </header>
+      <PageHelp pageKey="home" />
       <nav className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-space-md mt-space-xl">
         {links.map((l) => (
           <Link key={l.to} to={l.to} className="group">

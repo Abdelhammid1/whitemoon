@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { AuthLayout } from '../../layouts/AuthLayout'
 import { Button, Field, InlineError } from '../../components/ui'
 import { Icon } from '../../components/Icon'
+import { PageHelp } from '../../components/PageHelp'
 import { registerSupplier } from '../../api/auth'
 import { ApiError } from '../../api/client'
 
@@ -48,6 +49,7 @@ export function RegisterSupplierPage() {
       footerLinks={<Link to="/login" className="hover:text-on-surface">لديك حساب؟ تسجيل الدخول</Link>}
     >
       <form onSubmit={onSubmit} className="w-full flex flex-col gap-space-xl">
+        <PageHelp pageKey="register-supplier" />
         <fieldset className="flex flex-col gap-space-md">
           <legend className="font-small-medium text-small-medium text-secondary mb-space-sm">بيانات الدخول</legend>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md">

@@ -12,6 +12,7 @@ import {
 import { listCategories, PRODUCT_CATEGORIES } from '../../api/inventory'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 export function ProductDetailPage() {
   const { id } = useParams()
@@ -89,6 +90,7 @@ export function ProductDetailPage() {
         <Link to="/catalog" className="font-small text-small text-secondary hover:text-primary">→ الكتالوج</Link>
         <Link to="/cart" className="font-small text-small text-primary hover:underline">السلة</Link>
       </div>
+      <PageHelp pageKey="product-detail" />
 
       <Card className="mt-space-md flex flex-col md:flex-row gap-space-lg">
         {/* Image */}

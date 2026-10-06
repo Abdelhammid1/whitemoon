@@ -8,6 +8,7 @@ import {
 } from '../../api/logistics'
 import { ApiError } from '../../api/client'
 import { todayIso } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 const STATUS_AR: Record<string, string> = {
   scheduled: 'مجدول', shipped: 'تم الشحن', in_transit: 'في الطريق', delivered: 'تم التسليم', failed: 'فشل',
@@ -78,6 +79,7 @@ export function LogisticsPage() {
   return (
     <Wide>
       <PageTitle title="اللوجستيات" subtitle="مواعيد التسليم وإدارة الشحنات (أسطول داخلي / شحن خارجي)." />
+      <PageHelp pageKey="logistics" />
 
       <section className="mt-space-xl">
         <SectionHeader title="إضافة موعد تسليم" />

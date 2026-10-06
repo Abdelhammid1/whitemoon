@@ -3,6 +3,7 @@ import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, Spinner, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
+import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import { myOffers, upsertOffer, type Offer } from '../../api/inventory'
 import { ApiError } from '../../api/client'
@@ -46,6 +47,8 @@ export function OffersPage() {
         <PageTitle title="عروضي التوريدية" subtitle="تدير عروضك أنت فقط — لا يرى غيرك أسعارك." />
         <Button variant="primary" onClick={() => setOpen(true)} iconRight="add">إضافة / تعديل عرض</Button>
       </div>
+
+      <PageHelp pageKey="offers" />
 
       <Card padded={false} className="mt-space-xl overflow-hidden">
         {loading ? <Spinner /> : (

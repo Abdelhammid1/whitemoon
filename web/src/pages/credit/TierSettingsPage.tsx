@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Narrow } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, Dot, Card, Spinner, InlineError } from '../../components/ui'
+import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import { listTierSettings, setTierSetting, runEscalation, type TierSetting } from '../../api/credit'
 import { ApiError } from '../../api/client'
+import { formatNumber } from '../../lib/format'
+
+/** Drop trailing zeros so an editable field shows ٢٥٠٠٠٠ not 250000.0000. */
+const clean = (s: string): string => {
+  const n = Number(s)
+  return Number.isFinite(n) ? String(n) : s
+}
 
 type Tone = 'signal' | 'warning' | 'error' | 'neutral'
 const TIER_AR: Record<string, string> = { green: 'أخضر', white: 'أبيض', yellow: 'أصفر', red: 'أحمر' }
@@ -18,7 +26,7 @@ export function TierSettingsPage() {
 
   async function load() {
     setLoading(true); setError(null)
-    try { setRows((await listTierSettings()).items) }
+    try { setRows((await listTierSettings()).items.map((r) => ({ ...r, credit_limit: clean(r.credit_limit), deferred_pct: clean(r.deferred_pct) }))) }
     catch (err) { setError(err instanceof ApiError ? err.message : 'تعذّر التحميل') }
     finally { setLoading(false) }
   }
@@ -42,6 +50,7 @@ export function TierSettingsPage() {
           تشغيل فحص التصعيد
         </Button>
       </div>
+      <PageHelp pageKey="tiers" />
       <div className="mt-space-xl">
         {loading ? <Spinner /> : error ? <InlineError message={error} /> : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
@@ -56,8 +65,12 @@ export function TierSettingsPage() {
                     </span>
                     <Pill tone={tone}>{r.tier}</Pill>
                   </div>
-                  <Field label="السقف (ج.م)" dir="ltr" mono value={r.credit_limit} onChange={(e) => edit(r.tier, 'credit_limit', e.target.value)} />
-                  <Field label="الآجل %" dir="ltr" mono value={r.deferred_pct} onChange={(e) => edit(r.tier, 'deferred_pct', e.target.value)} />
+                  <Field label="السقف (ج.م)" dir="ltr" mono value={r.credit_limit}
+                    hint={<span className="font-mono-body" dir="ltr">{formatNumber(r.credit_limit)} ج.م</span>}
+                    onChange={(e) => edit(r.tier, 'credit_limit', e.target.value)} />
+                  <Field label="الآجل %" dir="ltr" mono value={r.deferred_pct}
+                    hint={<span className="font-mono-body" dir="ltr">{formatNumber(r.deferred_pct)}٪</span>}
+                    onChange={(e) => edit(r.tier, 'deferred_pct', e.target.value)} />
                   <div className="flex justify-end">
                     <Button variant="primary" onClick={() => save(r)} disabled={busy === r.tier}>حفظ</Button>
                   </div>

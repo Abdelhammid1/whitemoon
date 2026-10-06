@@ -8,6 +8,7 @@ import { useAuth } from '../../auth/AuthContext'
 import { getRfq, listRfqOffers, submitRfqOffer, type Rfq, type RfqOffer } from '../../api/commerce'
 import { ApiError } from '../../api/client'
 import { formatDate, formatMoney } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 export function RfqDetailPage() {
   const { id } = useParams()
@@ -62,6 +63,7 @@ export function RfqDetailPage() {
   return (
     <Narrow>
       <PageTitle title={`طلب عرض ${rfq.number}`} subtitle="العروض معروضة بالسعر فقط — دون كشف هوية المورد." />
+      <PageHelp pageKey="rfq-detail" />
       <Card className="mt-space-md flex flex-wrap items-center gap-space-md">
         <Pill tone={rfq.status === 'open' ? 'signal' : 'neutral'}>{rfq.status === 'open' ? 'مفتوح' : rfq.status}</Pill>
         <span className="font-body text-body text-secondary">المنتج <Mono>#{rfq.product_id}</Mono> — كمية <Mono>{rfq.qty}</Mono></span>

@@ -3,6 +3,7 @@ import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, Spinner, EmptyState, Card } from '../../components/ui'
 import { Modal } from '../../components/Overlay'
 import { Icon } from '../../components/Icon'
+import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import {
   listCategoriesManage,
@@ -141,6 +142,8 @@ export function CategoriesPage() {
         <PageTitle title="الفئات" subtitle="شجرة الفئات الرئيسية والفرعية — يديرها الأدمن وتظهر فورًا في الكتالوج ونموذج المنتج." />
         <Button variant="primary" onClick={openNew} iconRight="add">فئة جديدة</Button>
       </div>
+
+      <PageHelp pageKey="categories" />
 
       <div className="mt-space-xl">
         {loading ? <Spinner /> : tops.length === 0 ? (

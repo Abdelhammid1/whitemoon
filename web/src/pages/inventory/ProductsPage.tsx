@@ -5,6 +5,7 @@ import { PageTitle, Button, Field, Pill, Spinner, Card } from '../../components/
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
 import { Icon } from '../../components/Icon'
+import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import {
   addVariant, bestPrice, listCategories, listProducts, PRODUCT_CATEGORIES,
@@ -114,6 +115,8 @@ export function ProductsPage() {
         <PageTitle title="المنتجات والمخزون" subtitle="كتالوج موحّد مستقل عن المورد." />
         <Button variant="primary" onClick={() => navigate('/inventory/products/new')} iconRight="add">منتج جديد</Button>
       </div>
+
+      <PageHelp pageKey="products" />
 
       <div className="mt-space-xl flex flex-wrap items-end gap-space-md">
         <form onSubmit={(e) => { e.preventDefault(); void load() }} className="w-[320px]"><Field label="بحث (SKU / اسم)" value={q} onChange={(e) => setQ(e.target.value)} /></form>

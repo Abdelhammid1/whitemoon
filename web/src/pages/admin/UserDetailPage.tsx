@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Narrow } from '../../layouts/AppShell'
 import { PageTitle, Pill, Button, Field, Spinner, SectionHeader, EmptyState, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
+import { PageHelp } from '../../components/PageHelp'
 import { getUser, listAudit, updateUserProfile, type UserDetail, type AuditRow } from '../../api/admin'
 import { ApiError } from '../../api/client'
 import { useToast } from '../../components/Toast'
@@ -94,6 +95,8 @@ export function UserDetailPage() {
         <Pill tone={STATUS_TONE[user.status] ?? 'neutral'}>{user.status}</Pill>
         {user.roles.map((r) => <Pill key={r} tone="brand">{r}</Pill>)}
       </div>
+
+      <PageHelp pageKey="user-detail" />
 
       <section className="mt-space-xl">
         <Card>

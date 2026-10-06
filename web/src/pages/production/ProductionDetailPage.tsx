@@ -7,6 +7,7 @@ import { useToast } from '../../components/Toast'
 import { advanceMO, cancelMO, completeMO, getMO, type ManufacturingOrder } from '../../api/production'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 const STATUS_AR: Record<string, string> = { draft: 'مسودة', in_progress: 'قيد التنفيذ', completed: 'مكتمل', cancelled: 'ملغى' }
 
@@ -43,6 +44,7 @@ export function ProductionDetailPage() {
   return (
     <Narrow>
       <PageTitle title={`أمر تصنيع ${mo.number}`} />
+      <PageHelp pageKey="production-detail" />
       <Card className="mt-space-md flex flex-wrap items-center gap-space-sm">
         <Pill tone={mo.status === 'completed' ? 'signal' : mo.status === 'cancelled' ? 'error' : 'warning'}>{STATUS_AR[mo.status] ?? mo.status}</Pill>
         <span className="font-body text-body text-secondary">منتج <Mono>#{mo.output_product_id}</Mono> — كمية <Mono>{mo.output_qty}</Mono></span>

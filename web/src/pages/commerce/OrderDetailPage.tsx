@@ -18,6 +18,7 @@ import {
 import { availableSlots, bookSlot, trackShipment, type Shipment, type Slot } from '../../api/logistics'
 import { ApiError } from '../../api/client'
 import { formatDate, formatMoney, todayIso } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 const STATUS_AR: Record<string, string> = {
   pending: 'قيد الانتظار', confirmed: 'مؤكد', fulfilled: 'منفَّذ', cancelled: 'ملغى',
@@ -118,6 +119,7 @@ export function OrderDetailPage() {
   return (
     <Narrow>
       <PageTitle title={`طلب ${order.number}`} />
+      <PageHelp pageKey="order-detail" />
       <div className="mt-space-sm flex flex-wrap items-center gap-space-sm">
         <Pill tone={order.status === 'cancelled' ? 'error' : order.status === 'pending' ? 'warning' : 'signal'}>
           {STATUS_AR[order.status] ?? order.status}

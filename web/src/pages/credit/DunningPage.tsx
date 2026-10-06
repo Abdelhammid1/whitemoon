@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, Card, Spinner, EmptyState, InlineError } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
+import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import { listDunning, listTierSettings, runEscalation, type DunningRow } from '../../api/credit'
 import { ApiError } from '../../api/client'
@@ -123,6 +124,8 @@ export function DunningPage() {
         <PageTitle title="المتابعة والتحصيل" subtitle="العملاء ذوو الذمم المتأخرة، الأسوأ أولاً. كل القيم بالجنيه المصري." />
         <Button variant="primary" disabled={busy} onClick={runScan} iconRight="sync">تشغيل فحص التصعيد</Button>
       </div>
+
+      <PageHelp pageKey="dunning" />
 
       {/* Filters */}
       <div className="mt-space-lg flex flex-wrap items-end gap-space-md">

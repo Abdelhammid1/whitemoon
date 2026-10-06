@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react'
 import { Narrow } from '../../layouts/AppShell'
 import { Button, Card, Field, InlineError, PageTitle, Pill } from '../../components/ui'
 import { Icon } from '../../components/Icon'
+import { PageHelp } from '../../components/PageHelp'
 import { totpEnrollFinish, totpEnrollStart, type TotpEnrollStart } from '../../api/auth'
 import { ApiError } from '../../api/client'
 
@@ -62,6 +63,8 @@ export function TotpEnrollPage() {
   return (
     <Narrow>
       <PageTitle title="التحقق الثنائي (2FA)" subtitle="إلزامي لحسابات الإدارة والوكلاء والموظفين." />
+
+      <PageHelp pageKey="totp-enroll" />
 
       <div className="mt-space-xl flex flex-col gap-space-lg">
         {!enrollment && !done && (

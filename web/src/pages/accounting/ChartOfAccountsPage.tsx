@@ -6,6 +6,7 @@ import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import { createAccount, listAccounts, updateAccount, type AccountRow } from '../../api/accounting'
 import { ApiError } from '../../api/client'
+import { PageHelp } from '../../components/PageHelp'
 
 const TYPE_AR: Record<string, string> = {
   asset: 'أصول',
@@ -143,6 +144,8 @@ export function ChartOfAccountsPage() {
         <PageTitle title="دليل الحسابات" subtitle="شجرة الحسابات المعتمدة التي تُبنى عليها كل القيود." />
         <Button variant="primary" onClick={openCreate}>إضافة حساب</Button>
       </div>
+
+      <PageHelp pageKey="chart" />
 
       <div className="mt-space-xl">
         {loading ? (

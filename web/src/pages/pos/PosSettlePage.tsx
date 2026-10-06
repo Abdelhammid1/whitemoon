@@ -6,6 +6,7 @@ import { useToast } from '../../components/Toast'
 import { listSales, settleBatch, type PosSale, type PosBatch } from '../../api/pos'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 export function PosSettlePage() {
   const toast = useToast()
@@ -35,6 +36,7 @@ export function PosSettlePage() {
   return (
     <Wide>
       <PageTitle title="تسوية نقطة البيع" subtitle="ترحيل دفعي للقيود المحاسبية لمبيعات نقطة البيع (مثلاً نهاية اليوم)." />
+      <PageHelp pageKey="pos-settle" />
 
       <Card className="mt-space-xl flex flex-col gap-space-lg">
         <div className="flex flex-wrap items-center justify-between gap-space-md">

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, Card, InlineError } from '../../components/ui'
 import { Icon } from '../../components/Icon'
+import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import { API_BASE, ApiError } from '../../api/client'
 import {
@@ -336,6 +337,8 @@ export function ProductFormPage() {
           </Button>
         </div>
       </div>
+
+      <PageHelp pageKey="product-form" />
 
       <form onSubmit={onSubmit} className="mt-space-xl flex flex-col gap-space-lg">
         {/* ------------------------------------------------------ basics */}

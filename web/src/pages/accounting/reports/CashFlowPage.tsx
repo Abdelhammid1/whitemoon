@@ -9,6 +9,7 @@ import { ReportExport } from '../../../components/ReportExport'
 import { ApiError } from '../../../api/client'
 import { useToast } from '../../../components/Toast'
 import { formatMoney } from '../../../lib/format'
+import { PageHelp } from '../../../components/PageHelp'
 
 /** KPI tile matching the executive dashboard: icon chip, large mono value, label. */
 function Kpi({ icon, label, value, accent = false, tone = 'neutral' }: { icon: string; label: string; value: ReactNode; accent?: boolean; tone?: 'neutral' | 'error' }) {
@@ -44,6 +45,8 @@ export function CashFlowPage() {
         <PageTitle title="قائمة التدفقات النقدية" subtitle="مصادر واستخدامات النقد وصافي التغير." />
         <ReportExport path="/accounting/reports/cash-flow" name="التدفقات-النقدية" body={filter} disabled={!data || !filter} />
       </div>
+
+      <PageHelp pageKey="report-cashflow" />
 
       <Card className="mt-space-xl">
         <ReportFilterForm busy={busy} showAccountPrefix={false} showPartner={false} onRun={async (f) => {

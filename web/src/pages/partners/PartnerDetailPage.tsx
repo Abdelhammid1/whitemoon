@@ -14,6 +14,7 @@ import {
 } from '../../api/partners'
 import { ApiError } from '../../api/client'
 import { formatMoney, formatDate, todayIso } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 /* movement → Arabic label + balance-effect tone (+1 = partner owes us more) */
 function ledgerLabel(e: LedgerEntry): string {
@@ -132,6 +133,7 @@ export function PartnerDetailPage() {
   return (
     <Narrow>
       <PageTitle title={`شريك #${pid}`} subtitle="الحساب الجاري والشروط والتأمينات والاستحقاقات." />
+      <PageHelp pageKey="partner-detail" />
 
       {/* Summary KPI tiles */}
       <section className="mt-space-xl grid grid-cols-1 sm:grid-cols-3 gap-space-md">

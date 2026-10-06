@@ -3,6 +3,7 @@ import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
+import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import {
   createTransfer,
@@ -128,6 +129,8 @@ export function TransfersPage() {
         <PageTitle title="إذون التحويل" subtitle="كل حركة بضاعة موثّقة بإذن تحويل وقيد محاسبي مرتبط." />
         <Button variant="primary" onClick={() => { setForm(EMPTY_CREATE); setLines([{ ...EMPTY_LINE }]); setCreateOpen(true) }} iconRight="add">إذن تحويل جديد</Button>
       </div>
+
+      <PageHelp pageKey="transfers" />
 
       <form onSubmit={onLookup} className="mt-space-xl flex items-end gap-space-md">
         <div className="w-56"><Field label="استعراض إذن برقمه" dir="ltr" mono inputMode="numeric" value={lookupId} onChange={(e) => setLookupId(e.target.value)} /></div>

@@ -5,6 +5,7 @@ import { DataTable, Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import { applyEarlyDiscount, createDeferredTerms, listDeferredTerms, type DeferredTermRow } from '../../api/accounting'
 import { ApiError } from '../../api/client'
+import { PageHelp } from '../../components/PageHelp'
 import { formatDate, formatMoney, todayIso } from '../../lib/format'
 
 export function DeferredTermsPage() {
@@ -66,6 +67,8 @@ export function DeferredTermsPage() {
   return (
     <Narrow>
       <PageTitle title="البيع الآجل" subtitle="السعر الآجل كامل مُثبت لحظة الطلب — لا فائدة يومية، فقط خصم استحقاق عند السداد المبكر." />
+
+      <PageHelp pageKey="deferred" />
 
       <section className="mt-space-xl flex flex-col gap-space-md">
         <SectionHeader title="تثبيت شروط الآجل" />

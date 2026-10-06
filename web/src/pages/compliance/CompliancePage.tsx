@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Narrow } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, Card, Spinner, InlineError } from '../../components/ui'
 import { Icon } from '../../components/Icon'
+import { PageHelp } from '../../components/PageHelp'
 import { Mono } from '../../components/DataTable'
 import { useToast } from '../../components/Toast'
 import { etaReadiness, setProductEta, type EtaReadiness } from '../../api/compliance'
@@ -71,6 +72,8 @@ export function CompliancePage() {
             : <Pill tone="warning">● أصناف غير جاهزة</Pill>
         )}
       </div>
+
+      <PageHelp pageKey="compliance" />
 
       <div className="mt-space-xl">
         {loading ? <Spinner /> : error ? <InlineError message={error} /> : report && (

@@ -6,6 +6,7 @@ import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import { listPeriods, periodClose, periodEnsure, periodReopen, type PeriodListRow } from '../../api/accounting'
 import { ApiError } from '../../api/client'
+import { PageHelp } from '../../components/PageHelp'
 
 export function PeriodsPage() {
   const toast = useToast()
@@ -50,6 +51,8 @@ export function PeriodsPage() {
   return (
     <Narrow>
       <PageTitle title="الفترات المالية" subtitle="إنشاء / إقفال / إعادة فتح الفترات الشهرية. إقفال الفترة يرفض أي قيد جديد عليها." />
+
+      <PageHelp pageKey="periods" />
 
       <Card className="mt-space-xl">
         <div className="flex flex-wrap items-end gap-space-md">

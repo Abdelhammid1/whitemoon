@@ -5,6 +5,7 @@ import { PageTitle, Button, Field, Card } from '../../components/ui'
 import { useToast } from '../../components/Toast'
 import { createRfq } from '../../api/commerce'
 import { ApiError } from '../../api/client'
+import { PageHelp } from '../../components/PageHelp'
 
 export function RfqPage() {
   const toast = useToast()
@@ -37,6 +38,7 @@ export function RfqPage() {
   return (
     <Narrow>
       <PageTitle title="طلب عرض سعر (RFQ)" subtitle="الشركة تتوسّط العروض — هوية الموردين تبقى مخفية عنك." />
+      <PageHelp pageKey="rfq" />
       <Card className="mt-space-xl max-w-[480px]">
         <form onSubmit={submit} className="flex flex-col gap-space-md">
           <Field label="رقم المنتج" dir="ltr" mono inputMode="numeric" value={productId} onChange={(e) => setProductId(e.target.value)} required />

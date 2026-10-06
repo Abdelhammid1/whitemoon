@@ -9,6 +9,7 @@ import { useToast } from '../../components/Toast'
 import { listConversations, startConversation, type Conversation } from '../../api/comm'
 import { useAuth } from '../../auth/AuthContext'
 import { ApiError } from '../../api/client'
+import { PageHelp } from '../../components/PageHelp'
 
 export function ChatPage() {
   const navigate = useNavigate()
@@ -68,6 +69,7 @@ export function ChatPage() {
           </Button>
         )}
       </div>
+      <PageHelp pageKey="chat" />
 
       {isMod && (
         <label className="mt-space-lg inline-flex items-center gap-space-sm cursor-pointer select-none rounded-lg border border-surface-container-high bg-surface-container-lowest px-space-md py-space-sm font-body-medium text-body-medium text-on-surface shadow-card-sm transition-colors hover:bg-surface-container-low">

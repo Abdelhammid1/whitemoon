@@ -6,6 +6,7 @@ import { useToast } from '../../components/Toast'
 import { Modal } from '../../components/Overlay'
 import { fetchReceiptImageUrl, listReceipts, resolveReceipt, uploadReceiptFile, type ReceiptRow } from '../../api/accounting'
 import { ApiError } from '../../api/client'
+import { PageHelp } from '../../components/PageHelp'
 import { formatDate, formatMoney } from '../../lib/format'
 
 interface Result { receipt_id: number; status: string; ocr_amount: string | null; ocr_reference: string | null }
@@ -124,6 +125,8 @@ export function ReceiptsPage() {
   return (
     <Narrow>
       <PageTitle title="الإيصالات والعمليات اليومية" subtitle="مطابقة التحويلات البنكية ضوئيًا (OCR). المتعارض يذهب للمراجعة اليدوية." />
+
+      <PageHelp pageKey="receipts" />
 
       <Card className="mt-space-xl">
       <form onSubmit={onUpload} className="flex flex-col gap-space-md">

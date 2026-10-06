@@ -6,6 +6,7 @@ import { useToast } from '../../components/Toast'
 import { createSale, type PosSale } from '../../api/pos'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 interface Line { product_id: string; supplier_id: string; qty: string }
 
@@ -39,6 +40,7 @@ export function PosPage() {
   return (
     <Wide>
       <PageTitle title="نقطة البيع" subtitle="بيع مباشر من مخزونك — السعر من عرض المورد الفعّال، والقيد المحاسبي يُرحَّل دفعيًا." />
+      <PageHelp pageKey="pos" />
 
       <Card className="mt-space-xl flex flex-col gap-space-sm max-w-[640px]">
         {lines.map((l, i) => (

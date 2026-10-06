@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, Spinner, EmptyState, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
+import { PageHelp } from '../../components/PageHelp'
 import { adminListOrders, type AdminOrder, type OrderStatus } from '../../api/commerce'
 import { ApiError } from '../../api/client'
 import { formatDate, formatMoney } from '../../lib/format'
@@ -79,6 +80,8 @@ export function AdminOrdersPage() {
   return (
     <Wide>
       <PageTitle title="كل الطلبات" subtitle="كل طلبات العملاء مع البحث والفلترة وإدارة الحالة." />
+
+      <PageHelp pageKey="admin-orders" />
 
       <Card className="mt-space-xl flex flex-col gap-space-md">
         <div className="flex flex-wrap items-center gap-space-xs">

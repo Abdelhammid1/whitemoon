@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Card } from '../../components/ui'
 import { Icon } from '../../components/Icon'
+import { PageHelp } from '../../components/PageHelp'
 
 const REPORTS = [
   { to: '/accounting/reports/trial-balance', title: 'ميزان المراجعة', desc: 'أرصدة كل الحسابات لفترة محددة مع التحقق من التوازن.', icon: 'balance' },
@@ -15,6 +16,8 @@ export function ReportsIndexPage() {
   return (
     <Wide>
       <PageTitle title="التقارير المالية" subtitle="تُستخرج مباشرة من شجرة الحسابات — كل القيم بالجنيه المصري." />
+
+      <PageHelp pageKey="reports-index" />
 
       <nav className="mt-space-xl grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-space-md">
         {REPORTS.map((r) => (

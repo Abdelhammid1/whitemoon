@@ -9,6 +9,7 @@ import { ReportExport } from '../../../components/ReportExport'
 import { ApiError } from '../../../api/client'
 import { useToast } from '../../../components/Toast'
 import { formatMoney } from '../../../lib/format'
+import { PageHelp } from '../../../components/PageHelp'
 
 /** KPI tile matching the executive dashboard: icon chip, large mono value, label. */
 function Kpi({ icon, label, value, accent = false }: { icon: string; label: string; value: ReactNode; accent?: boolean }) {
@@ -42,6 +43,8 @@ export function BalanceSheetPage() {
         <PageTitle title="المركز المالي (الميزانية العمومية)" subtitle="الأصول والالتزامات وحقوق الملكية كما في تاريخ." />
         <ReportExport path="/accounting/reports/balance-sheet" name="المركز-المالي" body={filter} disabled={!data || !filter} />
       </div>
+
+      <PageHelp pageKey="report-balance" />
 
       <Card className="mt-space-xl">
         <ReportFilterForm busy={busy} showAccountPrefix={false} showPartner={false} onRun={async (f) => {

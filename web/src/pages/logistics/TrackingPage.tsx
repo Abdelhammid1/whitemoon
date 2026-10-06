@@ -8,6 +8,7 @@ import { ShipmentMap } from '../../components/ShipmentMap'
 import { trackShipment, type Shipment } from '../../api/logistics'
 import { ApiError } from '../../api/client'
 import { formatDate } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 const STEPS = ['scheduled', 'shipped', 'in_transit', 'delivered'] as const
 const STATUS_AR: Record<string, string> = {
@@ -138,6 +139,8 @@ export function TrackingPage() {
             <span>تحديث لحظي</span>
           </button>
         </header>
+
+        <PageHelp pageKey="tracking" />
 
         {/* Metadata strip — only fields the backend actually provides */}
         <Card className="grid grid-cols-2 md:grid-cols-3 gap-space-md">

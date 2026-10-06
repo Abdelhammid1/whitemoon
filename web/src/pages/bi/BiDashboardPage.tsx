@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Wide } from '../../layouts/AppShell'
 import { Spinner, InlineError, Card, Pill } from '../../components/ui'
 import { Icon } from '../../components/Icon'
+import { PageHelp } from '../../components/PageHelp'
 import { getDashboard, type Dashboard } from '../../api/bi'
 import { ApiError } from '../../api/client'
 import { formatNumber } from '../../lib/format'
@@ -121,6 +122,8 @@ export function BiDashboardPage() {
         </div>
         <Pill tone="signal">● بيانات لحظية من المنظومة</Pill>
       </header>
+
+      <PageHelp pageKey="dashboard" />
 
       {/* KPI matrix */}
       <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-space-md mt-space-xl">

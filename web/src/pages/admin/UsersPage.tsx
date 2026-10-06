@@ -4,6 +4,7 @@ import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Pill, Field, Button, Spinner, Card, InlineError } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
+import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import { createUser, listUsers, listRoles, listUserKinds, listUserStatuses, type AdminUser, type Role, type CodeLabel } from '../../api/admin'
 import { ApiError } from '../../api/client'
@@ -159,6 +160,8 @@ export function UsersPage() {
         <PageTitle title="المستخدمون" subtitle="بحث وفلترة حسابات المنظومة." />
         <Button variant="primary" onClick={() => setOpen(true)}>إضافة مستخدم</Button>
       </div>
+
+      <PageHelp pageKey="users" />
 
       <Card className="mt-space-xl flex flex-col gap-space-md">
         <form onSubmit={(e) => { e.preventDefault(); void load() }} className="max-w-[420px]">

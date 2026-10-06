@@ -1,5 +1,5 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import type { ReactNode } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { Icon } from '../components/Icon'
 import { ImpersonationBanner } from '../components/ImpersonationBanner'
@@ -127,7 +127,31 @@ const GROUPS: NavGroup[] = [
 export function AppShell() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const role = user?.kind ?? 'customer'
+
+  // Auto-show the onboarding page on first login only: never if the user has
+  // hidden it, never twice (a per-user 'seen' flag), and never blocking — it is
+  // a one-time redirect. All storage access is guarded. Runs once per mount.
+  const didAutoShow = useRef(false)
+  useEffect(() => {
+    if (didAutoShow.current || !user) return
+    const path = location.pathname
+    const isAuthRoute =
+      path === '/login' || path === '/otp' || path.startsWith('/register')
+    if (isAuthRoute) return
+    didAutoShow.current = true
+    try {
+      const hidden = localStorage.getItem(`wm-onboarding-hidden-${user.id}`) === '1'
+      const seen = localStorage.getItem(`wm-onboarding-seen-${user.id}`) === '1'
+      if (!hidden && !seen) {
+        localStorage.setItem(`wm-onboarding-seen-${user.id}`, '1')
+        navigate('/start')
+      }
+    } catch {
+      /* private mode / blocked storage — fine */
+    }
+  }, [user, location.pathname, navigate])
 
   const navItem = (active: boolean) =>
     `flex items-center gap-space-sm px-space-md py-2 rounded-lg font-body text-body transition-colors ${
@@ -162,6 +186,12 @@ export function AppShell() {
 
         {/* Nav */}
         <nav className="flex-1 overflow-y-auto px-space-sm pb-space-sm flex flex-col gap-space-xs">
+          {/* Onboarding — first entry, every role, outside the role-gated groups */}
+          <NavLink to="/start" className={({ isActive }) => navItem(isActive)}>
+            <Icon name="rocket_launch" size={18} className="shrink-0" />
+            <span className="flex-1 min-w-0 truncate">كيف أبدأ؟</span>
+          </NavLink>
+
           {GROUPS.filter((g) => g.roles.includes(role)).map((g) => (
             <div key={g.label} className="flex flex-col">
               <div className="px-space-md pt-space-sm pb-space-xs font-small text-[11px] text-on-surface-variant tracking-wider">

@@ -4,6 +4,7 @@ import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Pill, Button, Card, Spinner, EmptyState, InlineError } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Icon } from '../../components/Icon'
+import { PageHelp } from '../../components/PageHelp'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import { listFlagged, listMessages, type FlaggedConversation, type Message } from '../../api/comm'
@@ -57,6 +58,8 @@ export function ModerationPage() {
         title="مراقبة المحادثات"
         subtitle="المحادثات التي تحتوي رسائل محظورة. كل الرسائل تمر عبر الشركة وتخضع للرقابة الآلية."
       />
+
+      <PageHelp pageKey="moderation" />
 
       <div className="mt-space-lg">
         {loading ? <Spinner /> : error ? <InlineError message={error} /> : rows.length === 0 ? (

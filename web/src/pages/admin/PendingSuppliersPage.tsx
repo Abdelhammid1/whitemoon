@@ -3,6 +3,7 @@ import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Pill, Button, Spinner, Field, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
+import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import { approveSupplier, listPendingSuppliers, rejectSupplier, type PendingSupplier } from '../../api/admin'
 import { ApiError } from '../../api/client'
@@ -60,6 +61,7 @@ export function PendingSuppliersPage() {
   return (
     <Wide>
       <PageTitle title="الموردون المعلقون" subtitle="مراجعة ملفات التسجيل التجاري والوثائق الضريبية للموردين الجدد." />
+      <PageHelp pageKey="pending-suppliers" />
       <div className="mt-space-xl flex items-center gap-space-sm">
         <Pill tone="warning">{rows.length} معلق</Pill>
       </div>

@@ -7,6 +7,7 @@ import { useToast } from '../../components/Toast'
 import { listMessages, sendMessage, type Message } from '../../api/comm'
 import { ApiError } from '../../api/client'
 import { formatDate } from '../../lib/format'
+import { PageHelp } from '../../components/PageHelp'
 
 function roleLabel(role: string) {
   return role === 'customer' ? 'العميل' : role === 'supplier' ? 'المورّد' : 'الإدارة'
@@ -153,6 +154,8 @@ export function ChatThreadPage() {
           <span className="tracking-tight" dir="ltr">SECURE_MEDIATION: ON</span>
         </div>
       </div>
+
+      <PageHelp pageKey="chat-thread" />
 
       {/* Mandatory mediation banner */}
       <div className="mt-space-md p-space-md bg-brand-weak rounded-xl flex items-start gap-space-sm border-r-2 border-primary">
