@@ -1,4 +1,4 @@
-import { api } from './client'
+import { api, openDocument, postForm } from './client'
 
 export interface CreditTier {
   customer_id: number
@@ -35,6 +35,8 @@ export interface PaymentApproval {
   approved_by: number | null
   approved_at: string | null
   note: string | null
+  source?: string
+  has_receipt?: boolean
 }
 
 export async function getCustomerCredit(id: number) {
@@ -107,4 +109,22 @@ export async function approvePayment(id: number) {
 }
 export async function rejectPayment(id: number, reason: string) {
   return api<PaymentApproval>(`/credit/payments/${id}/reject`, { method: 'POST', body: { reason } })
+}
+
+/** T-21: a customer uploads a bank-transfer receipt image (multipart). */
+export async function uploadReceipt(body: { image: File; amount: string; due_id?: number; paid_on?: string }) {
+  const form = new FormData()
+  form.append('image', body.image)
+  form.append('amount', body.amount)
+  if (body.due_id != null) form.append('due_id', String(body.due_id))
+  if (body.paid_on) form.append('paid_on', body.paid_on)
+  return postForm<PaymentApproval>('/credit/payments/upload-receipt', form)
+}
+/** A customer's own submitted receipts / payments. */
+export async function myPayments() {
+  return api<{ items: PaymentApproval[] }>('/credit/payments/mine')
+}
+/** Open a payment's receipt image in a new tab (auth'd). */
+export async function openReceipt(id: number) {
+  return openDocument(`/credit/payments/${id}/receipt`)
 }

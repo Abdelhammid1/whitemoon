@@ -131,6 +131,75 @@ export async function api<T = unknown>(
   throw new ApiError(resp.status, code, message)
 }
 
+function buildUrl(path: string, query?: Record<string, string | number | undefined>): string {
+  let url = `${API_BASE}${path}`
+  if (query) {
+    const params = new URLSearchParams()
+    for (const [k, v] of Object.entries(query)) {
+      if (v !== undefined && v !== null && v !== '') params.set(k, String(v))
+    }
+    const qs = params.toString()
+    if (qs) url += (url.includes('?') ? '&' : '?') + qs
+  }
+  return url
+}
+
+async function fetchBlob(path: string, query?: Record<string, string | number | undefined>): Promise<Blob> {
+  const headers: Record<string, string> = {}
+  const token = tokenStore.getAccess()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const resp = await fetch(buildUrl(path, query), { headers })
+  if (!resp.ok) {
+    const payload = (await parse(resp)) as { error?: string; message?: string } | null
+    throw new ApiError(resp.status, payload?.error ?? 'http_error', payload?.message ?? `HTTP ${resp.status}`)
+  }
+  return resp.blob()
+}
+
+/**
+ * Open an authenticated document (PDF, or printable HTML on a dev box without
+ * WeasyPrint) in a new tab. Fetches with the bearer token, then hands the
+ * browser a blob URL so a plain link's missing Authorization header is a
+ * non-issue. The blob URL is revoked after a minute to free memory.
+ */
+export async function openDocument(
+  path: string,
+  query?: Record<string, string | number | undefined>,
+): Promise<void> {
+  const blob = await fetchBlob(path, query)
+  const url = URL.createObjectURL(blob)
+  window.open(url, '_blank', 'noopener')
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
+}
+
+/** Download an authenticated file (e.g. an .xlsx export) to disk. */
+export async function downloadFile(
+  path: string,
+  filename: string,
+  query?: Record<string, string | number | undefined>,
+): Promise<void> {
+  const blob = await fetchBlob(path, query)
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+/** POST multipart form-data with the bearer token (for file uploads). */
+export async function postForm<T = unknown>(path: string, form: FormData): Promise<T> {
+  const headers: Record<string, string> = {}
+  const token = tokenStore.getAccess()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const resp = await fetch(buildUrl(path), { method: 'POST', headers, body: form })
+  if (resp.ok) return (await parse(resp)) as T
+  const payload = (await parse(resp)) as { error?: string; message?: string } | null
+  throw new ApiError(resp.status, payload?.error ?? 'http_error', payload?.message ?? `HTTP ${resp.status}`)
+}
+
 async function tryRefresh(): Promise<boolean> {
   const refresh = tokenStore.getRefresh()
   if (!refresh) {

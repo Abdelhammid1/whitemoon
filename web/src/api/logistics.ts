@@ -23,6 +23,9 @@ export interface Shipment {
   slot_id: number | null
   carrier_type: string
   status: string
+  allowed_next?: string[]
+  created_at?: string | null
+  shipped_at?: string | null
   current_lat: string | null
   current_lng: string | null
   location_updated_at: string | null
@@ -30,6 +33,10 @@ export interface Shipment {
   confirmation_code?: string
   shortages: { product_id: number; qty: string; photo_url: string | null; note: string | null }[]
   legs: ShipmentLeg[]
+}
+
+export async function listShipments(params: { status?: string; from?: string; to?: string } = {}) {
+  return api<{ items: Shipment[] }>('/logistics/shipments', { query: params })
 }
 
 export async function createSlot(slot_date: string, window: string, capacity: number) {

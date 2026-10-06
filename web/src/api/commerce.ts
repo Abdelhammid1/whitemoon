@@ -1,4 +1,4 @@
-import { api } from './client'
+import { api, downloadFile, openDocument } from './client'
 
 // ---------------------------------------------------------------- catalog
 
@@ -150,17 +150,24 @@ export interface Rfq {
   id: number
   number: string
   product_id: number
+  product_name?: string | null
   qty: string
   deadline: string | null
   qualification_requirements: string | null
   status: string
   offer_count: number
+  my_offer?: { unit_price: string; moq: string }
 }
 export interface RfqOffer {
   offer_id: number
   unit_price: string
   moq: string
   submitted_at: string
+  supplier_id?: number // admin-only; never present for a customer
+}
+
+export async function listRfqs() {
+  return api<{ items: Rfq[] }>('/commerce/rfqs')
 }
 
 export async function createRfq(body: {
@@ -199,10 +206,26 @@ export async function supplierOrders() {
 export interface CustomerStatement {
   customer_id: number
   profile: { display_name: string | null; geo_area: string | null }
+  tier: string
+  credit_limit: string
+  outstanding: string
+  available: string
   orders: Order[]
   dues: { id: number; amount: string; due_date: string; status: string; days_late: number | null }[]
-  outstanding: string
+  payments: { id: number; amount: string; paid_on: string; source: string }[]
 }
-export async function customerStatement(customerId: number) {
-  return api<CustomerStatement>(`/commerce/customers/${customerId}/statement`)
+export async function customerStatement(customerId: number, range: { from?: string; to?: string } = {}) {
+  return api<CustomerStatement>(`/commerce/customers/${customerId}/statement`, { query: range })
+}
+/** Open the Arabic PDF (or printable HTML) statement in a new tab. */
+export async function openStatementPdf(customerId: number, range: { from?: string; to?: string } = {}) {
+  return openDocument(`/commerce/customers/${customerId}/statement.pdf`, range)
+}
+/** Download the .xlsx statement. */
+export async function downloadStatementXlsx(customerId: number, range: { from?: string; to?: string } = {}) {
+  return downloadFile(`/commerce/customers/${customerId}/statement.xlsx`, `statement-${customerId}.xlsx`, range)
+}
+/** Open the Arabic PDF (or printable HTML) invoice for an order in a new tab. */
+export async function openOrderInvoice(orderId: number) {
+  return openDocument(`/commerce/orders/${orderId}/invoice`)
 }
