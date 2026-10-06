@@ -44,6 +44,15 @@ def _kind(uid: int) -> str:
     return user.kind if user else ""
 
 
+def _xlsx_safe(v: str) -> str:
+    """Neutralise CSV/formula injection: a cell beginning with = + - @ (or a
+    control char) is executed as a formula by Excel/Sheets. User-controlled
+    text (e.g. a store name) is prefixed with a single quote so it stays data."""
+    if v and v[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + v
+    return v
+
+
 # ================================================================ catalog
 
 
@@ -311,7 +320,7 @@ def customer_statement_xlsx(customer_id: int):
     assert summary is not None  # a new workbook always has an active sheet
     summary.title = "ملخص"
     summary.sheet_view.rightToLeft = True
-    summary.append(["العميل", name])
+    summary.append(["العميل", _xlsx_safe(name)])
     summary.append(["السقف الائتماني", float(s["credit_limit"])])
     summary.append(["الرصيد المستحق", float(s["outstanding"])])
     summary.append(["المتاح", float(s["available"])])

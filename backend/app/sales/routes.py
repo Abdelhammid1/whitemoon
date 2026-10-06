@@ -256,7 +256,11 @@ def payment_receipt(approval_id: int):
     row = db.session.get(PaymentApproval, approval_id)
     if row is None or not row.receipt_key:
         raise NotFound("لا يوجد إيصال", code="receipt_not_found")
-    if not has_permission(uid, "payment.approve") and row.customer_id != uid:
+    # Finance reviewers see any receipt (the review queue); otherwise only the
+    # customer who actually uploaded it — not merely anyone sharing customer_id.
+    is_reviewer = has_permission(uid, "payment.approve")
+    is_uploader = row.collected_by == uid and row.customer_id == uid
+    if not is_reviewer and not is_uploader:
         raise Forbidden("غير مصرح", code="forbidden")
     blob = storage.load(row.receipt_key)
     if blob is None:

@@ -206,6 +206,16 @@ def test_statement_has_balance_and_exports(client) -> None:
     assert pdf.mimetype in ("application/pdf", "text/html")
 
 
+def test_xlsx_cell_sanitised_against_formula_injection() -> None:
+    from app.commerce.routes import _xlsx_safe
+
+    assert _xlsx_safe("=1+1") == "'=1+1"
+    assert _xlsx_safe("+SUM(A1)") == "'+SUM(A1)"
+    assert _xlsx_safe("-2") == "'-2"
+    assert _xlsx_safe("@cmd") == "'@cmd"
+    assert _xlsx_safe("متجر الأمل") == "متجر الأمل"  # ordinary text untouched
+
+
 def test_statement_out_of_scope_forbidden(client) -> None:
     c1 = _u("customer", ("customer",))
     c2 = _u("customer", ("customer",))
