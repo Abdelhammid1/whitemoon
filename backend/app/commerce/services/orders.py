@@ -301,7 +301,9 @@ def transition_order(order_id: int, action: str, *, actor_id: int | None = None)
     rule = _ORDER_TRANSITIONS.get(action)
     if rule is None:
         raise Conflict(f"إجراء غير معروف: {action}", code="bad_action")
-    order = db.session.get(Order, order_id)
+    # Lock the order row so two concurrent transitions can't both pass the
+    # status check and double-process (e.g. reverse the GL twice on cancel).
+    order = db.session.get(Order, order_id, with_for_update=True)
     if order is None:
         raise NotFound("Order not found", code="order_not_found")
     allowed_from, order_to, sub_to = rule
