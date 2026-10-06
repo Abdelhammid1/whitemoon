@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { Narrow } from '../../layouts/AppShell'
 import { PageTitle, Pill, Button, Field, Spinner, SectionHeader, EmptyState, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
@@ -8,6 +8,7 @@ import { getUser, listAudit, updateUserProfile, type UserDetail, type AuditRow }
 import { ApiError } from '../../api/client'
 import { useToast } from '../../components/Toast'
 import { formatDate } from '../../lib/format'
+import { USER_STATUS_AR, label } from '../../lib/labels'
 
 const KIND_AR: Record<string, string> = {
   customer: 'عميل', supplier: 'مورد', agent: 'وكيل', branch: 'فرع', staff: 'موظف', admin: 'مدير',
@@ -87,12 +88,17 @@ export function UserDetailPage() {
 
   return (
     <Narrow>
-      <div className="flex items-center gap-space-md">
+      <div className="flex flex-wrap items-center justify-between gap-space-md">
         <PageTitle title={user.email ?? user.phone ?? `#${user.id}`} />
+        {user.kind === 'customer' && (
+          <Link to={`/admin/customers/${user.id}/statement`}>
+            <Button iconRight="account_balance_wallet">كشف الحساب</Button>
+          </Link>
+        )}
       </div>
       <div className="mt-space-sm flex flex-wrap items-center gap-space-sm">
         <Pill tone="neutral">{KIND_AR[user.kind] ?? user.kind}</Pill>
-        <Pill tone={STATUS_TONE[user.status] ?? 'neutral'}>{user.status}</Pill>
+        <Pill tone={STATUS_TONE[user.status] ?? 'neutral'}>{label(USER_STATUS_AR, user.status)}</Pill>
         {user.roles.map((r) => <Pill key={r} tone="brand">{r}</Pill>)}
       </div>
 

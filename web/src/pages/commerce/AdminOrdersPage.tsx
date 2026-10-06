@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, Spinner, EmptyState, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
+import { Icon } from '../../components/Icon'
 import { PageHelp } from '../../components/PageHelp'
-import { adminListOrders, type AdminOrder, type OrderStatus } from '../../api/commerce'
+import { useToast } from '../../components/Toast'
+import { adminListOrders, openOrderInvoice, type AdminOrder, type OrderStatus } from '../../api/commerce'
 import { ApiError } from '../../api/client'
 import { formatDate, formatMoney } from '../../lib/format'
 
@@ -36,6 +38,7 @@ const EMPTY_FILTERS: Filters = { status: '', q: '', customer_id: '', date_from: 
 
 export function AdminOrdersPage() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [status, setStatus] = useState<'' | OrderStatus>('')
   const [q, setQ] = useState('')
   const [customerId, setCustomerId] = useState('')
@@ -75,6 +78,14 @@ export function AdminOrdersPage() {
   function pickStatus(s: '' | OrderStatus) {
     setStatus(s)
     void runSearch({ status: s, q, customer_id: customerId, date_from: dateFrom, date_to: dateTo })
+  }
+
+  async function openInvoice(orderId: number) {
+    try {
+      await openOrderInvoice(orderId)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'تعذّر فتح الفاتورة')
+    }
   }
 
   return (
@@ -183,6 +194,24 @@ export function AdminOrdersPage() {
                   ),
                 },
                 { header: 'التاريخ', align: 'end', cell: (o) => <Mono>{formatDate(o.placed_at)}</Mono> },
+                {
+                  header: 'الفاتورة',
+                  align: 'center',
+                  cell: (o) => (
+                    <button
+                      type="button"
+                      title="فاتورة PDF"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        void openInvoice(o.id)
+                      }}
+                      className="inline-flex items-center gap-space-xs px-space-sm py-1 rounded-lg text-primary hover:bg-surface-container-low transition-colors"
+                    >
+                      <Icon name="picture_as_pdf" size={18} />
+                      <span className="font-small text-small">فاتورة</span>
+                    </button>
+                  ),
+                },
               ]}
             />
           </Card>

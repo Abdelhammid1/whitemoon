@@ -75,6 +75,7 @@ const GROUPS: NavGroup[] = [
       { to: '/partners', label: 'الوكلاء والفروع', icon: 'hub' },
       { to: '/production', label: 'أوامر التصنيع', icon: 'precision_manufacturing' },
       { to: '/logistics', label: 'اللوجستيات', icon: 'local_shipping' },
+      { to: '/logistics/shipments', label: 'الشحنات', icon: 'inventory' },
       { to: '/logistics/deliver', label: 'تأكيد التسليم', icon: 'task_alt' },
       { to: '/pos/settle', label: 'تسوية نقطة البيع', icon: 'point_of_sale' },
     ],
@@ -115,6 +116,8 @@ const GROUPS: NavGroup[] = [
       { to: '/cart', label: 'سلتي', icon: 'shopping_cart' },
       { to: '/orders', label: 'طلباتي', icon: 'list_alt' },
       { to: '/rfq', label: 'طلب عرض سعر', icon: 'request_quote' },
+      { to: '/statement', label: 'كشف الحساب', icon: 'account_balance_wallet' },
+      { to: '/pay/receipt', label: 'رفع إيصال تحويل', icon: 'upload_file' },
     ],
   },
   {

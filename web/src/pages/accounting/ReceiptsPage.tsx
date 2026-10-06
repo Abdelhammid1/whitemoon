@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Narrow } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
@@ -8,6 +8,7 @@ import { fetchReceiptImageUrl, listReceipts, resolveReceipt, uploadReceiptFile, 
 import { ApiError } from '../../api/client'
 import { PageHelp } from '../../components/PageHelp'
 import { formatDate, formatMoney } from '../../lib/format'
+import { RECEIPT_STATUS_AR, label } from '../../lib/labels'
 
 interface Result { receipt_id: number; status: string; ocr_amount: string | null; ocr_reference: string | null }
 
@@ -20,6 +21,7 @@ const STATUS_TONE: Record<string, 'signal' | 'warning' | 'error' | 'neutral'> = 
 export function ReceiptsPage() {
   const toast = useToast()
   const [file, setFile] = useState<File | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const [expectedAmount, setExpectedAmount] = useState('')
   const [expectedRef, setExpectedRef] = useState('')
   const [stubAmount, setStubAmount] = useState('')
@@ -113,7 +115,7 @@ export function ReceiptsPage() {
     try {
       const r = await resolveReceipt(result.receipt_id, status)
       setResult({ ...result, status: r.status })
-      toast.success(`تم تحديث الحالة إلى ${r.status}.`)
+      toast.success(`تم تحديث الحالة إلى ${label(RECEIPT_STATUS_AR, r.status)}.`)
       await load()
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'فشل الحسم')
@@ -132,18 +134,21 @@ export function ReceiptsPage() {
       <form onSubmit={onUpload} className="flex flex-col gap-space-md">
         <div className="border border-dashed border-surface-container-high rounded-xl p-space-xl text-center">
           <p className="font-body text-body text-secondary">ارفع صورة الإيصال (تُخزَّن على الخادم)</p>
-          <div className="max-w-[420px] mx-auto mt-space-md">
+          <div className="max-w-[420px] mx-auto mt-space-md flex flex-col items-center gap-space-sm">
             <input
+              ref={fileRef}
               type="file"
               accept="image/*,.pdf"
+              className="hidden"
               onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="block w-full text-body text-on-surface file:me-space-md file:rounded-lg file:border-0 file:bg-primary file:text-on-primary file:px-space-md file:py-space-xs file:font-body-medium hover:file:opacity-90 cursor-pointer"
-              required
             />
-            {file && (
-              <p className="mt-space-sm font-small text-small text-secondary">
-                <bdi dir="ltr">{file.name}</bdi> — {(file.size / 1024).toFixed(0)} KB
+            <Button type="button" variant="primary" onClick={() => fileRef.current?.click()} iconRight="upload">اختر ملفًا</Button>
+            {file ? (
+              <p className="font-small text-small text-secondary">
+                <bdi dir="ltr">{file.name}</bdi> — {(file.size / 1024).toFixed(0)} كيلوبايت
               </p>
+            ) : (
+              <p className="font-small text-small text-secondary">لم تختر ملفًا بعد</p>
             )}
           </div>
         </div>
@@ -152,10 +157,10 @@ export function ReceiptsPage() {
           <Field label="الرقم المرجعي المتوقع" dir="ltr" mono value={expectedRef} onChange={(e) => setExpectedRef(e.target.value)} />
         </div>
         <div className="border-t border-surface-container-high pt-space-md">
-          <p className="font-small text-small text-secondary mb-space-sm">وضع التطوير — قيم OCR محاكاة</p>
+          <p className="font-small text-small text-secondary mb-space-sm">وضع التطوير — قيم القراءة الضوئية محاكاة</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md">
-            <Field label="OCR Amount (stub)" dir="ltr" mono inputMode="decimal" value={stubAmount} onChange={(e) => setStubAmount(e.target.value)} />
-            <Field label="OCR Reference (stub)" dir="ltr" mono value={stubRef} onChange={(e) => setStubRef(e.target.value)} />
+            <Field label="مبلغ القراءة الضوئية (محاكاة)" dir="ltr" mono inputMode="decimal" value={stubAmount} onChange={(e) => setStubAmount(e.target.value)} />
+            <Field label="مرجع القراءة الضوئية (محاكاة)" dir="ltr" mono value={stubRef} onChange={(e) => setStubRef(e.target.value)} />
           </div>
         </div>
         <div className="flex justify-end"><Button variant="primary" type="submit" disabled={busy}>{busy ? 'جار الرفع…' : 'رفع ومطابقة'}</Button></div>
@@ -166,10 +171,10 @@ export function ReceiptsPage() {
         <Card className="mt-space-lg flex flex-col gap-space-sm">
           <div className="flex items-center justify-between">
             <span className="font-body text-body text-on-surface">إيصال <bdi dir="ltr" className="font-mono-medium">#{result.receipt_id}</bdi></span>
-            <Pill tone={STATUS_TONE[result.status] ?? 'warning'}>{result.status}</Pill>
+            <Pill tone={STATUS_TONE[result.status] ?? 'warning'}>{label(RECEIPT_STATUS_AR, result.status)}</Pill>
           </div>
           <span className="font-mono-body text-mono-body text-secondary">
-            OCR: <bdi dir="ltr">{result.ocr_amount ?? '—'}</bdi> / <bdi dir="ltr">{result.ocr_reference ?? '—'}</bdi>
+            القراءة الضوئية: <bdi dir="ltr">{result.ocr_amount ?? '—'}</bdi> / <bdi dir="ltr">{result.ocr_reference ?? '—'}</bdi>
           </span>
           {result.status === 'manual_review' && (
             <div className="flex gap-space-sm justify-end">
@@ -195,9 +200,9 @@ export function ReceiptsPage() {
             empty="لا توجد إيصالات بعد."
             columns={[
               { header: 'المعرف', width: '70px', cell: (r) => <Mono>#{r.id}</Mono> },
-              { header: 'الحالة', cell: (r) => <Pill tone={STATUS_TONE[r.status] ?? 'neutral'}>{r.status}</Pill> },
-              { header: 'مبلغ OCR', align: 'end', cell: (r) => <Mono>{r.ocr_amount ? formatMoney(r.ocr_amount) : '—'}</Mono> },
-              { header: 'مرجع OCR', cell: (r) => <Mono>{r.ocr_reference ?? '—'}</Mono> },
+              { header: 'الحالة', cell: (r) => <Pill tone={STATUS_TONE[r.status] ?? 'neutral'}>{label(RECEIPT_STATUS_AR, r.status)}</Pill> },
+              { header: 'مبلغ القراءة', align: 'end', cell: (r) => <Mono>{r.ocr_amount ? formatMoney(r.ocr_amount) : '—'}</Mono> },
+              { header: 'مرجع القراءة', cell: (r) => <Mono>{r.ocr_reference ?? '—'}</Mono> },
               { header: 'طلب مطابق', align: 'center', cell: (r) => <Mono>{r.matched_order_id ?? '—'}</Mono> },
               { header: 'رُفع', align: 'end', cell: (r) => <Mono>{r.uploaded_at ? formatDate(r.uploaded_at) : '—'}</Mono> },
             ]}

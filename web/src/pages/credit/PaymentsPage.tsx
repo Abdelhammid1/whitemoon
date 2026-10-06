@@ -5,7 +5,7 @@ import { DataTable, Mono } from '../../components/DataTable'
 import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import {
-  approvePayment, collectPayment, listPayments, rejectPayment, type PaymentApproval,
+  approvePayment, collectPayment, listPayments, openReceipt, rejectPayment, type PaymentApproval,
 } from '../../api/credit'
 import { ApiError } from '../../api/client'
 import { formatMoney, todayIso } from '../../lib/format'
@@ -53,6 +53,11 @@ export function PaymentsPage() {
     finally { setBusy(false) }
   }
 
+  async function viewReceipt(id: number) {
+    try { await openReceipt(id) }
+    catch (err) { toast.error(err instanceof ApiError ? err.message : 'تعذّر فتح الإيصال') }
+  }
+
   return (
     <Wide>
       <PageTitle title="اعتماد السداد" subtitle="تحصيل يُعتمد بمستوى واحد قبل الشركة — لا يعتمد المحصِّل تحصيله بنفسه." />
@@ -81,16 +86,24 @@ export function PaymentsPage() {
                 { header: 'المعرف', width: '70px', cell: (r) => <Mono>#{r.id}</Mono> },
                 { header: 'العميل', cell: (r) => <Mono>{r.customer_id}</Mono> },
                 { header: 'الذمة', cell: (r) => <Mono>{r.due_id ?? '—'}</Mono> },
+                { header: 'المصدر', align: 'center', cell: (r) => r.source === 'customer' ? <Pill tone="signal">تحويل مرفوع</Pill> : <Pill tone="neutral">تحصيل ميداني</Pill> },
                 { header: 'المبلغ', align: 'end', cell: (r) => <Mono>{formatMoney(r.amount)}</Mono> },
                 { header: 'الحالة', align: 'center', cell: (r) => <Pill tone={STATUS[r.status]?.tone ?? 'neutral'}>{STATUS[r.status]?.ar ?? r.status}</Pill> },
                 {
                   header: '', align: 'end',
-                  cell: (r) => r.status === 'pending' ? (
-                    <span className="flex gap-space-md justify-end">
-                      <button className="text-danger font-small-medium hover:underline disabled:opacity-40" onClick={() => act(() => rejectPayment(r.id, 'مرفوض من المراجعة'), 'رُفض.')} disabled={busy}>رفض</button>
-                      <button className="text-primary font-small-medium hover:underline disabled:opacity-40" onClick={() => act(() => approvePayment(r.id), 'اعتُمد.')} disabled={busy}>اعتماد</button>
+                  cell: (r) => (
+                    <span className="flex gap-space-md justify-end items-center">
+                      {r.has_receipt && (
+                        <button className="text-primary font-small-medium hover:underline" onClick={() => void viewReceipt(r.id)}>عرض الإيصال</button>
+                      )}
+                      {r.status === 'pending' && (
+                        <>
+                          <button className="text-danger font-small-medium hover:underline disabled:opacity-40" onClick={() => act(() => rejectPayment(r.id, 'مرفوض من المراجعة'), 'رُفض.')} disabled={busy}>رفض</button>
+                          <button className="text-primary font-small-medium hover:underline disabled:opacity-40" onClick={() => act(() => approvePayment(r.id), 'اعتُمد.')} disabled={busy}>اعتماد</button>
+                        </>
+                      )}
                     </span>
-                  ) : null,
+                  ),
                 },
               ]} />
             </Card>

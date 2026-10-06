@@ -33,9 +33,11 @@ import { AdminOrdersPage } from './pages/commerce/AdminOrdersPage'
 import { OrderDetailPage } from './pages/commerce/OrderDetailPage'
 import { RfqPage } from './pages/commerce/RfqPage'
 import { RfqDetailPage } from './pages/commerce/RfqDetailPage'
+import { StatementPage } from './pages/commerce/StatementPage'
 import { CreditPage } from './pages/credit/CreditPage'
 import { TierSettingsPage } from './pages/credit/TierSettingsPage'
 import { PaymentsPage } from './pages/credit/PaymentsPage'
+import { UploadReceiptPage } from './pages/credit/UploadReceiptPage'
 import { DunningPage } from './pages/credit/DunningPage'
 import { CompliancePage } from './pages/compliance/CompliancePage'
 import { PartnersPage } from './pages/partners/PartnersPage'
@@ -46,6 +48,7 @@ import { PosPage } from './pages/pos/PosPage'
 import { PosSalesPage } from './pages/pos/PosSalesPage'
 import { PosSettlePage } from './pages/pos/PosSettlePage'
 import { LogisticsPage } from './pages/logistics/LogisticsPage'
+import { ShipmentsPage } from './pages/logistics/ShipmentsPage'
 import { TrackingPage } from './pages/logistics/TrackingPage'
 import { DeliveryConfirmPage } from './pages/logistics/DeliveryConfirmPage'
 import { ChatPage } from './pages/comm/ChatPage'
@@ -85,6 +88,9 @@ export function App() {
         <Route path="/orders/:id" element={<OrderDetailPage />} />
         <Route path="/rfq" element={<RfqPage />} />
         <Route path="/rfq/:id" element={<RfqDetailPage />} />
+        <Route path="/statement" element={<StatementPage />} />
+        <Route path="/admin/customers/:id/statement" element={<ProtectedRoute roles={FINANCE}><StatementPage /></ProtectedRoute>} />
+        <Route path="/pay/receipt" element={<UploadReceiptPage />} />
         <Route path="/supplier/orders" element={<ProtectedRoute roles={['supplier']}><SupplierOrdersPage /></ProtectedRoute>} />
 
         <Route path="/admin/users" element={<ProtectedRoute roles={FINANCE}><UsersPage /></ProtectedRoute>} />
@@ -131,6 +137,7 @@ export function App() {
         <Route path="/pos/settle" element={<ProtectedRoute roles={FINANCE}><PosSettlePage /></ProtectedRoute>} />
 
         <Route path="/logistics" element={<ProtectedRoute roles={FINANCE}><LogisticsPage /></ProtectedRoute>} />
+        <Route path="/logistics/shipments" element={<ProtectedRoute roles={FINANCE}><ShipmentsPage /></ProtectedRoute>} />
         <Route path="/logistics/deliver" element={<ProtectedRoute roles={FINANCE}><DeliveryConfirmPage /></ProtectedRoute>} />
         <Route path="/orders/:id/shipment" element={<TrackingPage />} />
 

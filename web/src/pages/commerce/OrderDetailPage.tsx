@@ -12,6 +12,7 @@ import {
   confirmOrder,
   fulfillOrder,
   cancelOrder,
+  openOrderInvoice,
   type Order,
   type OrderAction,
 } from '../../api/commerce'
@@ -88,6 +89,14 @@ export function OrderDetailPage() {
     }
   }
 
+  async function openInvoice() {
+    try {
+      await openOrderInvoice(oid)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'تعذّر فتح الفاتورة')
+    }
+  }
+
   async function doTransition(action: OrderAction) {
     setActing(true)
     try {
@@ -126,6 +135,9 @@ export function OrderDetailPage() {
         </Pill>
         <span className="font-body text-body text-secondary">{order.payment_mode === 'deferred' ? 'آجل' : 'نقدي'}</span>
         <span className="font-mono-body text-mono-body text-secondary">{formatDate(order.placed_at)}</span>
+        <Button className="ms-auto" iconRight="picture_as_pdf" onClick={() => void openInvoice()}>
+          فاتورة PDF
+        </Button>
       </div>
 
       {/* Admin/staff actions — only the valid transitions for the current status. */}

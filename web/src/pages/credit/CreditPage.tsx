@@ -14,6 +14,7 @@ import {
 import { customerStatement, type CustomerStatement } from '../../api/commerce'
 import { ApiError } from '../../api/client'
 import { formatDate, formatMoney, todayIso } from '../../lib/format'
+import { ORDER_STATUS_AR, label } from '../../lib/labels'
 
 type Tone = 'signal' | 'warning' | 'error' | 'neutral'
 
@@ -301,7 +302,7 @@ export function CreditPage() {
               ) : (
                 <DataTable rows={statement.orders} rowKey={(o) => o.id} columns={[
                   { header: 'الطلب', cell: (o) => <Mono>{o.number}</Mono> },
-                  { header: 'الحالة', align: 'center', cell: (o) => <span className="font-small text-small text-secondary">{o.status}</span> },
+                  { header: 'الحالة', align: 'center', cell: (o) => <span className="font-small text-small text-secondary">{label(ORDER_STATUS_AR, o.status)}</span> },
                   { header: 'آجل', align: 'end', cell: (o) => <span dir="ltr"><Mono>{formatMoney(o.total_deferred)}</Mono> ج.م</span> },
                   { header: 'نقدي', align: 'end', cell: (o) => <span dir="ltr"><Mono>{formatMoney(o.total_cash)}</Mono> ج.م</span> },
                 ]} />
