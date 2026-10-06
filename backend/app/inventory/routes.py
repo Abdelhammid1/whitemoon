@@ -111,8 +111,10 @@ def update_product(product_id: int):
 
 
 @bp.get("/products/<int:product_id>")
-@jwt_required()
+@require_permission("product.manage")
 def get_product_detail(product_id: int):
+    # Admin/staff detail — exposes internal pricing/variants. Customers use the
+    # supplier-blind /catalog/products/<id> instead.
     return jsonify(products_svc.serialize(products_svc.get_product(product_id)))
 
 
@@ -201,8 +203,10 @@ def serve_product_image(image_id: int):
 
 
 @bp.get("/products")
-@jwt_required()
+@require_permission("product.manage")
 def list_products():
+    # Admin/staff catalog management view (internal fields). Customer browsing
+    # goes through /catalog/products, which hides suppliers and internal pricing.
     items = products_svc.list_products(
         q=request.args.get("q"),
         category=request.args.get("category"),

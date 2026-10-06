@@ -256,6 +256,24 @@ def test_product_update_variant_and_image_integrity(client) -> None:
     assert bad.status_code == 409
 
 
+def test_inventory_product_endpoints_hide_internal_data_from_customers(client) -> None:
+    """A customer must not read internal product data (wholesale/deferred price,
+    variants, tax/eta) via the admin inventory endpoints."""
+    from tests.helpers import auth_header, create_user
+    create_user(kind="admin", email="pdadmin@example.com", roles=("admin",))
+    create_user(kind="customer", email="pdcust@example.com", roles=("customer",))
+    adm = auth_header(client, email="pdadmin@example.com")
+    cust = auth_header(client, email="pdcust@example.com")
+    pid = client.post(
+        "/inventory/products", headers=adm,
+        json={"sku": "SEC-1", "name_ar": "منتج", "category": "food", "wholesale_price": "50"},
+    ).get_json()["id"]
+    assert client.get("/inventory/products", headers=cust).status_code == 403
+    assert client.get(f"/inventory/products/{pid}", headers=cust).status_code == 403
+    # Admin still can.
+    assert client.get(f"/inventory/products/{pid}", headers=adm).status_code == 200
+
+
 def test_product_catalog_accepts_expanded_categories(client) -> None:
     # T-10: segments beyond food/clothing are now valid.
     for cat in ("electronics", "home", "beauty", "construction", "stationery", "automotive", "other"):
