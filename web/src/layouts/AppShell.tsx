@@ -25,6 +25,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: '/', label: 'لوحة التحكم', icon: 'space_dashboard', end: true },
       { to: '/dashboard', label: 'التحليلات التنفيذية', icon: 'monitoring' },
+      { to: '/admin/orders', label: 'كل الطلبات', icon: 'receipt_long' },
       { to: '/admin/users', label: 'المستخدمون', icon: 'group' },
       { to: '/admin/suppliers/pending', label: 'الموردون المعلقون', icon: 'how_to_reg' },
       { to: '/admin/audit', label: 'سجل التدقيق', icon: 'history' },

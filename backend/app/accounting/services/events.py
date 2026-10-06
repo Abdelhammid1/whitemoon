@@ -125,6 +125,41 @@ def post(
     return PostingResult(entry_id=entry.id, entry_no=entry.entry_no)
 
 
+def reverse(entry_id: int, *, reason: str, posted_by: int | None = None) -> PostingResult:
+    """Post a mirror entry that reverses `entry_id` (debits↔credits) — e.g. when
+    an order is cancelled so its receivable/revenue is backed out. Posts into
+    today's period."""
+    orig = db.session.get(JournalEntry, entry_id)
+    if orig is None:
+        raise NotFound(f"journal entry {entry_id} not found", code="entry_not_found")
+    lines = db.session.execute(
+        select(JournalLine).where(JournalLine.entry_id == entry_id)
+    ).scalars().all()
+    rev = _create_entry(
+        entry_date=date.today(),
+        description=f"عكس القيد {orig.entry_no}: {reason}",
+        source="system",
+        source_event_type="reversal",
+        source_event_id=str(entry_id),
+        posted_by=posted_by,
+    )
+    for ln in lines:
+        db.session.add(
+            JournalLine(
+                entry_id=rev.id,
+                account_id=ln.account_id,
+                debit=ln.credit,  # swap
+                credit=ln.debit,
+                currency=ln.currency,
+                partner_type=ln.partner_type,
+                partner_id=ln.partner_id,
+                description=f"عكس: {ln.description or ''}".strip(),
+            )
+        )
+    db.session.flush()
+    return PostingResult(entry_id=rev.id, entry_no=rev.entry_no)
+
+
 def post_manual(
     *,
     entry_date: date,

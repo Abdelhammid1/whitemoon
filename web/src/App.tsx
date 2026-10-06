@@ -28,6 +28,7 @@ import { ProductDetailPage } from './pages/commerce/ProductDetailPage'
 import { SupplierOrdersPage } from './pages/commerce/SupplierOrdersPage'
 import { CartPage } from './pages/commerce/CartPage'
 import { OrdersPage } from './pages/commerce/OrdersPage'
+import { AdminOrdersPage } from './pages/commerce/AdminOrdersPage'
 import { OrderDetailPage } from './pages/commerce/OrderDetailPage'
 import { RfqPage } from './pages/commerce/RfqPage'
 import { RfqDetailPage } from './pages/commerce/RfqDetailPage'
@@ -78,6 +79,7 @@ export function App() {
         <Route path="/catalog/:id" element={<ProductDetailPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/admin/orders" element={<ProtectedRoute roles={FINANCE}><AdminOrdersPage /></ProtectedRoute>} />
         <Route path="/orders/:id" element={<OrderDetailPage />} />
         <Route path="/rfq" element={<RfqPage />} />
         <Route path="/rfq/:id" element={<RfqDetailPage />} />

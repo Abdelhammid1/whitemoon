@@ -78,7 +78,61 @@ export interface Order {
   total_deferred: string
   placed_at: string
   lines?: OrderLine[]
+  /** Present on the admin/staff view instead of `lines`. */
+  sub_orders?: AdminSubOrder[]
 }
+
+// ---------------------------------------------------------------- admin orders (T-13)
+
+export type OrderStatus = 'pending' | 'confirmed' | 'fulfilled' | 'cancelled'
+export type OrderAction = 'confirm' | 'fulfill' | 'cancel'
+
+export interface AdminOrderLine {
+  product_id: number
+  supplier_offer_id: number
+  qty: string
+  unit_price: string
+  line_total: string
+}
+export interface AdminSubOrder {
+  id: number
+  supplier_id: number
+  subtotal: string
+  lines: AdminOrderLine[]
+}
+export interface AdminOrder {
+  id: number
+  number: string
+  status: OrderStatus
+  payment_mode: 'cash' | 'deferred'
+  total_cash: string
+  total_deferred: string
+  placed_at: string
+  customer_id: number
+  customer_name: string | null
+  sub_orders: AdminSubOrder[]
+}
+
+export async function adminListOrders(
+  params: {
+    status?: string
+    customer_id?: string
+    q?: string
+    date_from?: string
+    date_to?: string
+    limit?: number
+  } = {},
+) {
+  return api<{ items: AdminOrder[] }>('/commerce/admin/orders', { query: params })
+}
+
+/** Move an order through its lifecycle. An invalid transition returns 409. */
+export async function transitionOrder(id: number, action: OrderAction) {
+  return api<AdminOrder>(`/commerce/orders/${id}/${action}`, { method: 'POST' })
+}
+export const confirmOrder = (id: number) => transitionOrder(id, 'confirm')
+export const fulfillOrder = (id: number) => transitionOrder(id, 'fulfill')
+export const cancelOrder = (id: number) => transitionOrder(id, 'cancel')
 
 export async function checkout(payment_mode: 'cash' | 'deferred') {
   return api<Order>('/commerce/checkout', { method: 'POST', body: { payment_mode } })

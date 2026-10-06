@@ -13,7 +13,7 @@ from ..common.errors import ApiError, BadRequest, Forbidden, NotFound, Unauthori
 from ..extensions import db
 from ..identity.models import User
 from ..identity.services.audit import emit as audit_emit
-from ..identity.services.rbac import has_permission
+from ..identity.services.rbac import has_permission, require_permission
 from .models import Order
 from .schemas import AddCartItemIn, CheckoutIn, RfqIn, RfqOfferIn, UpdateCartItemIn
 from .services import cart as cart_svc
@@ -196,6 +196,35 @@ def get_order(order_id: int):
     if not is_admin and order.customer_id != uid:
         raise Forbidden("ليس طلبك", code="forbidden")
     return jsonify(orders_svc.serialize_order(order, for_customer=not is_admin))
+
+
+@bp.get("/commerce/admin/orders")
+@require_permission("order.manage")
+def admin_list_orders():
+    """All orders with search + status/customer/date filters (T-13)."""
+    cid = request.args.get("customer_id", type=int)
+    items = orders_svc.list_all_orders(
+        status=request.args.get("status"),
+        customer_id=cid,
+        q=request.args.get("q"),
+        date_from=request.args.get("date_from"),
+        date_to=request.args.get("date_to"),
+        limit=min(request.args.get("limit", 200, type=int), 500),
+    )
+    return jsonify({"items": orders_svc.serialize_admin_rows(items)})
+
+
+@bp.post("/commerce/orders/<int:order_id>/<action>")
+@require_permission("order.manage")
+def transition_order(order_id: int, action: str):
+    """confirm / fulfill / cancel — propagates to sub-orders; cancel also
+    reverses the order's financials (T-13). The service validates the action."""
+    order = orders_svc.transition_order(order_id, action, actor_id=_uid())
+    audit_emit(
+        f"commerce.order.{action}", actor_user_id=_uid(),
+        target_type="order", target_id=order.id,
+    )
+    return jsonify(orders_svc.serialize_admin(order))
 
 
 # ================================================================ RFQ

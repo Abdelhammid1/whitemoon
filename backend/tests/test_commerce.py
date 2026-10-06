@@ -117,6 +117,81 @@ def test_multi_supplier_cart_checkout_splits_and_hides_supplier(client) -> None:
     assert order.total_cash == Decimal("470.0000")
 
 
+def test_admin_orders_list_and_transition(client) -> None:
+    """T-13: admin sees every order (list was customer-scoped before), and
+    confirming propagates the status to the per-supplier sub-orders."""
+    _, (_a, oa), (_b, ob) = _setup_two_suppliers(price_a="100", price_b="90")
+    cust = create_user(kind="customer", email="t13c@example.com", roles=("customer",))
+    db.session.commit()
+    cart_svc.add_item(customer_id=cust.id, offer_id=oa.id, qty=Decimal("2"))
+    cart_svc.add_item(customer_id=cust.id, offer_id=ob.id, qty=Decimal("3"))
+    order = orders_svc.checkout(customer_id=cust.id, payment_mode="cash")
+    db.session.commit()
+
+    create_user(kind="admin", email="t13a@example.com", roles=("admin",))
+    h = auth_header(client, email="t13a@example.com")
+
+    items = client.get("/commerce/admin/orders", headers=h).get_json()["items"]
+    row = next((o for o in items if o["id"] == order.id), None)
+    assert row is not None and "customer_id" in row and "customer_name" in row
+    # The list stays light (no per-supplier breakdown); detail carries it.
+    assert "sub_orders" not in row
+    assert "sub_orders" in client.get(f"/commerce/orders/{order.id}", headers=h).get_json()
+
+    r = client.post(f"/commerce/orders/{order.id}/confirm", headers=h)
+    assert r.status_code == 200 and r.get_json()["status"] == "confirmed"
+    db.session.refresh(order)
+    assert order.status == "confirmed"
+    assert all(s.status == "confirmed" for s in order.sub_orders)
+
+    # Invalid transitions return a clean 409, not a 500.
+    assert client.post(f"/commerce/orders/{order.id}/confirm", headers=h).status_code == 409
+    assert client.post(f"/commerce/orders/{order.id}/fulfill", headers=h).status_code == 200
+    assert client.post(f"/commerce/orders/{order.id}/cancel", headers=h).status_code == 409
+
+    # A customer cannot reach the admin list.
+    cuser = create_user(kind="customer", email="t13c2@example.com", roles=("customer",))
+    db.session.commit()
+    ch = auth_header(client, email="t13c2@example.com")
+    assert client.get("/commerce/admin/orders", headers=ch).status_code == 403
+    _ = cuser
+
+
+def test_cancel_deferred_order_reverses_financials(client) -> None:
+    """T-13 audit #1: cancelling a deferred order voids its due and reverses the
+    GL entry so nothing stays owed."""
+    from app.accounting.models import JournalEntry
+    from app.sales.models import CustomerDue
+    _, (_a, oa), _ = _setup_two_suppliers(price_a="100")
+    cust = create_user(kind="customer", email="t13def@example.com", roles=("customer",))
+    db.session.commit()
+    cart_svc.add_item(customer_id=cust.id, offer_id=oa.id, qty=Decimal("2"))
+    order = orders_svc.checkout(customer_id=cust.id, payment_mode="deferred")
+    db.session.commit()
+    due = db.session.execute(
+        select(CustomerDue).where(CustomerDue.order_id == order.id)
+    ).scalar_one()
+    assert due.status == "open"
+    orig_entry = order.journal_entry_id
+    assert orig_entry is not None
+
+    create_user(kind="admin", email="t13defadm@example.com", roles=("admin",))
+    h = auth_header(client, email="t13defadm@example.com")
+    assert client.post(f"/commerce/orders/{order.id}/cancel", headers=h).status_code == 200
+
+    db.session.refresh(due)
+    db.session.refresh(order)
+    assert order.status == "cancelled"
+    assert due.status == "cancelled"
+    rev = db.session.execute(
+        select(JournalEntry).where(
+            JournalEntry.source_event_type == "reversal",
+            JournalEntry.source_event_id == str(orig_entry),
+        )
+    ).scalar_one_or_none()
+    assert rev is not None
+
+
 def test_checkout_posts_cash_journal(client) -> None:
     _, (_a, oa), _ = _setup_two_suppliers(price_a="100")
     cust = create_user(kind="customer", email="c4@example.com", roles=("customer",))

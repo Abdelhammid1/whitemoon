@@ -117,7 +117,7 @@ class CustomerDue(Base, TimestampMixin):
     __table_args__ = (
         CheckConstraint("amount > 0", name="ck_customer_dues_amount_positive"),
         CheckConstraint(
-            "status in ('open','paid','defaulted')", name="ck_customer_dues_status"
+            "status in ('open','paid','defaulted','cancelled')", name="ck_customer_dues_status"
         ),
         CheckConstraint("currency = 'EGP'", name="ck_customer_dues_currency_egp"),
         Index("ix_customer_dues_customer", "customer_id", "status"),

@@ -14,11 +14,11 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from ...accounting.services import deferred as deferred_svc
 from ...accounting.services import events as journal
-from ...common.errors import BadRequest
+from ...common.errors import BadRequest, Conflict, NotFound
 from ...common.money import to_money
 from ...extensions import db
 from ...inventory.models import Product, SupplierOffer
@@ -210,6 +210,137 @@ def list_orders(customer_id: int, limit: int = 50) -> list[Order]:
         .limit(limit)
     )
     return list(db.session.execute(stmt).scalars().all())
+
+
+# Admin order lifecycle (T-13): action -> (allowed-from, order-to, sub-order-to).
+_ORDER_TRANSITIONS: dict[str, tuple[set[str], str, str]] = {
+    "confirm": ({"pending"}, "confirmed", "confirmed"),
+    "fulfill": ({"confirmed"}, "fulfilled", "preparing"),
+    "cancel": ({"pending", "confirmed"}, "cancelled", "cancelled"),
+}
+
+
+def list_all_orders(
+    *,
+    status: str | None = None,
+    customer_id: int | None = None,
+    q: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    limit: int = 200,
+) -> list[Order]:
+    """Admin/staff view of every order with search + status/customer/date
+    filters (T-13). Not customer-scoped."""
+    stmt = select(Order).order_by(Order.id.desc()).limit(limit)
+    if status:
+        stmt = stmt.where(Order.status == status)
+    if customer_id:
+        stmt = stmt.where(Order.customer_id == customer_id)
+    if q:
+        stmt = stmt.where(Order.number.ilike(f"%{q}%"))
+
+    def _parse(label: str, s: str) -> date:
+        try:
+            return date.fromisoformat(s)
+        except ValueError as e:
+            raise BadRequest(f"{label} يجب أن يكون بصيغة YYYY-MM-DD", code="bad_date") from e
+
+    if date_from:
+        stmt = stmt.where(func.date(Order.placed_at) >= _parse("date_from", date_from))
+    if date_to:
+        stmt = stmt.where(func.date(Order.placed_at) <= _parse("date_to", date_to))
+    return list(db.session.execute(stmt).scalars().all())
+
+
+def serialize_admin_rows(orders: list[Order]) -> list[dict[str, Any]]:
+    """Light list rows (no sub-order/line breakdown) with batch-loaded customer
+    names — for the admin orders table (T-13)."""
+    from ...identity.models import CustomerProfile
+
+    ids = {o.customer_id for o in orders}
+    names: dict[int, str] = {}
+    if ids:
+        rows = db.session.execute(
+            select(CustomerProfile.user_id, CustomerProfile.display_name).where(
+                CustomerProfile.user_id.in_(ids)
+            )
+        ).all()
+        names = {uid: name for uid, name in rows}
+    return [
+        {
+            "id": o.id,
+            "number": o.number,
+            "status": o.status,
+            "payment_mode": o.payment_mode,
+            "total_cash": str(o.total_cash),
+            "total_deferred": str(o.total_deferred),
+            "placed_at": o.placed_at.isoformat(),
+            "customer_id": o.customer_id,
+            "customer_name": names.get(o.customer_id),
+        }
+        for o in orders
+    ]
+
+
+def serialize_admin(order: Order) -> dict[str, Any]:
+    """Admin order view: full sub-order/supplier breakdown + the customer."""
+    from ...identity.models import CustomerProfile
+
+    d = serialize_order(order, for_customer=False)
+    d["customer_id"] = order.customer_id
+    prof = db.session.get(CustomerProfile, order.customer_id)
+    d["customer_name"] = prof.display_name if prof else None
+    return d
+
+
+def transition_order(order_id: int, action: str, *, actor_id: int | None = None) -> Order:
+    """Confirm / fulfill (prepare) / cancel an order and propagate the status to
+    its per-supplier sub-orders so suppliers see the change (T-13). Cancelling
+    also backs out the order's financials (GL reversal, voided due, closed
+    deferred terms) so a cancelled order leaves nothing owed."""
+    rule = _ORDER_TRANSITIONS.get(action)
+    if rule is None:
+        raise Conflict(f"إجراء غير معروف: {action}", code="bad_action")
+    order = db.session.get(Order, order_id)
+    if order is None:
+        raise NotFound("Order not found", code="order_not_found")
+    allowed_from, order_to, sub_to = rule
+    if order.status not in allowed_from:
+        raise Conflict(
+            f"لا يمكن تنفيذ «{action}» على طلب حالته «{order.status}»", code="bad_transition"
+        )
+    if action == "cancel":
+        _reverse_order_financials(order, posted_by=actor_id)
+    order.status = order_to
+    for sub in order.sub_orders:
+        sub.status = sub_to
+    db.session.commit()
+    return order
+
+
+def _reverse_order_financials(order: Order, *, posted_by: int | None) -> None:
+    """On cancel: reverse the order's GL entry, void its open due, and close any
+    deferred-terms row — so no receivable/revenue lingers."""
+    from ...accounting.models import DeferredTerm
+    from ...accounting.services import events as journal
+    from ...sales.models import CustomerDue
+
+    if order.journal_entry_id:
+        journal.reverse(
+            order.journal_entry_id, reason=f"إلغاء الطلب {order.number}", posted_by=posted_by
+        )
+    dues = db.session.execute(
+        select(CustomerDue).where(
+            CustomerDue.order_id == order.id, CustomerDue.status == "open"
+        )
+    ).scalars().all()
+    for d in dues:
+        d.status = "cancelled"
+    dt = db.session.execute(
+        select(DeferredTerm).where(DeferredTerm.order_id == order.id)
+    ).scalar_one_or_none()
+    if dt is not None and dt.settled_at is None:
+        dt.settled_at = datetime.now(UTC)
 
 
 def supplier_dashboard(supplier_id: int, limit: int = 100) -> list[dict[str, Any]]:

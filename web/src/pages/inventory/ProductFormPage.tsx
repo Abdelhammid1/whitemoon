@@ -213,7 +213,9 @@ export function ProductFormPage() {
     if (!form.name_ar.trim()) return 'الاسم بالعربية مطلوب'
     if (!form.sku.trim()) return 'SKU مطلوب'
     if (!form.category) return 'الفئة مطلوبة'
-    if (images.length < 1) return 'أضف صورة واحدة على الأقل'
+    // New products need at least one image; a legacy product being edited may
+    // have only image_url and no gallery rows — don't block its save.
+    if (!isEdit && images.length < 1) return 'أضف صورة واحدة على الأقل'
     if (images.length > MAX_IMAGES) return `الحد الأقصى ${MAX_IMAGES} صور`
     const dirty = variants.filter((v) => v.sku || v.barcode || v.size || v.color || v.pack)
     if (dirty.some((v) => !v.sku?.trim())) return 'كل متغيّر يحتاج SKU'

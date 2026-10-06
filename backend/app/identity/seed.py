@@ -47,6 +47,8 @@ PERMISSIONS: tuple[tuple[str, str], ...] = (
     ("inventory.manage", "تعديل أرصدة المخزون وإصدار إذون التحويل"),
     ("offer.manage", "إدارة عروض المورد (المورد لعروضه فقط)"),
     ("shortage.resolve", "حسم النواقص وتحديد الطرف المسؤول"),
+    # Commerce / orders (EPIC 3)
+    ("order.manage", "إدارة الطلبات: عرض الكل، تأكيد، تجهيز، إلغاء"),
     # Partners (EPIC 6)
     ("partner.manage", "إدارة الوكلاء والفروع: التأمينات، الشروط، الاستحقاقات"),
     # Production (EPIC 7)
@@ -76,6 +78,7 @@ ROLE_PERMS: dict[str, tuple[str, ...]] = {
         "product.manage",
         "inventory.manage",
         "shortage.resolve",
+        "order.manage",
         "production.manage",
         "pos.sell",
         "pos.settle",
@@ -91,6 +94,7 @@ ROLE_PERMS: dict[str, tuple[str, ...]] = {
         "user.read",
         "product.manage",
         "inventory.manage",
+        "order.manage",
         "production.manage",
         "pos.sell",
         "logistics.manage",
