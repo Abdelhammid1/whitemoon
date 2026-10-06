@@ -68,6 +68,54 @@ def collect_payment(
     return row
 
 
+def upload_customer_receipt(
+    *, customer_id: int, due_id: int | None, amount: Decimal, paid_on: date, receipt_key: str
+) -> PaymentApproval:
+    """A customer submits a bank-transfer receipt — recorded as a *pending*
+    approval (source='customer') for staff to review (T-21). The customer is
+    the collector of record, so a different staff user must approve it; the
+    self-approval guard in `approve_payment` already enforces that.
+
+    `receipt_key` is an object-storage key for an image the route already
+    signature-validated — never a client-supplied path."""
+    amount = to_money(amount)
+    if amount <= 0:
+        raise BadRequest("المبلغ يجب أن يكون موجبًا", code="amount_non_positive")
+    if paid_on > datetime.now(credit_svc.BUSINESS_TZ).date():
+        raise BadRequest("تاريخ السداد لا يمكن أن يكون في المستقبل", code="paid_on_future")
+    if due_id is not None:
+        due = db.session.get(CustomerDue, due_id)
+        if due is None:
+            raise NotFound("الذمة غير موجودة", code="due_not_found")
+        if due.customer_id != customer_id:
+            raise BadRequest("الذمة لا تخص هذا العميل", code="due_customer_mismatch")
+        if amount != to_money(due.amount):
+            raise BadRequest(
+                "لا يُقبل السداد الجزئي — المبلغ يجب أن يساوي قيمة الذمة",
+                code="partial_payment_unsupported",
+            )
+    row = PaymentApproval(
+        customer_id=customer_id,
+        due_id=due_id,
+        amount=amount,
+        paid_on=paid_on,
+        collected_by=customer_id,
+        status="pending",
+        source="customer",
+        receipt_key=receipt_key,
+    )
+    db.session.add(row)
+    db.session.flush()
+    audit_emit(
+        "payment.receipt_uploaded",
+        actor_user_id=customer_id,
+        target_type="payment_approval",
+        target_id=row.id,
+    )
+    db.session.commit()
+    return row
+
+
 def approve_payment(*, approval_id: int, approver_id: int) -> PaymentApproval:
     row = db.session.execute(
         select(PaymentApproval).where(PaymentApproval.id == approval_id).with_for_update()
@@ -139,4 +187,6 @@ def serialize(row: PaymentApproval) -> dict[str, Any]:
         "approved_by": row.approved_by,
         "approved_at": row.approved_at.isoformat() if row.approved_at else None,
         "note": row.note,
+        "source": row.source,
+        "has_receipt": row.receipt_key is not None,
     }

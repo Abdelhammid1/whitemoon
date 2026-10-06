@@ -5,16 +5,20 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from flask import Blueprint, jsonify, request
-from flask_jwt_extended import get_jwt_identity
+from datetime import date
+
+from flask import Blueprint, Response, jsonify, request
+from flask_jwt_extended import get_jwt_identity, jwt_required
 from pydantic import ValidationError
 from sqlalchemy import select
 
-from ..common.errors import ApiError, BadRequest, Unauthorized
+from ..accounting.providers import storage
+from ..common.errors import ApiError, BadRequest, Forbidden, NotFound, Unauthorized
+from ..common.images import IMAGE_EXTS, is_raster_image, mime_for_key
 from ..extensions import db
 from ..identity.services.audit import emit as audit_emit
 from ..identity.services.rbac import has_permission, require_permission
-from .models import EscalationEvent
+from .models import EscalationEvent, PaymentApproval
 from .schemas import (
     CollectPaymentIn,
     FreezeIn,
@@ -182,6 +186,86 @@ def reject_payment(approval_id: int):
     p = _parse(RejectPaymentIn)
     row = pay_svc.reject_payment(approval_id=approval_id, approver_id=_uid(), reason=p.reason)
     return jsonify(pay_svc.serialize(row))
+
+
+# ------------------------------------------------------------ customer receipts (T-21)
+
+
+@bp.post("/payments/upload-receipt")
+@jwt_required()
+def upload_receipt():
+    """A customer uploads a bank-transfer receipt (multipart `image`), optionally
+    against a specific due. It is recorded as a *pending* approval that appears
+    in the staff review queue (GET /credit/payments?status=pending)."""
+    uid = _uid()
+    if request.content_length and request.content_length > storage.MAX_UPLOAD_BYTES + 1024 * 1024:
+        raise BadRequest("حجم الملف كبير جدًا (الحد ١٠ ميجابايت)", code="file_too_large")
+    f = request.files.get("image")
+    if f is None or not f.filename:
+        raise BadRequest("مطلوب صورة إيصال التحويل", code="file_required")
+    data = f.read(storage.MAX_UPLOAD_BYTES + 1)
+    if not data:
+        raise BadRequest("الملف فارغ", code="empty_file")
+    if len(data) > storage.MAX_UPLOAD_BYTES:
+        raise BadRequest("حجم الملف كبير جدًا (الحد ١٠ ميجابايت)", code="file_too_large")
+    try:
+        ext = storage.safe_extension(f.filename)
+    except ValueError as e:
+        raise BadRequest("نوع الملف غير مدعوم", code="bad_file_type") from e
+    if ext not in IMAGE_EXTS or not is_raster_image(data):
+        raise BadRequest("يُقبل فقط صورة (PNG أو JPG أو WEBP أو GIF)", code="bad_file_type")
+
+    amount_raw = request.form.get("amount")
+    if not amount_raw:
+        raise BadRequest("مطلوب مبلغ التحويل", code="amount_required")
+    try:
+        amount = Decimal(amount_raw)
+    except (ArithmeticError, ValueError) as e:
+        raise BadRequest("مبلغ غير صالح", code="amount_invalid") from e
+    due_id_raw = request.form.get("due_id")
+    due_id = int(due_id_raw) if due_id_raw else None
+    paid_on_raw = request.form.get("paid_on")
+    try:
+        paid_on = date.fromisoformat(paid_on_raw) if paid_on_raw else date.today()
+    except ValueError as e:
+        raise BadRequest("تاريخ غير صالح (YYYY-MM-DD)", code="bad_date") from e
+
+    key = storage.store(data, prefix="payment-receipts", ext=ext)
+    row = pay_svc.upload_customer_receipt(
+        customer_id=uid, due_id=due_id, amount=amount, paid_on=paid_on, receipt_key=key
+    )
+    return jsonify(pay_svc.serialize(row)), 201
+
+
+@bp.get("/payments/mine")
+@jwt_required()
+def my_payments():
+    """A customer's own submitted receipts / collected payments, newest first."""
+    uid = _uid()
+    rows = pay_svc.list_approvals(collected_by=uid)
+    return jsonify({"items": [pay_svc.serialize(r) for r in rows]})
+
+
+@bp.get("/payments/<int:approval_id>/receipt")
+@jwt_required()
+def payment_receipt(approval_id: int):
+    """Stream a payment's receipt image. Visible to a finance reviewer
+    (`payment.approve`) or to the customer who uploaded it — never by a
+    client-supplied key."""
+    uid = _uid()
+    row = db.session.get(PaymentApproval, approval_id)
+    if row is None or not row.receipt_key:
+        raise NotFound("لا يوجد إيصال", code="receipt_not_found")
+    if not has_permission(uid, "payment.approve") and row.customer_id != uid:
+        raise Forbidden("غير مصرح", code="forbidden")
+    blob = storage.load(row.receipt_key)
+    if blob is None:
+        raise NotFound("الصورة غير متاحة", code="image_unavailable")
+    return Response(
+        blob,
+        mimetype=mime_for_key(row.receipt_key),
+        headers={"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox"},
+    )
 
 
 @bp.app_errorhandler(ApiError)

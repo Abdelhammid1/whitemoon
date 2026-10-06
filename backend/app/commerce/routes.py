@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from html import escape
 from typing import Any
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, Response, jsonify, request
 from flask_jwt_extended import get_jwt_identity, jwt_required
 from pydantic import ValidationError
 
@@ -134,16 +135,10 @@ def supplier_orders():
     return jsonify({"items": orders_svc.supplier_dashboard(uid)})
 
 
-@bp.get("/commerce/customers/<int:customer_id>/statement")
-@jwt_required()
-def customer_statement(customer_id: int):
-    """Unified customer file: profile + order history + dues (T-04).
-
-    Access: the customer themselves, finance/admin (user.read), or an
-    agent/branch **only** for a customer inside their geo territory (T-01)."""
-    from ..identity.models import CustomerProfile
+def _statement_access(customer_id: int) -> None:
+    """Statement access: the customer, finance/admin, or an agent/branch inside
+    the customer's geo territory (T-01/T-04)."""
     from ..partners.services import partners as partners_svc
-    from ..sales.models import CustomerDue
 
     uid = _uid()
     allowed = (
@@ -154,35 +149,195 @@ def customer_statement(customer_id: int):
     if not allowed:
         raise Forbidden("خارج النطاق المصرح", code="out_of_scope")
 
+
+def _parse_range() -> tuple[Any, Any]:
+    from datetime import date as _date
+
+    try:
+        df = _date.fromisoformat(request.args["from"]) if request.args.get("from") else None
+        dt = _date.fromisoformat(request.args["to"]) if request.args.get("to") else None
+    except ValueError as e:
+        raise BadRequest("صيغة التاريخ غير صحيحة (YYYY-MM-DD)", code="bad_date") from e
+    return df, dt
+
+
+def _build_statement(customer_id: int, date_from: Any = None, date_to: Any = None) -> dict[str, Any]:
+    """Customer statement data (T-19): profile, orders, dues, approved payments,
+    outstanding balance, credit limit and available credit. Optional date range
+    filters orders (placed_at), dues (due_date) and payments (paid_on)."""
+    from ..identity.models import CustomerProfile
+    from ..sales.models import CustomerDue, PaymentApproval
+    from ..sales.services import credit as credit_svc
+
+    def _in_range(d: Any) -> bool:
+        if date_from and d < date_from:
+            return False
+        return not (date_to and d > date_to)
+
     profile = db.session.get(CustomerProfile, customer_id)
-    orders = orders_svc.list_orders(customer_id)
-    dues = db.session.execute(
-        db.select(CustomerDue).where(CustomerDue.customer_id == customer_id).order_by(CustomerDue.id.desc())
-    ).scalars().all()
-    outstanding = sum(
-        (Decimal(str(d.amount)) for d in dues if d.status == "open"), start=Decimal("0")
+    orders = [o for o in orders_svc.list_orders(customer_id) if _in_range(o.placed_at.date())]
+    dues = [
+        d
+        for d in db.session.execute(
+            db.select(CustomerDue)
+            .where(CustomerDue.customer_id == customer_id)
+            .order_by(CustomerDue.id.desc())
+        ).scalars()
+        if _in_range(d.due_date)
+    ]
+    payments = [
+        p
+        for p in db.session.execute(
+            db.select(PaymentApproval)
+            .where(PaymentApproval.customer_id == customer_id, PaymentApproval.status == "approved")
+            .order_by(PaymentApproval.id.desc())
+        ).scalars()
+        if _in_range(p.paid_on)
+    ]
+    outstanding = credit_svc.outstanding(customer_id)
+    limit = credit_svc.effective_limit(customer_id)
+    tier = credit_svc.get_tier(customer_id)
+    return {
+        "customer_id": customer_id,
+        "profile": {
+            "display_name": profile.display_name if profile else None,
+            "geo_area": profile.geo_area if profile else None,
+        },
+        "tier": tier.tier,
+        "credit_limit": str(limit),
+        "outstanding": str(outstanding),
+        "available": str(limit - outstanding),
+        "orders": [orders_svc.serialize_order(o, for_customer=True) for o in orders],
+        "dues": [
+            {
+                "id": d.id,
+                "amount": str(d.amount),
+                "due_date": d.due_date.isoformat(),
+                "status": d.status,
+                "days_late": d.days_late,
+            }
+            for d in dues
+        ],
+        "payments": [
+            {
+                "id": p.id,
+                "amount": str(p.amount),
+                "paid_on": p.paid_on.isoformat(),
+                "source": p.source,
+            }
+            for p in payments
+        ],
+    }
+
+
+@bp.get("/commerce/customers/<int:customer_id>/statement")
+@jwt_required()
+def customer_statement(customer_id: int):
+    """Unified customer statement: profile, orders, dues, payments, balance and
+    available credit (T-04/T-19). Optional `from`/`to` date filter."""
+    _statement_access(customer_id)
+    df, dt = _parse_range()
+    return jsonify(_build_statement(customer_id, df, dt))
+
+
+@bp.get("/commerce/customers/<int:customer_id>/statement.pdf")
+@jwt_required()
+def customer_statement_pdf(customer_id: int):
+    """Arabic PDF/printable statement (T-19)."""
+    from ..common import documents as doc
+
+    _statement_access(customer_id)
+    df, dt = _parse_range()
+    s = _build_statement(customer_id, df, dt)
+    name = s["profile"]["display_name"] or f"#{customer_id}"
+
+    due_rows = "".join(
+        "<tr>"
+        f"<td class='num'>{escape(d['due_date'])}</td>"
+        f"<td class='num'>{doc.fmt_money(d['amount'])}</td>"
+        f"<td>{_DUE_STATUS_AR.get(d['status'], d['status'])}</td>"
+        "</tr>"
+        for d in s["dues"]
+    ) or "<tr><td colspan='3'>لا توجد ذمم</td></tr>"
+    pay_rows = "".join(
+        "<tr>"
+        f"<td class='num'>{escape(p['paid_on'])}</td>"
+        f"<td class='num'>{doc.fmt_money(p['amount'])}</td>"
+        "</tr>"
+        for p in s["payments"]
+    ) or "<tr><td colspan='2'>لا توجد مدفوعات</td></tr>"
+
+    rng = ""
+    if df or dt:
+        rng = f"<div><b>الفترة:</b> {escape(df.isoformat()) if df else '—'} → {escape(dt.isoformat()) if dt else '—'}</div>"
+    body = (
+        "<div class='head'>"
+        "<div class='brand'>وايت مون<small>كشف حساب العميل</small></div>"
+        f"<div class='meta'><div><b>العميل:</b> {escape(name)}</div>{rng}</div>"
+        "</div>"
+        "<h1>كشف الحساب</h1>"
+        "<table class='totals'><tbody>"
+        f"<tr><td>السقف الائتماني</td><td class='num'>{doc.fmt_money(s['credit_limit'])}</td></tr>"
+        f"<tr><td>الرصيد المستحق</td><td class='num'>{doc.fmt_money(s['outstanding'])}</td></tr>"
+        f"<tr><td>المتاح</td><td class='num'>{doc.fmt_money(s['available'])}</td></tr>"
+        "</tbody></table>"
+        "<h1 style='font-size:15px;margin-top:18px'>الذمم</h1>"
+        "<table><thead><tr><th class='num'>تاريخ الاستحقاق</th><th class='num'>المبلغ</th><th>الحالة</th></tr></thead>"
+        f"<tbody>{due_rows}</tbody></table>"
+        "<h1 style='font-size:15px;margin-top:18px'>المدفوعات المعتمدة</h1>"
+        "<table><thead><tr><th class='num'>التاريخ</th><th class='num'>المبلغ</th></tr></thead>"
+        f"<tbody>{pay_rows}</tbody></table>"
+        "<p style='color:#6b7280;font-size:11px'>جميع المبالغ بالجنيه المصري (ج.م).</p>"
     )
-    return jsonify(
-        {
-            "customer_id": customer_id,
-            "profile": {
-                "display_name": profile.display_name if profile else None,
-                "geo_area": profile.geo_area if profile else None,
-            },
-            "orders": [orders_svc.serialize_order(o, for_customer=True) for o in orders],
-            "dues": [
-                {
-                    "id": d.id,
-                    "amount": str(d.amount),
-                    "due_date": d.due_date.isoformat(),
-                    "status": d.status,
-                    "days_late": d.days_late,
-                }
-                for d in dues
-            ],
-            "outstanding": str(outstanding),
-        }
+    html = doc.document(f"كشف حساب {name}", body)
+    return doc.pdf_response(html, filename=f"statement-{customer_id}.pdf")
+
+
+@bp.get("/commerce/customers/<int:customer_id>/statement.xlsx")
+@jwt_required()
+def customer_statement_xlsx(customer_id: int):
+    """Excel (.xlsx) statement export (T-19)."""
+    import io
+
+    from openpyxl import Workbook
+
+    _statement_access(customer_id)
+    df, dt = _parse_range()
+    s = _build_statement(customer_id, df, dt)
+    name = s["profile"]["display_name"] or f"#{customer_id}"
+
+    wb = Workbook()
+    summary = wb.active
+    assert summary is not None  # a new workbook always has an active sheet
+    summary.title = "ملخص"
+    summary.sheet_view.rightToLeft = True
+    summary.append(["العميل", name])
+    summary.append(["السقف الائتماني", float(s["credit_limit"])])
+    summary.append(["الرصيد المستحق", float(s["outstanding"])])
+    summary.append(["المتاح", float(s["available"])])
+
+    dues = wb.create_sheet("الذمم")
+    dues.sheet_view.rightToLeft = True
+    dues.append(["تاريخ الاستحقاق", "المبلغ", "الحالة", "أيام التأخير"])
+    for d in s["dues"]:
+        dues.append([d["due_date"], float(d["amount"]), _DUE_STATUS_AR.get(d["status"], d["status"]), d["days_late"]])
+
+    pays = wb.create_sheet("المدفوعات")
+    pays.sheet_view.rightToLeft = True
+    pays.append(["التاريخ", "المبلغ"])
+    for p in s["payments"]:
+        pays.append([p["paid_on"], float(p["amount"])])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return Response(
+        buf.getvalue(),
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="statement-{customer_id}.xlsx"'},
     )
+
+
+_DUE_STATUS_AR = {"open": "مفتوحة", "paid": "مسددة", "defaulted": "متعثرة", "cancelled": "ملغاة"}
 
 
 @bp.get("/commerce/orders/<int:order_id>")
@@ -196,6 +351,82 @@ def get_order(order_id: int):
     if not is_admin and order.customer_id != uid:
         raise Forbidden("ليس طلبك", code="forbidden")
     return jsonify(orders_svc.serialize_order(order, for_customer=not is_admin))
+
+
+_ORDER_STATUS_AR = {
+    "pending": "قيد الانتظار",
+    "confirmed": "مؤكَّد",
+    "fulfilled": "منفَّذ",
+    "cancelled": "ملغى",
+}
+_PAYMENT_MODE_AR = {"cash": "نقدي", "deferred": "آجل", "mixed": "مختلط"}
+
+
+@bp.get("/commerce/orders/<int:order_id>/invoice")
+@jwt_required()
+def order_invoice(order_id: int):
+    """Arabic PDF invoice for an order (T-23). Customer-facing: suppliers are
+    never shown — lines are merged. The order's customer or staff may open it.
+
+    Returns a PDF where WeasyPrint is available (production), otherwise a
+    printable HTML page the browser can save as PDF."""
+    from ..common import documents as doc
+    from ..inventory.models import Product
+
+    order = db.session.get(Order, order_id)
+    if order is None:
+        raise NotFound("الطلب غير موجود", code="order_not_found")
+    uid = _uid()
+    is_staff = has_permission(uid, "user.read")
+    if not is_staff and order.customer_id != uid:
+        raise Forbidden("ليس طلبك", code="forbidden")
+
+    data = orders_svc.serialize_order(order, for_customer=True)
+    product_ids = {ln["product_id"] for ln in data["lines"]}
+    names = {
+        p.id: p.name_ar
+        for p in db.session.execute(
+            db.select(Product).where(Product.id.in_(product_ids or {0}))
+        ).scalars()
+    }
+
+    rows = "".join(
+        "<tr>"
+        f"<td>{escape(names.get(ln['product_id'], '—'))}</td>"
+        f"<td class='num'>{doc.fmt_money(ln['unit_price'])}</td>"
+        f"<td class='num'>{Decimal(ln['qty']):g}</td>"
+        f"<td class='num'>{doc.fmt_money(ln['line_total'])}</td>"
+        "</tr>"
+        for ln in data["lines"]
+    ) or "<tr><td colspan='4'>لا توجد بنود</td></tr>"
+
+    total = Decimal(data["total_cash"]) + Decimal(data["total_deferred"])
+    body = (
+        "<div class='head'>"
+        "<div class='brand'>وايت مون<small>فاتورة طلب</small></div>"
+        "<div class='meta'>"
+        f"<div><b>رقم الفاتورة:</b> {escape(data['number'])}</div>"
+        f"<div><b>التاريخ:</b> {escape(data['placed_at'][:10])}</div>"
+        f"<div><b>الحالة:</b> <span class='chip'>{_ORDER_STATUS_AR.get(data['status'], data['status'])}</span></div>"
+        f"<div><b>طريقة الدفع:</b> {_PAYMENT_MODE_AR.get(data['payment_mode'], data['payment_mode'])}</div>"
+        "</div></div>"
+        "<h1>فاتورة</h1>"
+        "<table><thead><tr>"
+        "<th>الصنف</th><th class='num'>سعر الوحدة</th>"
+        "<th class='num'>الكمية</th><th class='num'>الإجمالي</th>"
+        "</tr></thead><tbody>"
+        f"{rows}</tbody></table>"
+        "<table class='totals'><tbody>"
+        f"<tr><td>نقدي</td><td class='num'>{doc.fmt_money(data['total_cash'])}</td></tr>"
+        f"<tr><td>آجل</td><td class='num'>{doc.fmt_money(data['total_deferred'])}</td></tr>"
+        "</tbody><tfoot>"
+        f"<tr><td>الإجمالي</td><td class='num'>{doc.fmt_money(total)}</td></tr>"
+        "</tfoot></table>"
+        "<p style='color:#6b7280;font-size:11px'>جميع المبالغ بالجنيه المصري (ج.م). "
+        "هذه فاتورة مبدئية؛ الفاتورة الضريبية الإلكترونية (ETA) تصدر في مرحلة لاحقة.</p>"
+    )
+    html = doc.document(f"فاتورة {data['number']}", body)
+    return doc.pdf_response(html, filename=f"invoice-{data['number']}.pdf")
 
 
 @bp.get("/commerce/admin/orders")
@@ -247,6 +478,18 @@ def create_rfq():
     )
     audit_emit("commerce.rfq.create", actor_user_id=uid, target_type="rfq", target_id=rfq.id)
     return jsonify(rfq_svc.serialize_rfq(rfq)), 201
+
+
+@bp.get("/commerce/rfqs")
+@jwt_required()
+def list_rfqs():
+    """RFQ list: a supplier's open inbox, a customer's own RFQs, or all (admin).
+
+    The supplier inbox never reveals who opened each RFQ (mediated)."""
+    uid = _uid()
+    is_admin = has_permission(uid, "user.read")
+    items = rfq_svc.list_rfqs(requester_id=uid, kind=_kind(uid), is_admin=is_admin)
+    return jsonify({"items": items})
 
 
 @bp.get("/commerce/rfqs/<int:rfq_id>")

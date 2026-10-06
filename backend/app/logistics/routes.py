@@ -84,6 +84,27 @@ def book():
 # ---------------------------------------------------------------- tracking
 
 
+@bp.get("/shipments")
+@require_permission("logistics.manage")
+def list_shipments():
+    """Ops/admin shipment board — filter by status and create-date range.
+
+    Replaces the old flow of typing an order number: every row exposes its
+    allowed next transitions so the UI opens manage/confirm straight from the
+    table. The confirmation code is never included in a list response."""
+    status = request.args.get("status") or None
+    date_from = date_to = None
+    try:
+        if request.args.get("from"):
+            date_from = date.fromisoformat(request.args["from"])
+        if request.args.get("to"):
+            date_to = date.fromisoformat(request.args["to"])
+    except ValueError as e:
+        raise BadRequest("صيغة التاريخ غير صحيحة (YYYY-MM-DD)", code="bad_date") from e
+    rows = svc.list_shipments(status=status, date_from=date_from, date_to=date_to)
+    return jsonify({"items": [svc.serialize_shipment(s) for s in rows]})
+
+
 @bp.get("/orders/<int:order_id>/shipment")
 @jwt_required()
 def track(order_id: int):

@@ -150,6 +150,9 @@ class PaymentApproval(Base, TimestampMixin):
         CheckConstraint(
             "status in ('pending','approved','rejected')", name="ck_payment_approvals_status"
         ),
+        CheckConstraint(
+            "source in ('collector','customer')", name="ck_payment_approvals_source"
+        ),
         CheckConstraint("currency = 'EGP'", name="ck_payment_approvals_currency_egp"),
         Index("ix_payment_approvals_status", "status"),
         {"schema": "sales"},
@@ -174,6 +177,12 @@ class PaymentApproval(Base, TimestampMixin):
     )
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     note: Mapped[str | None] = mapped_column(String(1000))
+    # 'collector' = recorded by an agent/branch (US-3.2b); 'customer' = the
+    # customer uploaded a transfer receipt for staff to review (T-21).
+    source: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="collector", server_default="collector"
+    )
+    receipt_key: Mapped[str | None] = mapped_column(String(255))
 
 
 class EscalationEvent(Base):

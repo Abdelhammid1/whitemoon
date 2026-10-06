@@ -95,14 +95,47 @@ def list_offers(*, rfq_id: int, requester_id: int, is_admin: bool) -> list[dict[
     return out
 
 
-def serialize_rfq(rfq: Rfq) -> dict[str, Any]:
-    return {
+def serialize_rfq(rfq: Rfq, *, viewer_id: int | None = None) -> dict[str, Any]:
+    """Serialize an RFQ for its initiator, a supplier, or an admin.
+
+    Never includes the initiator's identity — the company mediates the RFQ, so
+    a supplier browsing the inbox sees only the product, qty, deadline and
+    requirements, exactly as `list_offers` hides the supplier from the customer.
+    `viewer_id`, when it is a supplier, adds `my_offer` so the inbox can show
+    'you already quoted' without revealing anyone else's price."""
+    product = db.session.get(Product, rfq.product_id)
+    out: dict[str, Any] = {
         "id": rfq.id,
         "number": rfq.number,
         "product_id": rfq.product_id,
+        "product_name": product.name_ar if product else None,
         "qty": str(rfq.qty),
         "deadline": rfq.deadline.isoformat() if rfq.deadline else None,
         "qualification_requirements": rfq.qualification_requirements,
         "status": rfq.status,
         "offer_count": len(rfq.offers),
     }
+    if viewer_id is not None:
+        mine = next((o for o in rfq.offers if o.supplier_id == viewer_id), None)
+        if mine is not None:
+            out["my_offer"] = {"unit_price": str(mine.unit_price), "moq": str(mine.moq)}
+    return out
+
+
+def list_rfqs(*, requester_id: int, kind: str, is_admin: bool) -> list[dict[str, Any]]:
+    """RFQ list scoped to the viewer:
+
+    - admin → every RFQ;
+    - supplier → the open inbox (RFQs still accepting offers), with `my_offer`
+      filled when this supplier already quoted — initiator identity never shown;
+    - customer → only the RFQs they opened.
+    """
+    stmt = select(Rfq).order_by(Rfq.id.desc())
+    if is_admin:
+        rfqs = db.session.execute(stmt).scalars().all()
+        return [serialize_rfq(r) for r in rfqs]
+    if kind == "supplier":
+        rfqs = db.session.execute(stmt.where(Rfq.status == "open")).scalars().all()
+        return [serialize_rfq(r, viewer_id=requester_id) for r in rfqs]
+    rfqs = db.session.execute(stmt.where(Rfq.initiator_user_id == requester_id)).scalars().all()
+    return [serialize_rfq(r) for r in rfqs]

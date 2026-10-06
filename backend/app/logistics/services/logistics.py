@@ -16,7 +16,7 @@ from ...common.money import to_money
 from ...extensions import db
 from ...identity.services.audit import emit as audit_emit
 from ...inventory.models import Product
-from ..models import DeliveryShortage, DeliverySlot, Shipment, ShipmentLeg
+from ..models import SHIPMENT_STATUSES, DeliveryShortage, DeliverySlot, Shipment, ShipmentLeg
 
 
 @dataclass(frozen=True)
@@ -156,6 +156,46 @@ _ALLOWED_TRANSITIONS = {
     "in_transit": {"delivered", "failed"},
 }
 
+# The order the UI should render the next-step buttons in, so a rep always
+# sees scheduled → shipped → in_transit → delivered laid out left-to-right.
+_TRANSITION_ORDER = ("shipped", "in_transit", "delivered", "failed")
+
+
+def allowed_next(status: str) -> list[str]:
+    """The statuses a shipment in `status` may move to, in display order.
+
+    `delivered` is reachable here (it is a valid next state) but the route
+    layer requires the confirmation-code flow to actually reach it — the UI
+    uses this list to know *which* buttons to show, not to bypass that."""
+    allowed = _ALLOWED_TRANSITIONS.get(status, set())
+    return [s for s in _TRANSITION_ORDER if s in allowed]
+
+
+def list_shipments(
+    *,
+    status: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    limit: int = 200,
+) -> list[Shipment]:
+    """Ops/admin shipment board, newest first, filtered by status + create date.
+
+    No customer/supplier identity is loaded here — a shipment row carries only
+    the order id, which staff are already entitled to see."""
+    stmt = select(Shipment)
+    if status:
+        if status not in SHIPMENT_STATUSES:
+            raise BadRequest("حالة غير صالحة", code="bad_status")
+        stmt = stmt.where(Shipment.status == status)
+    if date_from is not None:
+        stmt = stmt.where(Shipment.created_at >= datetime(date_from.year, date_from.month, date_from.day, tzinfo=UTC))
+    if date_to is not None:
+        # inclusive end-of-day
+        end = datetime(date_to.year, date_to.month, date_to.day, 23, 59, 59, tzinfo=UTC)
+        stmt = stmt.where(Shipment.created_at <= end)
+    stmt = stmt.order_by(Shipment.id.desc()).limit(min(limit, 500))
+    return list(db.session.execute(stmt).scalars().all())
+
 
 def update_status(*, shipment_id: int, status: str, actor_user_id: int) -> Shipment:
     s = _shipment_or_404(shipment_id)
@@ -286,6 +326,9 @@ def serialize_shipment(s: Shipment, *, include_code: bool = False) -> dict[str, 
         "slot_id": s.slot_id,
         "carrier_type": s.carrier_type,
         "status": s.status,
+        "allowed_next": allowed_next(s.status),
+        "created_at": s.created_at.isoformat() if s.created_at else None,
+        "shipped_at": s.shipped_at.isoformat() if s.shipped_at else None,
         "current_lat": str(s.current_lat) if s.current_lat is not None else None,
         "current_lng": str(s.current_lng) if s.current_lng is not None else None,
         "location_updated_at": s.location_updated_at.isoformat() if s.location_updated_at else None,
