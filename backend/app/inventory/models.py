@@ -28,6 +28,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     UniqueConstraint,
@@ -72,6 +73,47 @@ TRANSFER_STATUSES = ("draft", "issued", "received", "cancelled")
 SHORTAGE_STATUSES = ("pending", "resolved", "rejected")
 RESPONSIBLE_PARTY_TYPES = ("supplier", "channel_partner", "unallocated")
 
+# Default Material-Symbols icon per seeded category (T-15 seed).
+CATEGORY_ICONS = {
+    "food": "restaurant",
+    "clothing": "checkroom",
+    "electronics": "devices",
+    "home": "home",
+    "beauty": "spa",
+    "construction": "construction",
+    "stationery": "edit",
+    "automotive": "directions_car",
+    "other": "category",
+}
+
+
+# ---------------------------------------------------------------- Categories
+
+
+class Category(Base, TimestampMixin):
+    """Admin-managed product category tree (T-15). This table — not the
+    hardcoded CATEGORIES tuple — is the source of truth; products.category
+    is an FK to categories.code. Parent/child gives the main↔sub tree."""
+
+    __tablename__ = "categories"
+    __table_args__ = (
+        UniqueConstraint("code", name="uq_categories_code"),
+        Index("ix_categories_parent", "parent_code"),
+        {"schema": "inventory"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    code: Mapped[str] = mapped_column(String(40), nullable=False)
+    name_ar: Mapped[str] = mapped_column(String(120), nullable=False)
+    name_en: Mapped[str | None] = mapped_column(String(120))
+    icon: Mapped[str | None] = mapped_column(String(120))
+    image_url: Mapped[str | None] = mapped_column(String(500))
+    parent_code: Mapped[str | None] = mapped_column(
+        String(40), ForeignKey("inventory.categories.code")
+    )
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+
 
 # ---------------------------------------------------------------- Products
 
@@ -82,11 +124,6 @@ class Product(Base, TimestampMixin):
     __tablename__ = "products"
     __table_args__ = (
         UniqueConstraint("sku", name="uq_products_sku"),
-        CheckConstraint(
-            "category in ('food','clothing','electronics','home','beauty',"
-            "'construction','stationery','automotive','other')",
-            name="ck_products_category",
-        ),
         {"schema": "inventory"},
     )
 
@@ -94,7 +131,10 @@ class Product(Base, TimestampMixin):
     sku: Mapped[str] = mapped_column(String(60), nullable=False)
     name_ar: Mapped[str] = mapped_column(String(200), nullable=False)
     name_en: Mapped[str | None] = mapped_column(String(200))
-    category: Mapped[str] = mapped_column(String(20), nullable=False)
+    # Admin-managed category (T-15): FK to inventory.categories.code.
+    category: Mapped[str] = mapped_column(
+        String(40), ForeignKey("inventory.categories.code"), nullable=False
+    )
     unit: Mapped[str] = mapped_column(String(20), nullable=False, default="piece")
     eta_code: Mapped[str | None] = mapped_column(String(60))
     # ETA e-invoicing readiness at the item level (EPIC 11, US-11.1): the item

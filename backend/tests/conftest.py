@@ -84,6 +84,7 @@ def _reset_db(app: Flask) -> Iterator[None]:
                 "inventory.stock_balances, "
                 "inventory.supplier_offers, "
                 "inventory.products, "
+                "inventory.categories, "
                 "accounting.bank_receipts, "
                 "accounting.deferred_terms, "
                 "accounting.event_journal_map, "
@@ -117,6 +118,8 @@ def _reset_db(app: Flask) -> Iterator[None]:
         accounting_seed.seed_event_map()
         from app.sales.services import credit as _credit
         _credit.seed_tier_settings()
+        from app.inventory.services import categories as _categories
+        _categories.seed_defaults()
         db.session.commit()
         otp_provider.LAST_CODES.clear()
         yield

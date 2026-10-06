@@ -210,9 +210,55 @@ export async function reportShortage(body: {
 export interface Category {
   code: string
   label: string
+  name_ar?: string
+  name_en?: string | null
+  icon?: string | null
+  image_url?: string | null
+  parent_code?: string | null
+  sort_order?: number
+  is_active?: boolean
 }
 export async function listCategories() {
   return api<{ items: Category[] }>('/inventory/categories')
+}
+// --- T-15: admin category management ---
+export interface ManagedCategory extends Category {
+  name_ar: string
+  parent_code: string | null
+  sort_order: number
+  is_active: boolean
+  product_count: number
+}
+export async function listCategoriesManage() {
+  return api<{ items: ManagedCategory[] }>('/inventory/categories/manage')
+}
+export async function createCategory(body: {
+  name_ar: string
+  code?: string
+  name_en?: string
+  icon?: string
+  image_url?: string
+  parent_code?: string
+  sort_order?: number
+}) {
+  return api<ManagedCategory>('/inventory/categories', { method: 'POST', body })
+}
+export async function updateCategory(
+  code: string,
+  body: Partial<{
+    name_ar: string
+    name_en: string
+    icon: string
+    image_url: string
+    parent_code: string
+    sort_order: number
+    is_active: boolean
+  }>,
+) {
+  return api<ManagedCategory>(`/inventory/categories/${code}`, { method: 'PUT', body })
+}
+export async function deleteCategory(code: string) {
+  return api<{ deleted: string }>(`/inventory/categories/${code}`, { method: 'DELETE' })
 }
 /** Stock/transfer location types (code + Arabic label) from the backend. */
 export async function listLocationTypes() {

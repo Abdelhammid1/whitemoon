@@ -24,6 +24,7 @@ from .schemas import (
     TransferOrderIn,
     VariantIn,
 )
+from .services import categories as categories_svc
 from .services import offers as offers_svc
 from .services import products as products_svc
 from .services import reorder as reorder_svc
@@ -343,11 +344,62 @@ def reorder_check():
 @bp.get("/categories")
 @jwt_required()
 def list_categories():
-    """Allowed product categories (code + Arabic label) — the UI's single
-    source so its picker can't drift from the CHECK constraint."""
-    from .models import CATEGORIES, CATEGORY_LABELS
+    """Active product categories (admin-managed, T-15) — the UI's single
+    source for catalog filters and the product form."""
+    items = [categories_svc.serialize(c) for c in categories_svc.list_categories(active_only=True)]
+    return jsonify({"items": items})
 
-    return jsonify({"items": [{"code": c, "label": CATEGORY_LABELS.get(c, c)} for c in CATEGORIES]})
+
+@bp.get("/categories/manage")
+@require_permission("product.manage")
+def list_categories_manage():
+    """All categories incl. inactive, with product counts — admin page."""
+    return jsonify({"items": categories_svc.list_for_management()})
+
+
+@bp.post("/categories")
+@require_permission("product.manage")
+def create_category():
+    body: Any = request.get_json(silent=True) or {}
+    if not (body.get("name_ar") or "").strip():
+        raise BadRequest("name_ar is required", code="validation_error")
+    c = categories_svc.create(
+        code=body.get("code"),
+        name_ar=body["name_ar"],
+        name_en=body.get("name_en"),
+        icon=body.get("icon"),
+        image_url=body.get("image_url"),
+        parent_code=body.get("parent_code"),
+        sort_order=body.get("sort_order"),
+    )
+    audit_emit("inventory.category.create", actor_user_id=_uid(), target_type="category", target_id=c.id)
+    return jsonify(categories_svc.serialize(c)), 201
+
+
+@bp.put("/categories/<code>")
+@require_permission("product.manage")
+def update_category(code: str):
+    body: Any = request.get_json(silent=True) or {}
+    c = categories_svc.update(
+        code,
+        name_ar=body.get("name_ar"),
+        name_en=body.get("name_en"),
+        icon=body.get("icon"),
+        image_url=body.get("image_url"),
+        parent_code=body.get("parent_code"),
+        sort_order=body.get("sort_order"),
+        is_active=body.get("is_active"),
+    )
+    audit_emit("inventory.category.update", actor_user_id=_uid(), target_type="category", target_id=c.id)
+    return jsonify(categories_svc.serialize(c))
+
+
+@bp.delete("/categories/<code>")
+@require_permission("product.manage")
+def delete_category(code: str):
+    categories_svc.delete(code)
+    audit_emit("inventory.category.delete", actor_user_id=_uid(), target_type="category", target_id=code)
+    return jsonify({"deleted": code})
 
 
 @bp.get("/location-types")

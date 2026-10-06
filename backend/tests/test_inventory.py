@@ -81,6 +81,50 @@ def test_location_types_endpoint_lists_from_backend(client) -> None:
     assert all(x.get("label") for x in items)
 
 
+def test_category_crud_and_product_guard(client) -> None:
+    """T-15: admin adds a category; it shows in the catalog/product source,
+    a product can use it, and it can't be deleted while products reference it."""
+    from tests.helpers import auth_header, create_user
+    create_user(kind="admin", email="catmgr@example.com", roles=("admin",))
+    h = auth_header(client, email="catmgr@example.com")
+
+    r = client.post(
+        "/inventory/categories",
+        headers=h,
+        json={"name_ar": "مستلزمات طبية", "code": "medical", "icon": "medical_services"},
+    )
+    assert r.status_code == 201, r.get_json()
+    assert r.get_json()["code"] == "medical"
+
+    # Arabic-only name (no code, no English) still creates a valid category.
+    r2 = client.post("/inventory/categories", headers=h, json={"name_ar": "أدوات مكتبية"})
+    assert r2.status_code == 201, r2.get_json()
+    assert r2.get_json()["code"]  # a usable code was generated
+
+    # Appears immediately in the active list (catalog filter + product form).
+    codes = {c["code"] for c in client.get("/inventory/categories", headers=h).get_json()["items"]}
+    assert "medical" in codes
+
+    # A product can be created with it.
+    p = client.post(
+        "/inventory/products",
+        headers=h,
+        json={"sku": "MED-1", "name_ar": "كمامات طبية", "category": "medical"},
+    )
+    assert p.status_code in (200, 201), p.get_json()
+
+    # Delete is blocked while products reference it.
+    assert client.delete("/inventory/categories/medical", headers=h).status_code == 409
+
+    # Unknown category is rejected.
+    bad = client.post(
+        "/inventory/products",
+        headers=h,
+        json={"sku": "X-1", "name_ar": "س", "category": "does_not_exist"},
+    )
+    assert bad.status_code == 409
+
+
 def test_product_catalog_accepts_expanded_categories(client) -> None:
     # T-10: segments beyond food/clothing are now valid.
     for cat in ("electronics", "home", "beauty", "construction", "stationery", "automotive", "other"):

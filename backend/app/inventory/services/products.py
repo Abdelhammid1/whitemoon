@@ -8,7 +8,8 @@ from sqlalchemy import select
 
 from ...common.errors import Conflict, NotFound
 from ...extensions import db
-from ..models import CATEGORIES, Product, ProductVariant
+from ..models import Product, ProductVariant
+from . import categories as categories_svc
 
 
 def create_product(
@@ -27,8 +28,7 @@ def create_product(
     description: str | None = None,
     image_url: str | None = None,
 ) -> Product:
-    if category not in CATEGORIES:
-        raise Conflict(f"category must be one of {CATEGORIES}", code="bad_category")
+    categories_svc.assert_assignable(category)
     existing = db.session.execute(
         select(Product).where(Product.sku == sku)
     ).scalar_one_or_none()

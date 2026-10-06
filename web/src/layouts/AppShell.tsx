@@ -59,6 +59,7 @@ const GROUPS: NavGroup[] = [
     label: 'المستودع',
     roles: ['admin', 'staff'],
     items: [
+      { to: '/inventory/categories', label: 'الفئات', icon: 'category' },
       { to: '/inventory/products', label: 'المنتجات والمخزون', icon: 'inventory_2' },
       { to: '/inventory/stock', label: 'أرصدة المخزون', icon: 'warehouse' },
       { to: '/inventory/reorder', label: 'تنبيهات إعادة الطلب', icon: 'notification_important' },

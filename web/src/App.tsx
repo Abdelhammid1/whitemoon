@@ -55,6 +55,7 @@ import { ProductsPage } from './pages/inventory/ProductsPage'
 import { OffersPage } from './pages/inventory/OffersPage'
 import { StockPage } from './pages/inventory/StockPage'
 import { ReorderAlertsPage } from './pages/inventory/ReorderAlertsPage'
+import { CategoriesPage } from './pages/inventory/CategoriesPage'
 import { TransfersPage } from './pages/inventory/TransfersPage'
 import { ShortagesPage } from './pages/inventory/ShortagesPage'
 
@@ -99,6 +100,7 @@ export function App() {
         <Route path="/accounting/reports/cash-flow" element={<ProtectedRoute roles={FINANCE}><CashFlowPage /></ProtectedRoute>} />
         <Route path="/accounting/reports/general-ledger" element={<ProtectedRoute roles={FINANCE}><GeneralLedgerPage /></ProtectedRoute>} />
 
+        <Route path="/inventory/categories" element={<ProtectedRoute roles={FINANCE}><CategoriesPage /></ProtectedRoute>} />
         <Route path="/inventory/products" element={<ProtectedRoute roles={FINANCE}><ProductsPage /></ProtectedRoute>} />
         <Route path="/inventory/offers" element={<ProtectedRoute roles={['supplier']}><OffersPage /></ProtectedRoute>} />
         <Route path="/inventory/stock" element={<StockPage />} />
