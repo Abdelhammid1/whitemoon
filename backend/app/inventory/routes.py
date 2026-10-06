@@ -10,14 +10,13 @@ from flask_jwt_extended import get_jwt_identity, jwt_required
 from pydantic import ValidationError
 from sqlalchemy import select
 
-from ..common.errors import ApiError, BadRequest, Forbidden, Unauthorized
+from ..common.errors import ApiError, BadRequest, Forbidden, NotFound, Unauthorized
 from ..extensions import db
 from ..identity.services.audit import emit as audit_emit
 from ..identity.services.rbac import has_permission, require_permission
 from .models import TransferOrder
 from .schemas import (
     OfferIn,
-    ProductIn,
     ShortageIn,
     ShortageResolveIn,
     StockAdjustIn,
@@ -27,6 +26,26 @@ from .schemas import (
 from .services import categories as categories_svc
 from .services import offers as offers_svc
 from .services import products as products_svc
+
+# Product-image upload hardening (T-14): only real raster images.
+_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
+_IMAGE_MIME = {
+    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+    ".webp": "image/webp", ".gif": "image/gif",
+}
+
+
+def _is_raster_image(data: bytes) -> bool:
+    """Signature sniff — rejects SVG/HTML/scripts regardless of extension."""
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        return True
+    if data[:3] == b"\xff\xd8\xff":  # JPEG
+        return True
+    if data[:6] in (b"GIF87a", b"GIF89a"):
+        return True
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return True
+    return False
 from .services import reorder as reorder_svc
 from .services import shortages as shortages_svc
 from .services import stock as stock_svc
@@ -58,29 +77,43 @@ def _uid() -> int:
 @bp.post("/products")
 @require_permission("product.manage")
 def create_product():
-    payload = _parse(ProductIn)
+    body: Any = request.get_json(silent=True) or {}
+    for req in ("sku", "name_ar", "category"):
+        if not str(body.get(req) or "").strip():
+            raise BadRequest(f"{req} is required", code="validation_error")
     product = products_svc.create_product(
-        sku=payload.sku,
-        name_ar=payload.name_ar,
-        name_en=payload.name_en,
-        category=payload.category,
-        unit=payload.unit,
-        eta_code=payload.eta_code,
-        food_expiry_tracked=payload.food_expiry_tracked,
-        created_by=_uid(),
-        subcategory=payload.subcategory,
-        brand=payload.brand,
-        barcode=payload.barcode,
-        description=payload.description,
-        image_url=payload.image_url,
+        sku=body["sku"], name_ar=body["name_ar"], category=body["category"],
+        unit=body.get("unit") or "piece", name_en=body.get("name_en"),
+        eta_code=body.get("eta_code"), eta_code_type=body.get("eta_code_type"),
+        eta_ready=bool(body.get("eta_ready")), tax_rate=body.get("tax_rate"),
+        food_expiry_tracked=bool(body.get("food_expiry_tracked")), created_by=_uid(),
+        subcategory=body.get("subcategory"), brand=body.get("brand"),
+        barcode=body.get("barcode"), description=body.get("description"),
+        image_url=body.get("image_url"), status=body.get("status") or "active",
+        wholesale_price=body.get("wholesale_price"), deferred_price=body.get("deferred_price"),
+        default_moq=body.get("default_moq"), variants=body.get("variants") or [],
+        images=body.get("images") or [], initial_batch=body.get("initial_batch"),
     )
-    audit_emit(
-        "inventory.product.create",
-        actor_user_id=_uid(),
-        target_type="product",
-        target_id=product.id,
-    )
+    audit_emit("inventory.product.create", actor_user_id=_uid(), target_type="product", target_id=product.id)
     return jsonify(products_svc.serialize(product)), 201
+
+
+@bp.put("/products/<int:product_id>")
+@require_permission("product.manage")
+def update_product(product_id: int):
+    body: Any = request.get_json(silent=True) or {}
+    # Never let a body key shadow the path id (would be a TypeError -> 500).
+    body.pop("id", None)
+    body.pop("product_id", None)
+    product = products_svc.update_product(product_id, **body)
+    audit_emit("inventory.product.update", actor_user_id=_uid(), target_type="product", target_id=product.id)
+    return jsonify(products_svc.serialize(product))
+
+
+@bp.get("/products/<int:product_id>")
+@jwt_required()
+def get_product_detail(product_id: int):
+    return jsonify(products_svc.serialize(products_svc.get_product(product_id)))
 
 
 @bp.post("/products/<int:product_id>/variants")
@@ -88,19 +121,83 @@ def create_product():
 def add_variant(product_id: int):
     payload = _parse(VariantIn)
     v = products_svc.add_variant(
-        product_id=product_id,
-        sku=payload.sku,
-        barcode=payload.barcode,
-        size=payload.size,
-        color=payload.color,
+        product_id=product_id, sku=payload.sku, barcode=payload.barcode,
+        size=payload.size, color=payload.color, pack=getattr(payload, "pack", None),
     )
     audit_emit(
-        "inventory.variant.create",
-        actor_user_id=_uid(),
-        target_type="product_variant",
-        target_id=v.id,
+        "inventory.variant.create", actor_user_id=_uid(),
+        target_type="product_variant", target_id=v.id,
     )
     return jsonify({"id": v.id, "product_id": v.product_id, "sku": v.sku}), 201
+
+
+@bp.post("/products/<int:product_id>/images")
+@require_permission("product.manage")
+def add_product_image(product_id: int):
+    """Attach an image: a multipart file upload, or {url} JSON for an external
+    image. Returns the stored image's servable URL."""
+    f = request.files.get("image")
+    if f is None:
+        body: Any = request.get_json(silent=True) or {}
+        if not body.get("url"):
+            raise BadRequest("image file or url required", code="validation_error")
+        img = products_svc.add_image(product_id, url=body["url"], is_primary=bool(body.get("is_primary")))
+    else:
+        from ..accounting.providers import storage
+
+        data = f.read()
+        # Only accept real raster images; an SVG/HTML served inline would be
+        # stored XSS against the public catalog. Check extension AND magic bytes.
+        name = f.filename or ""
+        ext = ("." + name.rsplit(".", 1)[-1].lower()) if "." in name else ""
+        if ext not in _IMAGE_EXTS or not _is_raster_image(data):
+            raise BadRequest("الصورة يجب أن تكون PNG أو JPG أو WEBP أو GIF", code="bad_image")
+        key = storage.store(data, prefix="products", ext=ext)
+        img = products_svc.add_image(
+            product_id, storage_key=key, is_primary=bool(request.form.get("is_primary")),
+        )
+    audit_emit("inventory.product.image", actor_user_id=_uid(), target_type="product", target_id=product_id)
+    return jsonify({"id": img.id, "url": img.url, "is_primary": img.is_primary}), 201
+
+
+@bp.delete("/products/<int:product_id>/images/<int:image_id>")
+@require_permission("product.manage")
+def delete_product_image(product_id: int, image_id: int):
+    products_svc.delete_image(product_id, image_id)
+    audit_emit("inventory.product.image.delete", actor_user_id=_uid(), target_type="product", target_id=product_id)
+    return jsonify({"deleted": image_id})
+
+
+@bp.post("/products/<int:product_id>/images/<int:image_id>/primary")
+@require_permission("product.manage")
+def set_primary_product_image(product_id: int, image_id: int):
+    products_svc.set_primary_image(product_id, image_id)
+    return jsonify({"primary": image_id})
+
+
+@bp.get("/product-images/<int:image_id>")
+def serve_product_image(image_id: int):
+    """Public: catalog/product images are not sensitive. Served with a fixed
+    image MIME + hardening headers so a stored file can't execute in a browser."""
+    from flask import Response
+
+    from ..accounting.providers import storage
+    from .models import ProductImage
+
+    img = db.session.get(ProductImage, image_id)
+    if img is None or not img.storage_key:
+        raise NotFound("image not found", code="image_not_found")
+    data = storage.load(img.storage_key)
+    if data is None:
+        raise NotFound("image not found", code="image_not_found")
+    ext = ("." + img.storage_key.rsplit(".", 1)[-1].lower()) if "." in img.storage_key else ""
+    mime = _IMAGE_MIME.get(ext, "application/octet-stream")
+    resp = Response(data, mimetype=mime)
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["Content-Security-Policy"] = "sandbox; default-src 'none'"
+    if mime == "application/octet-stream":  # defensive: never render unknown inline
+        resp.headers["Content-Disposition"] = "attachment"
+    return resp
 
 
 @bp.get("/products")
@@ -109,6 +206,7 @@ def list_products():
     items = products_svc.list_products(
         q=request.args.get("q"),
         category=request.args.get("category"),
+        status=request.args.get("status"),
         limit=min(int(request.args.get("limit", "100")), 500),
     )
     return jsonify({"items": [products_svc.serialize(p) for p in items]})

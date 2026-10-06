@@ -35,6 +35,7 @@ class VariantIn(BaseModel):
     barcode: str | None = Field(default=None, max_length=60)
     size: str | None = Field(default=None, max_length=60)
     color: str | None = Field(default=None, max_length=60)
+    pack: str | None = Field(default=None, max_length=60)
 
 
 class OfferIn(BaseModel):

@@ -1,4 +1,7 @@
-import { api } from './client'
+import { api, API_BASE, ApiError, tokenStore } from './client'
+
+export type ProductStatus = 'active' | 'draft' | 'suspended'
+export type EtaCodeType = 'EGS' | 'GS1'
 
 export interface ProductVariant {
   id: number
@@ -6,7 +9,14 @@ export interface ProductVariant {
   barcode: string | null
   size: string | null
   color: string | null
+  pack: string | null
   is_active: boolean
+}
+export interface ProductImage {
+  id: number
+  url: string
+  is_primary: boolean
+  sort_order?: number
 }
 export interface Product {
   id: number
@@ -21,9 +31,17 @@ export interface Product {
   image_url?: string | null
   unit: string
   eta_code: string | null
+  eta_code_type?: EtaCodeType | null
+  eta_ready?: boolean
+  tax_rate?: string | null
   food_expiry_tracked: boolean
+  status?: ProductStatus
   is_active: boolean
+  wholesale_price?: string | null
+  deferred_price?: string | null
+  default_moq?: string | null
   variants?: ProductVariant[]
+  images?: ProductImage[]
 }
 
 /** Allowed product categories (curated list, T-10) — code → Arabic label. */
@@ -91,21 +109,98 @@ export interface Shortage {
 export async function listProducts(params: { q?: string; category?: string }) {
   return api<{ items: Product[] }>('/inventory/products', { query: params })
 }
-export async function createProduct(body: {
+/** Variant payload accepted by create/update (replaces the variant set wholesale). */
+export interface ProductVariantInput {
   sku: string
-  name_ar: string
+  barcode?: string
+  size?: string
+  color?: string
+  pack?: string
+}
+/** Image payload accepted by create/update for external URLs (max 5). */
+export interface ProductImageInput {
+  url: string
+  is_primary?: boolean
+}
+/** Optional opening stock batch created alongside the product. */
+export interface InitialBatchInput {
+  supplier_id: number
+  batch_code: string
+  production_date: string // YYYY-MM-DD
+  expiry_date: string // YYYY-MM-DD
+  qty: string
+}
+/** Full rich create/update body (every field optional on update). */
+export interface ProductInput {
+  sku?: string
+  name_ar?: string
+  category?: string
   name_en?: string
-  category: string
-  subcategory?: string
+  unit?: string
+  description?: string
   brand?: string
   barcode?: string
-  description?: string
-  image_url?: string
-  unit?: string
+  subcategory?: string
+  status?: ProductStatus
   eta_code?: string
+  eta_code_type?: EtaCodeType
+  tax_rate?: string
   food_expiry_tracked?: boolean
-}) {
+  wholesale_price?: string
+  deferred_price?: string
+  default_moq?: string
+  image_url?: string
+  variants?: ProductVariantInput[]
+  images?: ProductImageInput[]
+  initial_batch?: InitialBatchInput
+}
+
+export async function createProduct(body: ProductInput) {
   return api<Product>('/inventory/products', { method: 'POST', body })
+}
+export async function updateProduct(id: number, body: ProductInput) {
+  return api<Product>(`/inventory/products/${id}`, { method: 'PUT', body })
+}
+export async function getProductDetail(id: number) {
+  return api<Product>(`/inventory/products/${id}`)
+}
+/** Attach an image to a product: a File is uploaded as multipart; a string is
+ *  attached as an external URL (JSON). Returns the stored image record. */
+export async function uploadProductImage(
+  id: number,
+  fileOrUrl: File | string,
+  isPrimary = false,
+): Promise<ProductImage> {
+  if (typeof fileOrUrl === 'string') {
+    return api<ProductImage>(`/inventory/products/${id}/images`, {
+      method: 'POST',
+      body: { url: fileOrUrl, is_primary: isPrimary },
+    })
+  }
+  const form = new FormData()
+  form.append('image', fileOrUrl)
+  if (isPrimary) form.append('is_primary', 'true')
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  const token = tokenStore.getAccess()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const resp = await fetch(`${API_BASE}/inventory/products/${id}/images`, {
+    method: 'POST',
+    headers,
+    body: form,
+  })
+  const data = await resp.json().catch(() => null)
+  if (!resp.ok) {
+    throw new ApiError(resp.status, data?.error ?? 'error', data?.message ?? 'تعذّر رفع الصورة')
+  }
+  return data as ProductImage
+}
+/** Remove one product image (T-14 edit). */
+export async function deleteProductImage(productId: number, imageId: number) {
+  return api<{ deleted: number }>(`/inventory/products/${productId}/images/${imageId}`, { method: 'DELETE' })
+}
+/** Make an existing image the primary one (mirrored to the catalog). */
+export async function setPrimaryProductImage(productId: number, imageId: number) {
+  return api<{ primary: number }>(`/inventory/products/${productId}/images/${imageId}/primary`, { method: 'POST' })
 }
 export async function addVariant(
   productId: number,

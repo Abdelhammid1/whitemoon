@@ -125,6 +125,137 @@ def test_category_crud_and_product_guard(client) -> None:
     assert bad.status_code == 409
 
 
+def test_product_pro_form_create(client) -> None:
+    """T-14: create a product with 2 variants, 2 images, pricing/tax/status and
+    an initial batch; it serializes fully and shows in the catalog with image."""
+    from decimal import Decimal
+
+    from tests.helpers import auth_header, create_user
+    admin = create_user(kind="admin", email="prodadmin@example.com", roles=("admin",))
+    supplier = create_user(kind="supplier", email="prodsup@example.com", roles=("supplier",))
+    h = auth_header(client, email="prodadmin@example.com")
+
+    r = client.post(
+        "/inventory/products",
+        headers=h,
+        json={
+            "sku": "PRO-1", "name_ar": "زيت طعام فاخر", "name_en": "Premium Oil",
+            "category": "food", "unit": "carton", "status": "active",
+            "wholesale_price": "100.00", "deferred_price": "110.00", "default_moq": "5",
+            "tax_rate": "14.0", "eta_code": "EG-1234", "eta_code_type": "EGS",
+            "food_expiry_tracked": True,
+            "variants": [
+                {"sku": "PRO-1-S", "size": "صغير", "color": "ذهبي", "pack": "علبة"},
+                {"sku": "PRO-1-L", "size": "كبير", "color": "ذهبي", "pack": "كرتونة"},
+            ],
+            "images": [
+                {"url": "https://img.example/oil-a.jpg", "is_primary": True},
+                {"url": "https://img.example/oil-b.jpg"},
+            ],
+            "initial_batch": {
+                "supplier_id": supplier.id, "batch_code": "B-2026-01",
+                "production_date": "2026-01-01", "expiry_date": "2027-01-01", "qty": "50",
+            },
+        },
+    )
+    assert r.status_code == 201, r.get_json()
+    data = r.get_json()
+    assert len(data["variants"]) == 2
+    assert data["variants"][0]["pack"] == "علبة"
+    assert len(data["images"]) == 2
+    assert data["image_url"] == "https://img.example/oil-a.jpg"  # primary mirrored
+    assert data["status"] == "active" and data["is_active"] is True
+    assert data["eta_code_type"] == "EGS"
+    pid = data["id"]
+
+    # Detail endpoint returns the full record.
+    det = client.get(f"/inventory/products/{pid}", headers=h)
+    assert det.status_code == 200 and len(det.get_json()["images"]) == 2
+
+    # With an active offer it shows in the catalog, carrying its primary image.
+    offers_svc.upsert_offer(
+        supplier_id=supplier.id, product_id=pid, unit_price=Decimal("100"), moq=Decimal("1")
+    )
+    db.session.commit()
+    cat = client.get("/catalog/products", headers=h).get_json()["items"]
+    row = next((x for x in cat if x["product_id"] == pid), None)
+    assert row is not None and row["image_url"] == "https://img.example/oil-a.jpg"
+    _ = admin  # created for symmetry
+
+
+def test_product_image_upload_rejects_non_images(client) -> None:
+    """T-14 security: an SVG/HTML upload (stored-XSS vector) is rejected; a real
+    PNG is accepted and served with a safe image MIME + nosniff."""
+    import io
+
+    from tests.helpers import auth_header, create_user
+    create_user(kind="admin", email="imgadmin@example.com", roles=("admin",))
+    h = auth_header(client, email="imgadmin@example.com")
+    pid = client.post(
+        "/inventory/products", headers=h,
+        json={"sku": "IMG-1", "name_ar": "منتج صور", "category": "food"},
+    ).get_json()["id"]
+
+    # An SVG disguised as .svg (or anything non-raster) is refused.
+    svg = b"<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>"
+    bad = client.post(
+        f"/inventory/products/{pid}/images", headers=h,
+        data={"image": (io.BytesIO(svg), "x.svg")}, content_type="multipart/form-data",
+    )
+    assert bad.status_code == 400
+
+    # A real 1x1 PNG is accepted.
+    png = bytes.fromhex(
+        "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
+        "890000000a49444154789c6360000002000154a24f630000000049454e44ae426082"
+    )
+    ok = client.post(
+        f"/inventory/products/{pid}/images", headers=h,
+        data={"image": (io.BytesIO(png), "ok.png")}, content_type="multipart/form-data",
+    )
+    assert ok.status_code == 201, ok.get_json()
+    img_url = ok.get_json()["url"]
+    served = client.get(img_url)  # public serve
+    assert served.status_code == 200
+    assert served.mimetype == "image/png"
+    assert served.headers.get("X-Content-Type-Options") == "nosniff"
+
+
+def test_product_update_variant_and_image_integrity(client) -> None:
+    """Audit fixes: re-saving a product keeping a variant SKU must not violate
+    the unique constraint; duplicate SKUs in one payload are rejected cleanly;
+    a legacy image_url is preserved when editing a product with no gallery."""
+    from tests.helpers import auth_header, create_user
+    create_user(kind="admin", email="upadmin@example.com", roles=("admin",))
+    h = auth_header(client, email="upadmin@example.com")
+
+    pid = client.post(
+        "/inventory/products", headers=h,
+        json={
+            "sku": "UP-1", "name_ar": "منتج تعديل", "category": "food",
+            "image_url": "https://img.example/legacy.jpg",
+            "variants": [{"sku": "UP-1-S", "size": "صغير"}],
+        },
+    ).get_json()["id"]
+
+    # Re-save keeping the same variant SKU (form always re-sends variants).
+    r = client.put(
+        f"/inventory/products/{pid}", headers=h,
+        json={"status": "draft", "variants": [{"sku": "UP-1-S", "size": "وسط"}]},
+    )
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()["status"] == "draft"
+    # Legacy image_url (no gallery rows) survived the edit.
+    assert r.get_json()["image_url"] == "https://img.example/legacy.jpg"
+
+    # Duplicate variant SKUs in one payload -> clean 409, not a 500.
+    bad = client.put(
+        f"/inventory/products/{pid}", headers=h,
+        json={"variants": [{"sku": "DUP"}, {"sku": "DUP"}]},
+    )
+    assert bad.status_code == 409
+
+
 def test_product_catalog_accepts_expanded_categories(client) -> None:
     # T-10: segments beyond food/clothing are now valid.
     for cat in ("electronics", "home", "beauty", "construction", "stationery", "automotive", "other"):

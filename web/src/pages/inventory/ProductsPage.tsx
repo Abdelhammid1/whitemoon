@@ -1,25 +1,38 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, Spinner, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Modal } from '../../components/Overlay'
+import { Icon } from '../../components/Icon'
 import { useToast } from '../../components/Toast'
 import {
-  addVariant, bestPrice, createProduct, listCategories, listProducts, PRODUCT_CATEGORIES,
-  type Category, type Product,
+  addVariant, bestPrice, listCategories, listProducts, PRODUCT_CATEGORIES,
+  type Category, type Product, type ProductStatus,
 } from '../../api/inventory'
-import { ApiError } from '../../api/client'
+import { ApiError, API_BASE } from '../../api/client'
 
-const EMPTY_FORM = {
-  sku: '', name_ar: '', name_en: '', category: 'food', subcategory: '', brand: '',
-  barcode: '', description: '', image_url: '', unit: 'piece', eta_code: '',
-  food_expiry_tracked: false,
+const EMPTY_VARIANT = { sku: '', barcode: '', size: '', color: '', pack: '' }
+
+const STATUS_LABEL: Record<ProductStatus, string> = {
+  active: 'نشط',
+  draft: 'مسودة',
+  suspended: 'موقوف',
+}
+const STATUS_TONE: Record<ProductStatus, 'signal' | 'warning' | 'error'> = {
+  active: 'signal',
+  draft: 'warning',
+  suspended: 'error',
 }
 
-const EMPTY_VARIANT = { sku: '', barcode: '', size: '', color: '' }
+/** Resolve a product thumbnail src (prefix the api base for the serve route). */
+function thumbSrc(url: string): string {
+  return url.startsWith('/inventory/') ? `${API_BASE}${url}` : url
+}
 
 export function ProductsPage() {
   const toast = useToast()
+  const navigate = useNavigate()
   const [q, setQ] = useState('')
   const [category, setCategory] = useState('')
   // Seed with the static list as a fallback so chips/labels never vanish; the
@@ -27,8 +40,6 @@ export function ProductsPage() {
   const [categories, setCategories] = useState<Category[]>(PRODUCT_CATEGORIES)
   const [rows, setRows] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
-  const [open, setOpen] = useState(false)
-  const [form, setForm] = useState(EMPTY_FORM)
   const [busy, setBusy] = useState(false)
   // Variant manager
   const [variantFor, setVariantFor] = useState<Product | null>(null)
@@ -54,37 +65,6 @@ export function ProductsPage() {
   }, [])
 
   const catLabel = (code: string) => categories.find((c) => c.code === code)?.label ?? code
-
-  async function onCreate(e: FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    try {
-      // Omit empty optional fields.
-      const body = {
-        sku: form.sku,
-        name_ar: form.name_ar,
-        category: form.category,
-        food_expiry_tracked: form.food_expiry_tracked,
-        ...(form.name_en ? { name_en: form.name_en } : {}),
-        ...(form.subcategory ? { subcategory: form.subcategory } : {}),
-        ...(form.brand ? { brand: form.brand } : {}),
-        ...(form.barcode ? { barcode: form.barcode } : {}),
-        ...(form.description ? { description: form.description } : {}),
-        ...(form.image_url ? { image_url: form.image_url } : {}),
-        ...(form.unit ? { unit: form.unit } : {}),
-        ...(form.eta_code ? { eta_code: form.eta_code } : {}),
-      }
-      await createProduct(body)
-      toast.success('تم إنشاء المنتج.')
-      setOpen(false)
-      setForm(EMPTY_FORM)
-      await load()
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : 'فشل الإنشاء')
-    } finally {
-      setBusy(false)
-    }
-  }
 
   async function onAddVariant() {
     if (!variantFor) return
@@ -125,14 +105,14 @@ export function ProductsPage() {
   const chip = (active: boolean) =>
     `px-2 py-0.5 rounded-full font-small text-small transition-colors ${active ? 'bg-primary text-on-primary' : 'bg-surface-variant text-on-surface-variant hover:text-primary'}`
 
-  const selectCls =
-    'bg-transparent border-b border-surface-container-high py-2 font-body text-body focus:outline-none focus:border-primary'
+  const statusOf = (p: Product): ProductStatus =>
+    p.status ?? (p.is_active ? 'active' : 'suspended')
 
   return (
     <Wide>
       <div className="flex items-start justify-between">
         <PageTitle title="المنتجات والمخزون" subtitle="كتالوج موحّد مستقل عن المورد." />
-        <Button variant="primary" onClick={() => setOpen(true)} iconRight="add">إضافة منتج</Button>
+        <Button variant="primary" onClick={() => navigate('/inventory/products/new')} iconRight="add">منتج جديد</Button>
       </div>
 
       <div className="mt-space-xl flex flex-wrap items-end gap-space-md">
@@ -150,6 +130,13 @@ export function ProductsPage() {
       <Card padded={false} className="mt-space-lg overflow-hidden">
         {loading ? <Spinner /> : (
           <DataTable rows={rows} rowKey={(p) => p.id} empty="لا توجد منتجات." columns={[
+            { header: 'الصورة', cell: (p) => (
+              <div className="w-10 h-10 rounded-lg bg-surface-container flex items-center justify-center overflow-hidden shrink-0">
+                {p.image_url
+                  ? <img src={thumbSrc(p.image_url)} alt="" className="w-full h-full object-cover" />
+                  : <Icon name="image" size={18} className="text-outline" />}
+              </div>
+            ) },
             { header: 'SKU', cell: (p) => <Mono>{p.sku}</Mono> },
             { header: 'الاسم', cell: (p) => (
               <div className="flex flex-col">
@@ -169,48 +156,15 @@ export function ProductsPage() {
                 {priceBusy === p.id ? '...' : 'أفضل سعر'}
               </button>
             ) },
-            { header: 'الحالة', align: 'end', cell: (p) => <Pill tone={p.is_active ? 'signal' : 'neutral'}>{p.is_active ? 'نشط' : 'موقوف'}</Pill> },
+            { header: 'الحالة', cell: (p) => <Pill tone={STATUS_TONE[statusOf(p)]}>{STATUS_LABEL[statusOf(p)]}</Pill> },
+            { header: '', align: 'end', cell: (p) => (
+              <button className="font-small-medium text-small-medium text-primary px-space-sm py-1 rounded-lg hover:bg-surface-container-low" onClick={() => navigate(`/inventory/products/${p.id}/edit`)}>
+                تعديل
+              </button>
+            ) },
           ]} />
         )}
       </Card>
-
-      {/* Create product */}
-      <Modal open={open} onClose={() => setOpen(false)} title="إضافة منتج جديد" footer={
-        <>
-          <Button onClick={() => setOpen(false)}>إلغاء</Button>
-          <Button variant="primary" onClick={onCreate} disabled={busy || !form.sku || !form.name_ar || !form.category}>حفظ</Button>
-        </>
-      }>
-        <form onSubmit={onCreate} className="flex flex-col gap-space-md">
-          <div className="grid grid-cols-2 gap-space-md">
-            <Field label="SKU" dir="ltr" mono value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} required />
-            <div className="flex flex-col">
-              <label className="font-small text-small text-secondary mb-1">الفئة</label>
-              <select className={selectCls} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}>
-                {categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}
-              </select>
-            </div>
-          </div>
-          <Field label="الاسم بالعربية" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} required />
-          <Field label="الاسم بالإنجليزية (اختياري)" dir="ltr" value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} />
-          <div className="grid grid-cols-2 gap-space-md">
-            <Field label="تصنيف فرعي (اختياري)" value={form.subcategory} onChange={(e) => setForm({ ...form, subcategory: e.target.value })} />
-            <Field label="الماركة (اختياري)" value={form.brand} onChange={(e) => setForm({ ...form, brand: e.target.value })} />
-          </div>
-          <div className="grid grid-cols-2 gap-space-md">
-            <Field label="الباركود (اختياري)" dir="ltr" mono value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} />
-            <Field label="الوحدة" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} />
-          </div>
-          <Field label="الوصف (اختياري)" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
-          <Field label="رابط الصورة (اختياري)" dir="ltr" value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} />
-          <div className="grid grid-cols-2 gap-space-md items-center">
-            <Field label="كود ETA (اختياري)" dir="ltr" mono value={form.eta_code} onChange={(e) => setForm({ ...form, eta_code: e.target.value })} />
-            <label className="flex items-center gap-space-sm font-body text-body mt-space-lg">
-              <input type="checkbox" checked={form.food_expiry_tracked} onChange={(e) => setForm({ ...form, food_expiry_tracked: e.target.checked })} /> تتبّع الصلاحية
-            </label>
-          </div>
-        </form>
-      </Modal>
 
       {/* Variants manager */}
       <Modal open={variantFor !== null} onClose={() => setVariantFor(null)} title={variantFor ? `متغيّرات: ${variantFor.name_ar}` : 'المتغيّرات'} footer={
@@ -223,6 +177,7 @@ export function ProductsPage() {
               { header: 'الباركود', cell: (v) => v.barcode ? <Mono>{v.barcode}</Mono> : <span className="text-secondary">—</span> },
               { header: 'المقاس', cell: (v) => v.size ?? '—' },
               { header: 'اللون', cell: (v) => v.color ?? '—' },
+              { header: 'العبوة', cell: (v) => v.pack ?? '—' },
             ]} />
             <div className="border-t border-surface-container-high pt-space-md flex flex-col gap-space-sm">
               <span className="font-body-medium text-body-medium text-primary">إضافة متغيّر</span>

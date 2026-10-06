@@ -69,6 +69,9 @@ LOCATION_TYPE_LABELS = {
     "in_transit": "في الطريق",
     "customer_hold": "حجز عميل",
 }
+PRODUCT_STATUSES = ("active", "draft", "suspended")
+PRODUCT_STATUS_LABELS = {"active": "نشط", "draft": "مسودة", "suspended": "موقوف"}
+ETA_CODE_TYPES = ("EGS", "GS1")
 TRANSFER_STATUSES = ("draft", "issued", "received", "cancelled")
 SHORTAGE_STATUSES = ("pending", "resolved", "rejected")
 RESPONSIBLE_PARTY_TYPES = ("supplier", "channel_partner", "unallocated")
@@ -153,10 +156,25 @@ class Product(Base, TimestampMixin):
     brand: Mapped[str | None] = mapped_column(String(120))
     barcode: Mapped[str | None] = mapped_column(String(60))
     description: Mapped[str | None] = mapped_column(String(2000))
-    image_url: Mapped[str | None] = mapped_column(String(500))
+    image_url: Mapped[str | None] = mapped_column(String(500))  # mirrors the primary image
+    # Lifecycle (T-14): active / draft / suspended. is_active mirrors (active).
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="active", server_default="active")
+    # Reference pricing defaults (T-14) — the authoritative sale price still
+    # comes from supplier offers; these are catalog/list defaults.
+    wholesale_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 4))
+    deferred_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 4))
+    default_moq: Mapped[Decimal | None] = mapped_column(Numeric(18, 4))
+    # Tax + ETA e-invoicing classification (T-14).
+    tax_rate: Mapped[Decimal | None] = mapped_column(Numeric(6, 3))
+    eta_code_type: Mapped[str | None] = mapped_column(String(10))
 
     variants: Mapped[list[ProductVariant]] = relationship(
         back_populates="product", cascade="all, delete-orphan", order_by="ProductVariant.id"
+    )
+    images: Mapped[list[ProductImage]] = relationship(
+        back_populates="product",
+        cascade="all, delete-orphan",
+        order_by="ProductImage.sort_order, ProductImage.id",
     )
 
 
@@ -179,9 +197,34 @@ class ProductVariant(Base, TimestampMixin):
     barcode: Mapped[str | None] = mapped_column(String(60))
     size: Mapped[str | None] = mapped_column(String(60))
     color: Mapped[str | None] = mapped_column(String(60))
+    pack: Mapped[str | None] = mapped_column(String(60))  # العبوة (T-14)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     product: Mapped[Product] = relationship(back_populates="variants")
+
+
+class ProductImage(Base, TimestampMixin):
+    """Product gallery image (T-14): 1–5 per product, one primary. The primary
+    is mirrored onto Product.image_url so the catalog shows it."""
+
+    __tablename__ = "product_images"
+    __table_args__ = (
+        Index("ix_product_images_product", "product_id"),
+        {"schema": "inventory"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    product_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("inventory.products.id"), nullable=False
+    )
+    url: Mapped[str] = mapped_column(String(500), nullable=False)
+    # Set for uploaded files (served via GET /inventory/product-images/<id>);
+    # null for externally-hosted image URLs.
+    storage_key: Mapped[str | None] = mapped_column(String(500))
+    is_primary: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+    product: Mapped[Product] = relationship(back_populates="images")
 
 
 # ---------------------------------------------------------------- Supplier offers
@@ -397,6 +440,7 @@ class Batch(Base, TimestampMixin):
         BigInteger, ForeignKey("identity.users.id"), nullable=False
     )
     batch_code: Mapped[str] = mapped_column(String(60), nullable=False)
+    production_date: Mapped[date | None] = mapped_column(Date)  # T-14
     expiry_date: Mapped[date | None] = mapped_column(Date)
     qty_on_hand: Mapped[Decimal] = mapped_column(Numeric(18, 4), nullable=False)
 

@@ -52,6 +52,7 @@ import { ModerationPage } from './pages/comm/ModerationPage'
 import { BiDashboardPage } from './pages/bi/BiDashboardPage'
 import { NotificationsPage } from './pages/notifications/NotificationsPage'
 import { ProductsPage } from './pages/inventory/ProductsPage'
+import { ProductFormPage } from './pages/inventory/ProductFormPage'
 import { OffersPage } from './pages/inventory/OffersPage'
 import { StockPage } from './pages/inventory/StockPage'
 import { ReorderAlertsPage } from './pages/inventory/ReorderAlertsPage'
@@ -102,6 +103,8 @@ export function App() {
 
         <Route path="/inventory/categories" element={<ProtectedRoute roles={FINANCE}><CategoriesPage /></ProtectedRoute>} />
         <Route path="/inventory/products" element={<ProtectedRoute roles={FINANCE}><ProductsPage /></ProtectedRoute>} />
+        <Route path="/inventory/products/new" element={<ProtectedRoute roles={FINANCE}><ProductFormPage /></ProtectedRoute>} />
+        <Route path="/inventory/products/:id/edit" element={<ProtectedRoute roles={FINANCE}><ProductFormPage /></ProtectedRoute>} />
         <Route path="/inventory/offers" element={<ProtectedRoute roles={['supplier']}><OffersPage /></ProtectedRoute>} />
         <Route path="/inventory/stock" element={<StockPage />} />
         <Route path="/inventory/reorder" element={<ProtectedRoute roles={FINANCE}><ReorderAlertsPage /></ProtectedRoute>} />
