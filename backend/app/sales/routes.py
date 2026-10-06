@@ -223,14 +223,18 @@ def upload_receipt():
     except (ArithmeticError, ValueError) as e:
         raise BadRequest("مبلغ غير صالح", code="amount_invalid") from e
     due_id_raw = request.form.get("due_id")
-    due_id = int(due_id_raw) if due_id_raw else None
+    try:
+        due_id = int(due_id_raw) if due_id_raw else None
+    except ValueError as e:
+        raise BadRequest("رقم ذمة غير صالح", code="due_id_invalid") from e
     paid_on_raw = request.form.get("paid_on")
     try:
         paid_on = date.fromisoformat(paid_on_raw) if paid_on_raw else date.today()
     except ValueError as e:
         raise BadRequest("تاريخ غير صالح (YYYY-MM-DD)", code="bad_date") from e
 
-    key = storage.store(data, prefix="payment-receipts", ext=ext)
+    # Same storage concern as accounting receipts → S3_BUCKET_RECEIPTS in prod.
+    key = storage.store(data, prefix="receipts", ext=ext)
     row = pay_svc.upload_customer_receipt(
         customer_id=uid, due_id=due_id, amount=amount, paid_on=paid_on, receipt_key=key
     )

@@ -183,14 +183,18 @@ def _build_statement(customer_id: int, date_from: Any = None, date_to: Any = Non
             return False
         return not (date_to and d > date_to)
 
+    # A statement is a financial record, so the date filter must see the full
+    # history — not just the 50 most-recent orders the default list returns.
+    _STMT_CAP = 5000
     profile = db.session.get(CustomerProfile, customer_id)
-    orders = [o for o in orders_svc.list_orders(customer_id) if _in_range(o.placed_at.date())]
+    orders = [o for o in orders_svc.list_orders(customer_id, limit=_STMT_CAP) if _in_range(o.placed_at.date())]
     dues = [
         d
         for d in db.session.execute(
             db.select(CustomerDue)
             .where(CustomerDue.customer_id == customer_id)
             .order_by(CustomerDue.id.desc())
+            .limit(_STMT_CAP)
         ).scalars()
         if _in_range(d.due_date)
     ]
@@ -200,6 +204,7 @@ def _build_statement(customer_id: int, date_from: Any = None, date_to: Any = Non
             db.select(PaymentApproval)
             .where(PaymentApproval.customer_id == customer_id, PaymentApproval.status == "approved")
             .order_by(PaymentApproval.id.desc())
+            .limit(_STMT_CAP)
         ).scalars()
         if _in_range(p.paid_on)
     ]
@@ -320,22 +325,23 @@ def customer_statement_xlsx(customer_id: int):
     assert summary is not None  # a new workbook always has an active sheet
     summary.title = "ملخص"
     summary.sheet_view.rightToLeft = True
+    money = lambda v: float(Decimal(str(v)).quantize(Decimal("0.01")))  # noqa: E731 — 2dp, no binary drift
     summary.append(["العميل", _xlsx_safe(name)])
-    summary.append(["السقف الائتماني", float(s["credit_limit"])])
-    summary.append(["الرصيد المستحق", float(s["outstanding"])])
-    summary.append(["المتاح", float(s["available"])])
+    summary.append(["السقف الائتماني", money(s["credit_limit"])])
+    summary.append(["الرصيد المستحق", money(s["outstanding"])])
+    summary.append(["المتاح", money(s["available"])])
 
     dues = wb.create_sheet("الذمم")
     dues.sheet_view.rightToLeft = True
     dues.append(["تاريخ الاستحقاق", "المبلغ", "الحالة", "أيام التأخير"])
     for d in s["dues"]:
-        dues.append([d["due_date"], float(d["amount"]), _DUE_STATUS_AR.get(d["status"], d["status"]), d["days_late"]])
+        dues.append([d["due_date"], money(d["amount"]), _DUE_STATUS_AR.get(d["status"], d["status"]), d["days_late"]])
 
     pays = wb.create_sheet("المدفوعات")
     pays.sheet_view.rightToLeft = True
     pays.append(["التاريخ", "المبلغ"])
     for p in s["payments"]:
-        pays.append([p["paid_on"], float(p["amount"])])
+        pays.append([p["paid_on"], money(p["amount"])])
 
     buf = io.BytesIO()
     wb.save(buf)
