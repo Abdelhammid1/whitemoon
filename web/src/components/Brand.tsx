@@ -1,26 +1,28 @@
+import logoUrl from '../assets/white-moon-logo.png'
+
 interface Props {
   size?: number
   withWordmark?: boolean
 }
 
-/** White Moon crescent mark + bilingual wordmark, inline (no external image). */
+/** White Moon crescent-town mark + bilingual wordmark. The mark is cream, so it
+ *  sits in a navy tile to stay visible on every surface (light or dark). */
 export function Brand({ size = 24, withWordmark = true }: Props) {
+  const tile = size + 10
   return (
     <div className="flex items-center gap-space-sm">
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 24 24"
-        fill="none"
-        aria-hidden
-        xmlns="http://www.w3.org/2000/svg"
+      <span
+        className="inline-flex shrink-0 items-center justify-center rounded-lg bg-primary shadow-card-sm"
+        style={{ width: tile, height: tile }}
       >
-        <path
-          d="M15.5 2a10 10 0 1 0 6.5 17.3A8 8 0 0 1 15.5 2Z"
-          fill="currentColor"
-          className="text-gold"
+        <img
+          src={logoUrl}
+          alt="White Moon"
+          width={size}
+          height={size}
+          style={{ width: size, height: size, objectFit: 'contain' }}
         />
-      </svg>
+      </span>
       {withWordmark && (
         <span className="font-headline-2 text-headline-2 text-primary font-medium tracking-tight">
           وايت مون

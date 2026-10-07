@@ -230,5 +230,7 @@ Expected: 26 Phase-1 tests + ~35 Phase-2 tests, all green. Breakdown:
 
 None of these change the Phase 2 contract — they add presentation on top.
 
-When tests pass against your DB, say **"start Phase 3"** and I'll build
-inventory + transfer orders + reorder escalation (EPIC 4).
+> **Historical note.** Phase 2 (the accounting engine, EPIC 3) is **built and
+> merged**, as is Phase 3 (inventory + transfer orders + reorder escalation,
+> EPIC 4) described next. See the status table in the root `README.md`; treat
+> this file as the original API spec, not the current project status.

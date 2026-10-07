@@ -251,6 +251,8 @@ Also inspect `audit.events` directly:
 docker exec white-moon-postgres-1 psql -U wm -d whitemoon -c "select at, action, actor_user_id, target_id from audit.events order by id desc limit 10;"
 ```
 
-When you're happy, say **"start Phase 2"** and I'll build the accounting
-engine (EPIC 3) — but only after Abdel-Hameed's signatures land on
-`docs/02-chart-of-accounts.md` and `docs/03-journal-map.md`.
+> **Historical note.** This is the original Phase-1 handoff doc. Phase 1 (and
+> every phase through 13) is **built and merged** — see the status table in the
+> root `README.md`. The accounting engine (EPIC 3 / Phase 2) described next in
+> `docs/07-phase2-api.md` is implemented. Treat these `NN-phaseN-api.md` files as
+> the original API specifications, not as the current project status.

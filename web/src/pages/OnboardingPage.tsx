@@ -91,7 +91,7 @@ export function OnboardingPage() {
         /* ignore */
       }
     }
-    navigate('/')
+    navigate('/home')
   }
 
   const pct = total > 0 ? Math.round((completed / total) * 100) : 0

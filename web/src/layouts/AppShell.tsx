@@ -2,6 +2,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { Icon } from '../components/Icon'
+import logoUrl from '../assets/white-moon-logo.png'
 import { ImpersonationBanner } from '../components/ImpersonationBanner'
 
 interface NavEntry {
@@ -23,7 +24,7 @@ const GROUPS: NavGroup[] = [
     label: 'النظام',
     roles: ['admin', 'staff'],
     items: [
-      { to: '/', label: 'لوحة التحكم', icon: 'space_dashboard', end: true },
+      { to: '/home', label: 'لوحة التحكم', icon: 'space_dashboard', end: true },
       { to: '/dashboard', label: 'التحليلات التنفيذية', icon: 'monitoring' },
       { to: '/admin/orders', label: 'كل الطلبات', icon: 'receipt_long' },
       { to: '/admin/users', label: 'المستخدمون', icon: 'group' },
@@ -102,7 +103,7 @@ const GROUPS: NavGroup[] = [
     label: 'المورد',
     roles: ['supplier'],
     items: [
-      { to: '/', label: 'لوحة التحكم', icon: 'space_dashboard', end: true },
+      { to: '/home', label: 'لوحة التحكم', icon: 'space_dashboard', end: true },
       { to: '/supplier/orders', label: 'طلبات واردة', icon: 'inbox' },
       { to: '/inventory/offers', label: 'عروضي', icon: 'sell' },
       { to: '/inventory/stock', label: 'مخزوني', icon: 'warehouse' },
@@ -123,7 +124,7 @@ const GROUPS: NavGroup[] = [
   {
     label: 'حسابي',
     roles: ['customer', 'agent', 'branch'],
-    items: [{ to: '/', label: 'لوحة التحكم', icon: 'space_dashboard', end: true }],
+    items: [{ to: '/home', label: 'لوحة التحكم', icon: 'space_dashboard', end: true }],
   },
 ]
 
@@ -177,9 +178,7 @@ export function AppShell() {
             className="w-9 h-9 rounded-xl grid place-items-center shrink-0"
             style={{ background: 'linear-gradient(145deg,#2b3a67,#141b35)' }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path d="M15.5 2a10 10 0 1 0 6.5 17.3A8 8 0 0 1 15.5 2Z" className="text-gold" fill="currentColor" />
-            </svg>
+            <img src={logoUrl} alt="White Moon" width={24} height={24} style={{ width: 24, height: 24, objectFit: 'contain' }} />
           </span>
           <div className="flex flex-col leading-tight min-w-0">
             <b className="font-headline-2 text-headline-2 text-on-surface font-medium">وايت مون</b>
