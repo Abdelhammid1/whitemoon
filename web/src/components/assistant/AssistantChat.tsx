@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Button, Pill } from '../ui'
 import { Icon } from '../Icon'
+import { Markdown } from '../Markdown'
 import { useToast } from '../Toast'
 import { ApiError } from '../../api/client'
 import {
@@ -228,13 +229,19 @@ function MessageBubble({ message, compact }: { message: AsstMessage; compact: bo
         {isUser ? 'أنت' : 'المساعد'}
       </div>
       <div
-        className={`rounded-2xl ${compact ? 'px-space-md py-space-sm' : 'p-space-md'} font-body text-body whitespace-pre-wrap break-words ${
+        className={`rounded-2xl ${compact ? 'px-space-md py-space-sm' : 'p-space-md'} font-body text-body break-words ${
           isUser
-            ? 'bg-brand-weak text-on-surface'
+            ? 'bg-brand-weak text-on-surface whitespace-pre-wrap'
             : 'bg-surface-container-lowest border border-surface-container-high text-on-surface shadow-card-sm'
         }`}
       >
-        {message.content || '…'}
+        {isUser ? (
+          message.content || '…'
+        ) : message.content ? (
+          <Markdown>{message.content}</Markdown>
+        ) : (
+          '…'
+        )}
       </div>
       {!isUser && gap && (
         <div className="flex items-center gap-space-xs font-small text-small text-warning">
