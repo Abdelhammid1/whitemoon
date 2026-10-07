@@ -15,6 +15,16 @@ from .accounting.models import (
     JournalLine,
     Period,
 )
+from .assistant.models import (
+    AsstConversation,
+    AsstMessage,
+    IndexVersion,
+    KbChunk,
+    KbDocument,
+    KnowledgeGap,
+    RedactionLog,
+    UsageCounter,
+)
 from .audit.models import AuditEvent
 from .comm.models import Conversation, Message
 from .commerce.models import (
@@ -86,6 +96,8 @@ from .sales.models import (
 
 __all__ = [
     "Account",
+    "AsstConversation",
+    "AsstMessage",
     "AuditEvent",
     "BackupCode",
     "BankReceipt",
@@ -104,6 +116,12 @@ __all__ = [
     "DeliverySlot",
     "EscalationEvent",
     "EventJournalMap",
+    "IndexVersion",
+    "KbChunk",
+    "KbDocument",
+    "KnowledgeGap",
+    "RedactionLog",
+    "UsageCounter",
     "ImpersonationGrant",
     "JournalEntry",
     "JournalLine",

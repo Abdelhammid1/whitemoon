@@ -1,6 +1,9 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    # pgvector/pgvector ships the `vector` extension on top of the official
+    # postgres:16 image (same data format as before — the volume carries over).
+    # Required by the Admin AI Assistant knowledge base (RAG embeddings).
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: wm
       POSTGRES_PASSWORD: wm

@@ -24,6 +24,8 @@ dependencies = [
   "weasyprint>=61",
   "openpyxl>=3.1",
   "twilio>=9.0",
+  "httpx>=0.27",
+  "pgvector>=0.3",
 ]
 
 [project.optional-dependencies]
@@ -35,6 +37,11 @@ dev = [
   "ruff>=0.6",
   "pyright>=1.1",
   "httpx>=0.27",
+]
+# Local embeddings for the assistant's RAG index (bge-m3). Heavy (torch); the
+# app degrades to a deterministic fallback embedding when this isn't installed.
+ai = [
+  "sentence-transformers>=3.0",
 ]
 
 [build-system]

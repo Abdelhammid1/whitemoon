@@ -34,6 +34,7 @@ def _register_blueprints(app: Flask) -> None:
     # without triggering circular model loads at import time.
     from . import models  # noqa: F401 — attach models to metadata
     from .accounting.routes import bp as accounting_bp
+    from .assistant.routes import bp as assistant_bp
     from .bi.routes import bp as bi_bp
     from .comm.routes import bp as comm_bp
     from .commerce.routes import bp as commerce_bp
@@ -52,6 +53,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(accounting_bp)
+    app.register_blueprint(assistant_bp)
     app.register_blueprint(bi_bp)
     app.register_blueprint(comm_bp)
     app.register_blueprint(compliance_bp)

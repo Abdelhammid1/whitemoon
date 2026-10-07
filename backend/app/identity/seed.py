@@ -64,6 +64,7 @@ PERMISSIONS: tuple[tuple[str, str], ...] = (
     # Cross-cutting
     ("bi.view", "عرض لوحة التحليلات التنفيذية"),
     ("notify.send", "إرسال إشعار لمستخدم"),
+    ("assistant.use", "استخدام مساعد الذكاء الاصطناعي للمدير (قراءة وشرح فقط)"),
 )
 
 # role_code -> list of permission codes
@@ -89,6 +90,7 @@ ROLE_PERMS: dict[str, tuple[str, ...]] = {
         "payment.approve",
         "bi.view",
         "notify.send",
+        "assistant.use",
     ),
     "staff": (
         "user.read",
