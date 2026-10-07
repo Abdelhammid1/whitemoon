@@ -99,14 +99,13 @@ def get_conversation(conversation_id: int):
 @require_permission("assistant.use")
 def ask(conversation_id: int):
     uid = _uid()
-    conv = _own_conversation(conversation_id, uid)
+    _own_conversation(conversation_id, uid)  # ownership check (within this session)
     p = _parse(AskIn)
-    # Title a fresh conversation from its first question (redacted).
-    if not conv.title:
-        conv.title = redaction.redact(p.question).text[:80]
-        db.session.commit()
-
-    gen = chat.answer(conv, p.question, route=p.route, actor_id=uid)
+    # Pass the id as a plain value — never the ORM object — into the streaming
+    # generator. The generator runs after this handler returns and manages its
+    # own session; a detached/expired instance would raise DetachedInstanceError
+    # (titling + committing here previously expired `conv`).
+    gen = chat.answer(conversation_id, p.question, route=p.route, actor_id=uid)
     return Response(
         stream_with_context(gen),
         mimetype="text/plain; charset=utf-8",

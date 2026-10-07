@@ -81,12 +81,23 @@ def _today_usage(user_id: int) -> UsageCounter:
     return row
 
 
-def answer(conversation: AsstConversation, question: str, *, route: str | None, actor_id: int) -> Iterator[str]:
+def answer(conversation_id: int, question: str, *, route: str | None, actor_id: int) -> Iterator[str]:
     """Stream the assistant's answer. Side effects (persist, audit, usage, gap)
-    happen at the boundaries so the stream itself only yields text."""
-    # 1) redact the question and persist it (redacted), then audit.
+    happen at the boundaries so the stream itself only yields text.
+
+    Takes the conversation *id* (not an ORM object): this generator runs after
+    the request handler returns, so it loads the conversation in its own live
+    session — passing a possibly-expired instance would raise
+    DetachedInstanceError on the first attribute access."""
+    conversation = db.session.get(AsstConversation, conversation_id)
+    if conversation is None:
+        return
+    # 1) redact the question and persist it (redacted); title a fresh conversation
+    #    from its first question (within this live session), then audit.
     clean_q = redaction.redact_and_log(question, scope="question")
     clean_route = (route or "")[:300] or None
+    if not conversation.title:
+        conversation.title = redaction.redact(question).text[:80]
     db.session.add(AsstMessage(conversation_id=conversation.id, role="user", content=clean_q, meta={"route": clean_route}))
     audit_emit(
         "assistant.ask",

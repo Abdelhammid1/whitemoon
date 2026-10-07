@@ -114,6 +114,25 @@ def test_retrieved_context_is_redacted_before_reaching_deepseek(client, monkeypa
 
 # ---------------------------------------------------------------- knowledge gap
 
+def test_first_question_on_new_conversation_succeeds(client, monkeypatch) -> None:
+    """Regression: the first ask on a title-less conversation raised
+    DetachedInstanceError (the title commit expired the ORM object that the
+    streaming generator then touched). It must now complete, save the user
+    message, and set the title."""
+    monkeypatch.setattr("app.assistant.providers.deepseek.chat_stream", lambda messages, **_: iter(["تمام"]))
+    adm = _admin()
+    h = auth_header(client, email=adm.email)
+    cid = _mk_conversation(client, h)  # created with no title
+
+    out = _ask(client, h, cid, "السيستم شغال ازاي؟")
+    assert "تمام" in out  # streamed answer completed, no exception
+
+    conv = client.get(f"/assistant/conversations/{cid}", headers=h).get_json()
+    assert conv["title"]  # titled from the first question
+    roles = [m["role"] for m in conv["messages"]]
+    assert "user" in roles and "assistant" in roles  # both persisted
+
+
 def test_unanswerable_question_is_logged_as_gap(client, monkeypatch) -> None:
     monkeypatch.setattr("app.assistant.providers.deepseek.chat_stream", lambda messages, **_: iter(["لا أملك معلومات كافية"]))
     adm = _admin()
