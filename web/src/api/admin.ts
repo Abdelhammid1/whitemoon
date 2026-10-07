@@ -92,10 +92,15 @@ export interface AuditRow {
   id: number
   at: string
   actor_user_id: number | null
+  actor_name: string | null
   action: string
   target_type: string | null
   target_id: string | null
+  target_name: string | null
   reason: string | null
+  ip: string | null
+  user_agent: string | null
+  os: string | null
 }
 export async function listAudit(params: { action?: string; limit?: number } = {}) {
   return api<{ items: AuditRow[] }>('/admin/audit', { query: params })

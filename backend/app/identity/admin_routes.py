@@ -281,6 +281,56 @@ def list_user_statuses():
     )
 
 
+def _user_labels(user_ids: set[int]) -> dict[int, str]:
+    """Best human label for each user id: store/legal/partner name, else email,
+    else phone, else #id. One batched pass (no N+1)."""
+    ids = {i for i in user_ids if i}
+    if not ids:
+        return {}
+    from ..identity.models import ChannelPartnerProfile, CustomerProfile, SupplierProfile, User
+
+    cust: dict[int, str] = {
+        uid: name
+        for uid, name in db.session.execute(
+            select(CustomerProfile.user_id, CustomerProfile.display_name).where(CustomerProfile.user_id.in_(ids))
+        )
+    }
+    supp: dict[int, str] = {
+        uid: name
+        for uid, name in db.session.execute(
+            select(SupplierProfile.user_id, SupplierProfile.legal_name).where(SupplierProfile.user_id.in_(ids))
+        )
+    }
+    part: dict[int, str] = {
+        uid: name
+        for uid, name in db.session.execute(
+            select(ChannelPartnerProfile.user_id, ChannelPartnerProfile.display_name).where(ChannelPartnerProfile.user_id.in_(ids))
+        )
+    }
+    labels: dict[int, str] = {}
+    for u in db.session.execute(select(User).where(User.id.in_(ids))).scalars():
+        labels[u.id] = cust.get(u.id) or supp.get(u.id) or part.get(u.id) or u.email or u.phone or f"#{u.id}"
+    return labels
+
+
+def _os_from_ua(ua: str | None) -> str | None:
+    """Short OS/platform label from a User-Agent string."""
+    if not ua:
+        return None
+    s = ua.lower()
+    if "windows" in s:
+        return "Windows"
+    if "iphone" in s or "ipad" in s or "ios" in s:
+        return "iOS"
+    if "android" in s:
+        return "Android"
+    if "mac os" in s or "macintosh" in s:
+        return "macOS"
+    if "linux" in s:
+        return "Linux"
+    return "غير معروف"
+
+
 @bp.get("/audit")
 @require_permission("admin.high")
 def list_audit():
@@ -290,6 +340,21 @@ def list_audit():
     if action:
         stmt = stmt.where(AuditEvent.action == action)
     rows = db.session.execute(stmt).scalars().all()
+
+    # Resolve actor + (user-)target ids to names in one batch.
+    ref_ids: set[int] = set()
+    for e in rows:
+        if e.actor_user_id:
+            ref_ids.add(e.actor_user_id)
+        if e.target_type == "user" and e.target_id and e.target_id.isdigit():
+            ref_ids.add(int(e.target_id))
+    labels = _user_labels(ref_ids)
+
+    def _target_name(e: AuditEvent) -> str | None:
+        if e.target_type == "user" and e.target_id and e.target_id.isdigit():
+            return labels.get(int(e.target_id))
+        return None
+
     return jsonify(
         {
             "items": [
@@ -297,10 +362,15 @@ def list_audit():
                     "id": e.id,
                     "at": e.at.isoformat(),
                     "actor_user_id": e.actor_user_id,
+                    "actor_name": labels.get(e.actor_user_id) if e.actor_user_id else None,
                     "action": e.action,
                     "target_type": e.target_type,
                     "target_id": e.target_id,
+                    "target_name": _target_name(e),
                     "reason": e.reason,
+                    "ip": e.ip,
+                    "user_agent": e.user_agent,
+                    "os": _os_from_ua(e.user_agent),
                 }
                 for e in rows
             ]

@@ -44,6 +44,25 @@ export function formatDate(iso: string | null | undefined): string {
   }
 }
 
+/** Date + time (hour:minute) in Egypt time (Africa/Cairo), Arabic-Indic digits,
+ *  e.g. ٢٠٢٦/١٠/٠٧ ١٤:٣٢ — regardless of the viewer's own timezone. */
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—'
+  try {
+    const dt = new Date(iso)
+    if (Number.isNaN(dt.getTime())) return iso
+    const p = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Africa/Cairo',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(dt)
+    const g = (t: string) => p.find((x) => x.type === t)?.value ?? ''
+    return _toArDigits(`${g('year')}/${g('month')}/${g('day')} ${g('hour')}:${g('minute')}`)
+  } catch {
+    return iso
+  }
+}
+
 export function todayIso(): string {
   return new Date().toISOString().slice(0, 10)
 }

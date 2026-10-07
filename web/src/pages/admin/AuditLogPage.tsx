@@ -5,7 +5,7 @@ import { DataTable, Mono } from '../../components/DataTable'
 import { PageHelp } from '../../components/PageHelp'
 import { listAudit, type AuditRow } from '../../api/admin'
 import { ApiError } from '../../api/client'
-import { formatDate } from '../../lib/format'
+import { formatDateTime } from '../../lib/format'
 
 export function AuditLogPage() {
   const [loading, setLoading] = useState(true)
@@ -21,7 +21,7 @@ export function AuditLogPage() {
 
   return (
     <Wide>
-      <PageTitle title="سجل التدقيق" subtitle="كل عملية حساسة في المنظومة موثّقة بالمنفِّذ والهدف والوقت." />
+      <PageTitle title="سجل التدقيق" subtitle="كل عملية حساسة موثّقة بالمنفِّذ والهدف والوقت (بتوقيت مصر) وعنوان IP ونظام التشغيل." />
       <PageHelp pageKey="audit" />
       <div className="mt-space-xl">
         {loading ? (
@@ -35,19 +35,36 @@ export function AuditLogPage() {
               rowKey={(e) => e.id}
               empty="لا توجد أحداث مسجّلة بعد."
               columns={[
-                { header: 'الوقت', cell: (e) => <Mono>{formatDate(e.at)}</Mono> },
+                { header: 'الوقت (مصر)', cell: (e) => <Mono>{formatDateTime(e.at)}</Mono> },
                 { header: 'الإجراء', cell: (e) => <Pill tone="neutral">{e.action}</Pill> },
                 {
                   header: 'المنفِّذ',
-                  align: 'center',
-                  cell: (e) => <Mono>{e.actor_user_id ?? '—'}</Mono>,
+                  cell: (e) => (
+                    <span className="font-body text-body text-on-surface">
+                      {e.actor_name ?? (e.actor_user_id ? <Mono>#{e.actor_user_id}</Mono> : '—')}
+                    </span>
+                  ),
                 },
                 {
                   header: 'الهدف',
+                  cell: (e) =>
+                    e.target_name ? (
+                      <span className="font-body text-body text-on-surface">{e.target_name}</span>
+                    ) : e.target_type || e.target_id ? (
+                      <span className="font-body text-body text-secondary">
+                        {e.target_type ? `${e.target_type} ` : ''}
+                        {e.target_id ? <Mono>#{e.target_id}</Mono> : ''}
+                      </span>
+                    ) : (
+                      '—'
+                    ),
+                },
+                { header: 'عنوان IP', cell: (e) => <span dir="ltr"><Mono>{e.ip ?? '—'}</Mono></span> },
+                {
+                  header: 'نظام التشغيل',
                   cell: (e) => (
-                    <span className="font-body text-body text-secondary">
-                      {e.target_type ? `${e.target_type} ` : ''}
-                      {e.target_id ? <Mono>#{e.target_id}</Mono> : '—'}
+                    <span className="font-body text-body text-secondary" title={e.user_agent ?? undefined}>
+                      {e.os ?? '—'}
                     </span>
                   ),
                 },
