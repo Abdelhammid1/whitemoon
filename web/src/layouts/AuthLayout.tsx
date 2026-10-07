@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import logoUrl from '../assets/white-moon-logo.png'
 
 /** Branded split layout: a midnight-navy hero panel beside a white form card.
  *  Stacks to one column on mobile. Shared by login / register / OTP / 2FA. */
@@ -23,9 +24,7 @@ export function AuthLayout({
           style={{ background: 'radial-gradient(circle, #a8812b 0%, transparent 70%)' }}
         />
         <div className="relative flex items-center gap-space-sm">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M15.5 2a10 10 0 1 0 6.5 17.3A8 8 0 0 1 15.5 2Z" className="text-gold" fill="currentColor" />
-          </svg>
+          <img src={logoUrl} alt="White Moon" width={44} height={44} style={{ width: 44, height: 44, objectFit: 'contain' }} />
           <div className="flex flex-col leading-tight">
             <span className="font-headline-2 text-headline-2 font-medium">وايت مون</span>
             <span className="font-mono-body text-[11px] text-primary-fixed-dim tracking-widest">WHITE MOON</span>
