@@ -87,6 +87,10 @@ export async function uploadForText(file: File) {
  * Ask a question and stream the answer. Calls `onDelta` with each text chunk as
  * it arrives (first token in <3s). Resolves when the stream ends.
  */
+/** Abort the request if nothing arrives within this window (a dead/stalled
+ *  connection), so the UI fails fast with a clear message instead of freezing. */
+const STALL_MS = 45_000
+
 export async function askStream(
   conversationId: number,
   body: { question: string; route?: string | null },
@@ -96,22 +100,47 @@ export async function askStream(
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const token = tokenStore.getAccess()
   if (token) headers.Authorization = `Bearer ${token}`
-  const res = await fetch(`${API_BASE}/assistant/conversations/${conversationId}/ask`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-    signal,
-  })
-  if (!res.ok || !res.body) {
-    const j = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
-    throw new ApiError(res.status, j?.error ?? 'ask_failed', j?.message ?? 'تعذّر الحصول على إجابة')
+
+  // Internal controller: aborts on the external signal OR on a stall timeout.
+  const ctrl = new AbortController()
+  let timedOut = false
+  if (signal) {
+    if (signal.aborted) ctrl.abort()
+    else signal.addEventListener('abort', () => ctrl.abort(), { once: true })
   }
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder('utf-8')
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    const text = decoder.decode(value, { stream: true })
-    if (text) onDelta(text)
+  let stall: ReturnType<typeof setTimeout>
+  const arm = () => {
+    clearTimeout(stall)
+    stall = setTimeout(() => { timedOut = true; ctrl.abort() }, STALL_MS)
+  }
+
+  try {
+    arm()
+    const res = await fetch(`${API_BASE}/assistant/conversations/${conversationId}/ask`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: ctrl.signal,
+    })
+    if (!res.ok || !res.body) {
+      const j = (await res.json().catch(() => null)) as { error?: string; message?: string } | null
+      throw new ApiError(res.status, j?.error ?? 'ask_failed', j?.message ?? 'تعذّر الحصول على إجابة')
+    }
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder('utf-8')
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      arm() // reset the stall timer on every chunk
+      const text = decoder.decode(value, { stream: true })
+      if (text) onDelta(text)
+    }
+  } catch (err) {
+    if (timedOut) {
+      throw new ApiError(408, 'timeout', 'انتهت مهلة الاتصال بالمساعد. تأكد من تشغيل الخادم وحاول مجددًا.')
+    }
+    throw err
+  } finally {
+    clearTimeout(stall!)
   }
 }
