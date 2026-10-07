@@ -21,7 +21,7 @@ export function AuditLogPage() {
 
   return (
     <Wide>
-      <PageTitle title="سجل التدقيق" subtitle="كل عملية حساسة موثّقة بالمنفِّذ والهدف والوقت (بتوقيت مصر) وعنوان IP ونظام التشغيل." />
+      <PageTitle title="سجل التدقيق" subtitle="كل عملية حساسة موثّقة بالمنفِّذ والهدف والوقت (بتوقيت مصر) وعنوان IP (من الخادم) ونظام التشغيل (كما يبلّغه المتصفح)." />
       <PageHelp pageKey="audit" />
       <div className="mt-space-xl">
         {loading ? (

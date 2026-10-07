@@ -84,7 +84,11 @@ def audited(
 
 def _request_meta() -> tuple[str | None, str | None]:
     try:
-        ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+        # remote_addr is corrected by ProxyFix (TRUSTED_PROXY_COUNT) to the real
+        # client IP as seen by OUR proxy. We deliberately do NOT read the raw
+        # X-Forwarded-For header, which a client can spoof to forge the audited
+        # IP. User-Agent is client-reported (advisory, not authoritative).
+        ip = request.remote_addr
         ua = request.headers.get("User-Agent")
         return (ip, ua)
     except RuntimeError:

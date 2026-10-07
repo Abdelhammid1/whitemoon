@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
+
 from flask import Flask, jsonify
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .common.errors import ApiError
 from .config import Config, get_config
@@ -13,6 +16,16 @@ def create_app(config: Config | None = None) -> Flask:
     # Hard cap on request bodies (uploads) — Flask returns 413 before the
     # handler reads anything. 12 MB leaves room over the 10 MB file limit.
     app.config.setdefault("MAX_CONTENT_LENGTH", 12 * 1024 * 1024)
+
+    # Trust X-Forwarded-* ONLY from our own reverse proxy, so the audit log's
+    # client IP can't be spoofed by a raw X-Forwarded-For header. Set
+    # TRUSTED_PROXY_COUNT to the number of proxies in front of the app (e.g. 1
+    # for a single nginx). Default 0 = no proxy (dev), remote_addr is the peer.
+    hops = int(os.getenv("TRUSTED_PROXY_COUNT", "0"))
+    if hops > 0:
+        app.wsgi_app = ProxyFix(  # type: ignore[method-assign]
+            app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops
+        )
 
     db.init_app(app)
     migrate.init_app(app, db)
