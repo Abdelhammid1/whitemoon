@@ -3,6 +3,8 @@ import { AppShell } from './layouts/AppShell'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { RootRoute } from './auth/RootRoute'
 import { UserGuidePage } from './pages/UserGuidePage'
+import { AssistantPage } from './pages/AssistantPage'
+import { KnowledgeGapsPage } from './pages/KnowledgeGapsPage'
 import { HomePage } from './pages/HomePage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { LoginPage } from './pages/auth/LoginPage'
@@ -76,6 +78,8 @@ export function App() {
       {/* Standalone page but auth-gated: the guide exposes the permission matrix,
           internal routes table and ops procedures, so it is not public. */}
       <Route path="/guide" element={<ProtectedRoute><UserGuidePage /></ProtectedRoute>} />
+      {/* Admin AI assistant — standalone full page, admin-only (assistant.use). */}
+      <Route path="/assistant" element={<ProtectedRoute roles={['admin']}><AssistantPage /></ProtectedRoute>} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterCustomerPage />} />
       <Route path="/register/supplier" element={<RegisterSupplierPage />} />
@@ -104,6 +108,7 @@ export function App() {
         <Route path="/admin/suppliers/pending" element={<ProtectedRoute roles={FINANCE}><PendingSuppliersPage /></ProtectedRoute>} />
         <Route path="/admin/impersonation" element={<ProtectedRoute roles={FINANCE}><ImpersonationPage /></ProtectedRoute>} />
         <Route path="/admin/audit" element={<ProtectedRoute roles={['admin']}><AuditLogPage /></ProtectedRoute>} />
+        <Route path="/assistant/gaps" element={<ProtectedRoute roles={['admin']}><KnowledgeGapsPage /></ProtectedRoute>} />
 
         <Route path="/accounting/chart" element={<ProtectedRoute roles={FINANCE}><ChartOfAccountsPage /></ProtectedRoute>} />
         <Route path="/accounting/periods" element={<ProtectedRoute roles={FINANCE}><PeriodsPage /></ProtectedRoute>} />

@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { Icon } from '../components/Icon'
 import logoUrl from '../assets/white-moon-logo.png'
 import { ImpersonationBanner } from '../components/ImpersonationBanner'
+import { AssistantWidget } from '../components/assistant/AssistantWidget'
 
 interface NavEntry {
   to: string
@@ -30,6 +31,8 @@ const GROUPS: NavGroup[] = [
       { to: '/admin/users', label: 'المستخدمون', icon: 'group' },
       { to: '/admin/suppliers/pending', label: 'الموردون المعلقون', icon: 'how_to_reg' },
       { to: '/admin/audit', label: 'سجل التدقيق', icon: 'history' },
+      { to: '/assistant', label: 'مساعد المدير', icon: 'smart_toy', roles: ['admin'] },
+      { to: '/assistant/gaps', label: 'فجوات المعرفة', icon: 'quiz', roles: ['admin'] },
       { to: '/comm/moderation', label: 'مراقبة المحادثات', icon: 'gpp_maybe' },
       { to: '/admin/impersonation', label: 'الدخول كمستخدم', icon: 'switch_account' },
     ],
@@ -241,6 +244,8 @@ export function AppShell() {
           <Outlet />
         </main>
       </div>
+      {/* Admin AI assistant dock — self-gates to admins, carries the current route */}
+      <AssistantWidget />
     </div>
   )
 }
