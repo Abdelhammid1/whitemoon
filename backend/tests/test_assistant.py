@@ -84,6 +84,34 @@ def test_question_is_redacted_before_reaching_deepseek(client, monkeypatch) -> N
     assert "/admin/users" in blob
 
 
+def test_retrieved_context_is_redacted_before_reaching_deepseek(client, monkeypatch) -> None:
+    """Egress boundary: even if a KB chunk somehow carried PII/a secret, it is
+    redacted before being sent to DeepSeek (not just the user's question)."""
+    from app.assistant.services import retrieval
+
+    captured: dict = {}
+
+    def fake_stream(messages, **_):
+        captured["messages"] = messages
+        yield "ok"
+
+    poisoned = retrieval.Hit(
+        text="leaked contact secret@corp.com and phone 01099998888 token sk-ABCDEF1234567890",
+        source_path="docs/x.md", source_type="doc", title="x", score=0.9,
+    )
+    monkeypatch.setattr("app.assistant.services.chat.retrieval.retrieve", lambda *a, **k: [poisoned])
+    monkeypatch.setattr("app.assistant.providers.deepseek.chat_stream", fake_stream)
+
+    adm = _admin()
+    h = auth_header(client, email=adm.email)
+    cid = _mk_conversation(client, h)
+    _ask(client, h, cid, "اشرحلي الصفحة دي")
+    blob = "\n".join(m["content"] for m in captured["messages"])
+    assert "secret@corp.com" not in blob and "01099998888" not in blob
+    assert "sk-ABCDEF1234567890" not in blob
+    assert "⟪email⟫" in blob and "⟪phone⟫" in blob and "⟪token⟫" in blob
+
+
 # ---------------------------------------------------------------- knowledge gap
 
 def test_unanswerable_question_is_logged_as_gap(client, monkeypatch) -> None:

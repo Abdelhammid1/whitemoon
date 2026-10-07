@@ -51,6 +51,14 @@ def _render_context(hits: list[retrieval.Hit], route: str | None) -> str:
     return "\n".join(parts)
 
 
+def _egress_clean(text: str, *, scope: str = "egress") -> str:
+    """Final redaction at the ONLY boundary where data leaves to DeepSeek.
+    Applied to every message part (KB context + history), not just the user's
+    question, so neither an indexed secret the scanner missed nor any PII can
+    be sent out. Counts are logged (kind+count, never value) as egress proof."""
+    return redaction.redact_and_log(text, scope=scope)
+
+
 def _history_messages(conversation: AsstConversation) -> list[dict]:
     rows = db.session.execute(
         select(AsstMessage)
@@ -89,7 +97,9 @@ def answer(conversation: AsstConversation, question: str, *, route: str | None, 
     )
     db.session.commit()
 
-    # 2) daily cap.
+    # 2) daily cap — reserve the slot NOW (atomic-ish increment then commit), so
+    #    an aborted/failing stream still counts and concurrent requests can't all
+    #    slip under the limit by incrementing only on success.
     usage = _today_usage(actor_id)
     if usage.message_count >= DAILY_MESSAGE_CAP:
         msg = "لقد بلغت الحد اليومي لعدد رسائل المساعد. حاول مجددًا غدًا أو ارفع الحد من الإعدادات."
@@ -97,14 +107,19 @@ def answer(conversation: AsstConversation, question: str, *, route: str | None, 
         db.session.commit()
         yield msg
         return
+    usage.message_count += 1
+    db.session.commit()
 
-    # 3) retrieve.
+    # 3) retrieve + build the prompt. EVERY part that leaves to DeepSeek passes
+    #    through redaction here (the egress chokepoint) — KB context and history
+    #    included, not just the question.
     hits = retrieval.retrieve(clean_q, k=6)
-    context = _render_context(hits, clean_route)
-    messages = (
-        [{"role": "system", "content": f"{_SYSTEM}\n\n=== سياق النظام ===\n{context}"}]
-        + _history_messages(conversation)
-    )
+    context = _egress_clean(_render_context(hits, clean_route), scope="context")
+    history = [
+        {"role": m["role"], "content": _egress_clean(m["content"], scope="history")}
+        for m in _history_messages(conversation)
+    ]
+    messages = [{"role": "system", "content": f"{_SYSTEM}\n\n=== سياق النظام ===\n{context}"}] + history
 
     # 4) stream DeepSeek, accumulating for persistence.
     buf: list[str] = []
@@ -129,8 +144,7 @@ def answer(conversation: AsstConversation, question: str, *, route: str | None, 
             },
         )
     )
-    usage.message_count += 1
-    usage.token_count += (len(clean_q) + len(full)) // 4  # rough estimate
+    usage.token_count += (len(clean_q) + len(full)) // 4  # rough estimate (slot already reserved)
     if is_gap:
         db.session.add(
             KnowledgeGap(
