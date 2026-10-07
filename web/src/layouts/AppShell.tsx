@@ -193,6 +193,11 @@ export function AppShell() {
             <Icon name="rocket_launch" size={18} className="shrink-0" />
             <span className="flex-1 min-w-0 truncate">كيف أبدأ؟</span>
           </NavLink>
+          {/* User guide — standalone full-page doc, every role */}
+          <NavLink to="/guide" className={({ isActive }) => navItem(isActive)}>
+            <Icon name="menu_book" size={18} className="shrink-0" />
+            <span className="flex-1 min-w-0 truncate">دليل الاستخدام</span>
+          </NavLink>
 
           {GROUPS.filter((g) => g.roles.includes(role)).map((g) => (
             <div key={g.label} className="flex flex-col">

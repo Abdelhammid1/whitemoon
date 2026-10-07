@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './layouts/AppShell'
 import { ProtectedRoute } from './auth/ProtectedRoute'
 import { RootRoute } from './auth/RootRoute'
+import { UserGuidePage } from './pages/UserGuidePage'
 import { HomePage } from './pages/HomePage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { LoginPage } from './pages/auth/LoginPage'
@@ -72,6 +73,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/" element={<RootRoute />} />
+      <Route path="/guide" element={<UserGuidePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterCustomerPage />} />
       <Route path="/register/supplier" element={<RegisterSupplierPage />} />
