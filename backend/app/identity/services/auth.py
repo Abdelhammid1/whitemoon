@@ -282,6 +282,33 @@ def logout_current() -> None:
         db.session.commit()
 
 
+def change_password(
+    *, user_id: int, current_password: str, new_password: str, keep_jti: str | None = None
+) -> None:
+    """Self-service password change for any authenticated user. Verifies the
+    current password, requires the new one to differ, then revokes every other
+    active session so other devices must sign in again (the caller's own session
+    — `keep_jti` — is left valid so they stay logged in)."""
+    user = db.session.get(User, user_id)
+    if user is None:
+        raise Unauthorized("User not found", code="user_not_found")
+    if not passwords.verify_password(user.password_hash, current_password):
+        raise Unauthorized("كلمة المرور الحالية غير صحيحة", code="wrong_current_password")
+    if passwords.verify_password(user.password_hash, new_password):
+        raise BadRequest("كلمة المرور الجديدة يجب أن تختلف عن الحالية", code="password_unchanged")
+
+    user.password_hash = passwords.hash_password(new_password)
+    others = db.session.execute(
+        select(Session).where(Session.user_id == user_id, Session.revoked_at.is_(None))
+    ).scalars().all()
+    now = datetime.now(UTC)
+    for s in others:
+        if keep_jti is None or s.jwt_jti != keep_jti:
+            s.revoked_at = now
+    audit.emit("auth.password_changed", actor_user_id=user_id, target_type="user", target_id=user_id)
+    db.session.commit()
+
+
 def refresh_current() -> str:
     raw = get_jwt_identity()
     if raw is None:

@@ -5,6 +5,11 @@ from __future__ import annotations
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
+class ChangePasswordIn(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
 class RegisterCustomerIn(BaseModel):
     phone: str | None = None
     email: EmailStr | None = None

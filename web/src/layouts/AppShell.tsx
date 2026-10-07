@@ -201,6 +201,11 @@ export function AppShell() {
             <Icon name="menu_book" size={18} className="shrink-0" />
             <span className="flex-1 min-w-0 truncate">دليل الاستخدام</span>
           </NavLink>
+          {/* Change password — every role */}
+          <NavLink to="/account/password" className={({ isActive }) => navItem(isActive)}>
+            <Icon name="password" size={18} className="shrink-0" />
+            <span className="flex-1 min-w-0 truncate">تغيير كلمة المرور</span>
+          </NavLink>
 
           {GROUPS.filter((g) => g.roles.includes(role)).map((g) => (
             <div key={g.label} className="flex flex-col">

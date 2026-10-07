@@ -110,3 +110,10 @@ export async function totpEnrollFinish(code: string) {
     body: { code },
   })
 }
+
+export async function changePassword(current_password: string, new_password: string) {
+  return api<{ status: string }>('/auth/change-password', {
+    method: 'POST',
+    body: { current_password, new_password },
+  })
+}

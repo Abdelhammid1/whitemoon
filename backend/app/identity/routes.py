@@ -5,13 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 from flask import Blueprint, jsonify, request
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended import get_jwt, get_jwt_identity, jwt_required
 from pydantic import ValidationError
 
 from ..common.errors import ApiError, BadRequest, Unauthorized
 from ..extensions import db
 from .models import User
 from .schemas import (
+    ChangePasswordIn,
     LoginIn,
     OtpVerifyIn,
     RegisterCustomerIn,
@@ -122,6 +123,23 @@ def logout():
 def refresh():
     access = auth_svc.refresh_current()
     return jsonify({"access_token": access})
+
+
+@bp.post("/change-password")
+@jwt_required()
+def change_password():
+    """Self-service password change for any signed-in user."""
+    raw = get_jwt_identity()
+    if raw is None:
+        raise Unauthorized("No identity", code="no_identity")
+    p = _parse(ChangePasswordIn)
+    auth_svc.change_password(
+        user_id=int(raw),
+        current_password=p.current_password,
+        new_password=p.new_password,
+        keep_jti=get_jwt().get("jti"),
+    )
+    return jsonify({"status": "password_changed"})
 
 
 @bp.get("/me")

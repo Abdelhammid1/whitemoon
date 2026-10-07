@@ -5,6 +5,7 @@ import { RootRoute } from './auth/RootRoute'
 import { UserGuidePage } from './pages/UserGuidePage'
 import { AssistantPage } from './pages/AssistantPage'
 import { KnowledgeGapsPage } from './pages/KnowledgeGapsPage'
+import { ChangePasswordPage } from './pages/ChangePasswordPage'
 import { HomePage } from './pages/HomePage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { LoginPage } from './pages/auth/LoginPage'
@@ -89,6 +90,7 @@ export function App() {
         <Route path="/home" element={<HomePage />} />
         <Route path="/start" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
         <Route path="/2fa" element={<TotpEnrollPage />} />
+        <Route path="/account/password" element={<ChangePasswordPage />} />
 
         <Route path="/catalog" element={<CatalogPage />} />
         <Route path="/catalog/:id" element={<ProductDetailPage />} />
