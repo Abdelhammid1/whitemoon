@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from './layouts/AppShell'
 import { ProtectedRoute } from './auth/ProtectedRoute'
+import { LandingPage } from './pages/LandingPage'
 import { HomePage } from './pages/HomePage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { LoginPage } from './pages/auth/LoginPage'
@@ -70,6 +71,7 @@ const FINANCE = ['admin', 'staff']
 export function App() {
   return (
     <Routes>
+      <Route path="/welcome" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterCustomerPage />} />
       <Route path="/register/supplier" element={<RegisterSupplierPage />} />
