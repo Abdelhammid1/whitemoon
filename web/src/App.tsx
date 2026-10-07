@@ -73,7 +73,9 @@ export function App() {
   return (
     <Routes>
       <Route path="/" element={<RootRoute />} />
-      <Route path="/guide" element={<UserGuidePage />} />
+      {/* Standalone page but auth-gated: the guide exposes the permission matrix,
+          internal routes table and ops procedures, so it is not public. */}
+      <Route path="/guide" element={<ProtectedRoute><UserGuidePage /></ProtectedRoute>} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterCustomerPage />} />
       <Route path="/register/supplier" element={<RegisterSupplierPage />} />

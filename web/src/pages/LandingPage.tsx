@@ -242,8 +242,6 @@ export function LandingPage() {
           <Brand size={22} />
           <p className="font-small text-small text-on-surface-variant">جميع الأسعار بالجنيه المصري (ج.م) · منصّة أعمال B2B</p>
           <div className="flex items-center gap-space-md font-small-medium text-small-medium text-on-surface-variant">
-            <Link to="/guide" className="hover:text-primary">دليل الاستخدام</Link>
-            <span className="text-outline-variant">·</span>
             <Link to="/login" className="hover:text-primary">دخول</Link>
             <span className="text-outline-variant">·</span>
             <Link to="/register" className="hover:text-primary">عميل جديد</Link>
