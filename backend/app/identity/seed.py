@@ -154,10 +154,28 @@ def seed_rbac() -> None:
 
 
 def seed_bootstrap_admin() -> User | None:
-    """Create an admin.high user if none exists. Credentials from env."""
-    stmt = select(User).join(UserRole).join(Role).where(Role.code == "admin.high")
-    existing = db.session.execute(stmt).scalar_one_or_none()
-    if existing is not None:
+    """Create the bootstrap admin.high user only if NO admin already exists.
+
+    Idempotency must not assume exactly one admin: the Users screen now lets
+    staff add more admins, so an equality query like `scalar_one_or_none()`
+    raises `MultipleResultsFound` once there are two. We only need *existence*,
+    so limit to one row. We also never spawn a default-password admin when any
+    admin (of any role count) is already present — a security precondition for
+    re-running this against a live database.
+    """
+    stmt = (
+        select(User.id)
+        .join(UserRole, UserRole.user_id == User.id)
+        .join(Role, Role.id == UserRole.role_id)
+        .where(Role.code == "admin.high")
+        .limit(1)
+    )
+    if db.session.execute(stmt).first() is not None:
+        return None
+    # Belt-and-suspenders: also skip if any admin-kind user exists at all, so a
+    # deployment with admins but (somehow) no admin.high role is never handed a
+    # fresh default-password superadmin.
+    if db.session.execute(select(User.id).where(User.kind == "admin").limit(1)).first() is not None:
         return None
 
     # Not a .local/.test address: those are special-use TLDs the email
@@ -181,8 +199,15 @@ def seed_bootstrap_admin() -> User | None:
 
 
 def run() -> None:
-    seed_rbac()
-    admin = seed_bootstrap_admin()
+    # RBAC first and committed on its own, so a later problem creating the
+    # bootstrap admin can never leave the system without roles/permissions.
+    seed_rbac()  # commits internally
+    try:
+        admin = seed_bootstrap_admin()
+    except Exception as exc:  # pragma: no cover - defensive; RBAC is already safe
+        db.session.rollback()
+        print(f"Bootstrap admin step failed ({exc!r}) — RBAC was seeded; continuing.")
+        return
     if admin is not None:
         print(f"Bootstrap admin created (id={admin.id}, email={admin.email}).")
         print("Change the password immediately via /auth/login then your admin flow.")
