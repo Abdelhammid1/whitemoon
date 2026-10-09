@@ -12,6 +12,14 @@ const TABS: { code: string; label: string }[] = [
   { code: 'answered', label: 'مُجابة' },
 ]
 
+/** Why this gap was flagged. */
+const SOURCE_AR: Record<string, string> = {
+  retrieval: 'ضعف في المصادر',
+  heuristic: 'المساعد اعتذر',
+  judge: 'تقييم آلي للإجابة',
+  user_feedback: 'بلاغ من المستخدم 👎',
+}
+
 export function KnowledgeGapsPage() {
   const toast = useToast()
   const [tab, setTab] = useState('open')
@@ -85,14 +93,30 @@ export function KnowledgeGapsPage() {
               <Card key={g.id} className="flex flex-col gap-space-sm">
                 <div className="flex flex-wrap items-center justify-between gap-space-sm">
                   <span className="font-body-medium text-body-medium text-on-surface">{g.question}</span>
-                  <Pill tone={g.status === 'answered' ? 'signal' : 'warning'}>
-                    {g.status === 'answered' ? 'مُجابة' : 'مفتوحة'}
-                  </Pill>
+                  <span className="inline-flex items-center gap-space-xs">
+                    {g.source && <Pill tone="gold">{SOURCE_AR[g.source] ?? g.source}</Pill>}
+                    <Pill tone={g.status === 'answered' ? 'signal' : 'warning'}>
+                      {g.status === 'answered' ? 'مُجابة' : 'مفتوحة'}
+                    </Pill>
+                  </span>
                 </div>
                 <div className="flex flex-wrap gap-space-md font-small text-small text-secondary">
                   {g.route && <span>الصفحة: {g.route}</span>}
                   <span>{formatDate(g.created_at)}</span>
                 </div>
+                {g.detail && (
+                  <p className="font-small text-small text-warning">سبب الرصد: {g.detail}</p>
+                )}
+                {g.assistant_answer && (
+                  <details className="rounded-lg bg-surface-container-low px-space-md py-space-sm">
+                    <summary className="cursor-pointer font-small-medium text-small-medium text-secondary">
+                      رد المساعد وقتها
+                    </summary>
+                    <p className="mt-space-xs font-body text-body text-on-surface-variant whitespace-pre-wrap">
+                      {g.assistant_answer}
+                    </p>
+                  </details>
+                )}
                 {g.status === 'answered' ? (
                   <p className="rounded-lg bg-surface-container-low p-space-md font-body text-body text-on-surface whitespace-pre-wrap">
                     {g.answer}

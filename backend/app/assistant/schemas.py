@@ -16,3 +16,9 @@ class AskIn(BaseModel):
 
 class AnswerGapIn(BaseModel):
     answer: str = Field(min_length=1, max_length=8000)
+
+
+class FeedbackIn(BaseModel):
+    question: str = Field(min_length=1, max_length=4000)
+    answer: str = Field(default="", max_length=8000)
+    route: str | None = Field(default=None, max_length=300)

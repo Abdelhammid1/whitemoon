@@ -8,6 +8,7 @@ import {
   askStream,
   createConversation,
   getConversation,
+  sendFeedback,
   uploadForText,
   type AsstMessage,
 } from '../../api/assistant'
@@ -139,6 +140,11 @@ export const AssistantChat = forwardRef<AssistantChatHandle, Props>(function Ass
     }
   }
 
+  async function handleFeedback(question: string, answer: string) {
+    if (convId == null) return
+    await sendFeedback(convId, { question, answer, route: route ?? null })
+  }
+
   const pad = compact ? 'p-space-sm' : 'p-space-md'
   const gap = compact ? 'gap-space-sm' : 'gap-space-md'
 
@@ -153,7 +159,16 @@ export const AssistantChat = forwardRef<AssistantChatHandle, Props>(function Ass
           </div>
         )}
         {messages.map((m, i) => (
-          <MessageBubble key={i} message={m} compact={compact} />
+          <MessageBubble
+            key={i}
+            message={m}
+            compact={compact}
+            onFeedback={
+              m.role === 'assistant' && m.content && convId != null && !streaming
+                ? () => handleFeedback(messages[i - 1]?.content ?? '', m.content)
+                : undefined
+            }
+          />
         ))}
         {lastAssistantEmpty && (
           <div className="flex items-center gap-space-sm px-space-sm font-small text-small text-secondary">
@@ -218,10 +233,36 @@ export const AssistantChat = forwardRef<AssistantChatHandle, Props>(function Ass
   )
 })
 
-function MessageBubble({ message, compact }: { message: AsstMessage; compact: boolean }) {
+function MessageBubble({
+  message,
+  compact,
+  onFeedback,
+}: {
+  message: AsstMessage
+  compact: boolean
+  onFeedback?: () => Promise<void>
+}) {
   const isUser = message.role === 'user'
   const gap = message.meta?.knowledge_gap
   const citations = message.meta?.citations ?? []
+  const toast = useToast()
+  const [fbSent, setFbSent] = useState(false)
+  const [fbBusy, setFbBusy] = useState(false)
+
+  async function flagNotHelpful() {
+    if (!onFeedback || fbBusy || fbSent) return
+    setFbBusy(true)
+    try {
+      await onFeedback()
+      setFbSent(true)
+      toast.success('شكرًا — سجّلنا إن الإجابة لم تفد لمراجعتها.')
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'تعذّر تسجيل الملاحظة')
+    } finally {
+      setFbBusy(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-space-xs">
       <div className="flex items-center gap-space-xs font-small text-small text-secondary">
@@ -254,6 +295,17 @@ function MessageBubble({ message, compact }: { message: AsstMessage; compact: bo
             <Pill key={i} tone="neutral">{c}</Pill>
           ))}
         </div>
+      )}
+      {!isUser && onFeedback && (
+        <button
+          type="button"
+          onClick={flagNotHelpful}
+          disabled={fbBusy || fbSent}
+          className="self-start inline-flex items-center gap-space-xs font-small text-small text-secondary transition-colors hover:text-danger disabled:opacity-60"
+        >
+          <Icon name={fbSent ? 'check' : 'thumb_down'} size={14} />
+          {fbSent ? 'شكرًا لملاحظتك' : 'الإجابة لم تفد'}
+        </button>
       )}
     </div>
   )

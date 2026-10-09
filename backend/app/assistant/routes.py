@@ -21,7 +21,7 @@ from ..identity.services.audit import emit as audit_emit
 from ..identity.services.rbac import require_permission
 from .models import AsstConversation, AsstMessage, KnowledgeGap, UsageCounter
 from .providers import deepseek
-from .schemas import AnswerGapIn, AskIn, NewConversationIn
+from .schemas import AnswerGapIn, AskIn, FeedbackIn, NewConversationIn
 from .services import chat, ocr, redaction, retrieval
 
 bp = Blueprint("assistant", __name__, url_prefix="/assistant")
@@ -113,6 +113,23 @@ def ask(conversation_id: int):
     )
 
 
+@bp.post("/conversations/<int:conversation_id>/feedback")
+@require_permission("assistant.use")
+def feedback(conversation_id: int):
+    """👎 'الإجابة لم تفد' — logs the Q/A as a knowledge gap for review."""
+    uid = _uid()
+    _own_conversation(conversation_id, uid)
+    p = _parse(FeedbackIn)
+    chat.log_user_feedback(
+        conversation_id=conversation_id, question=p.question, answer=p.answer, route=p.route
+    )
+    audit_emit(
+        "assistant.feedback", actor_user_id=uid,
+        target_type="assistant_conversation", target_id=conversation_id,
+    )
+    return jsonify({"status": "logged"})
+
+
 # ---------------------------------------------------------------- uploads (OCR)
 
 
@@ -193,6 +210,9 @@ def list_gaps():
                     "route": g.route,
                     "status": g.status,
                     "answer": g.answer,
+                    "assistant_answer": g.assistant_answer,
+                    "source": g.source,
+                    "detail": g.detail,
                     "created_at": g.created_at.isoformat(),
                 }
                 for g in rows

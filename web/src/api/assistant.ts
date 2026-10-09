@@ -37,7 +37,21 @@ export interface KnowledgeGap {
   route: string | null
   status: string
   answer: string | null
+  assistant_answer: string | null
+  source: string | null
+  detail: string | null
   created_at: string
+}
+
+/** 👎 "الإجابة لم تفد" — log the Q/A as a knowledge gap for review. */
+export async function sendFeedback(
+  conversationId: number,
+  body: { question: string; answer: string; route?: string | null },
+) {
+  return api<{ status: string }>(`/assistant/conversations/${conversationId}/feedback`, {
+    method: 'POST',
+    body,
+  })
 }
 
 export async function createConversation(title?: string) {

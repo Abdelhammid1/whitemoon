@@ -166,6 +166,12 @@ class KnowledgeGap(Base):
     question: Mapped[str] = mapped_column(Text, nullable=False)
     context: Mapped[str | None] = mapped_column(Text)
     route: Mapped[str | None] = mapped_column(String(300))
+    # What the assistant actually replied (redacted), and why this was flagged:
+    # 'retrieval' (no/weak sources), 'heuristic' (reply said "not enough info"),
+    # 'judge' (DeepSeek graded the answer inadequate), 'user_feedback' (👎).
+    assistant_answer: Mapped[str | None] = mapped_column(Text)
+    source: Mapped[str | None] = mapped_column(String(20))
+    detail: Mapped[str | None] = mapped_column(Text)
     status: Mapped[str] = mapped_column(String(10), nullable=False, default="open")
     answer: Mapped[str | None] = mapped_column(Text)
     answered_by: Mapped[int | None] = mapped_column(BigInteger)

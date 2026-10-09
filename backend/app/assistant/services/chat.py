@@ -10,7 +10,9 @@ Business/customer data never enters here: the only inputs are the admin's
 
 from __future__ import annotations
 
+import json
 import os
+import re
 from collections.abc import Iterator
 from datetime import UTC, datetime
 
@@ -25,6 +27,78 @@ from . import redaction, retrieval
 MAX_HISTORY = 10
 GAP_SCORE_THRESHOLD = 0.28
 DAILY_MESSAGE_CAP = int(os.getenv("ASSISTANT_DAILY_MESSAGE_CAP", "200"))
+# LLM-judge: after answering, grade the answer with DeepSeek and log a gap if it
+# wasn't correct/accurate/clear/sufficient. Disable with ASSISTANT_JUDGE_ENABLED=0.
+JUDGE_ENABLED = os.getenv("ASSISTANT_JUDGE_ENABLED", "1") != "0"
+
+# The reply itself admitting it couldn't answer (covers cases where retrieval
+# was "confident" but the answer was a refusal / "not enough info").
+_INSUFFICIENT_RE = re.compile(
+    r"(مش كافي|غير كافي|غير كافية|لا أملك معلومات كافية|مش عندي معلومات كافية|"
+    r"المصادر .{0,20}(مش|غير) كافية|محتاج مصادر إضافية|مش شايف في المصادر|"
+    r"معلومة ناقصة|معلومات ناقصة|لا توجد معلومات كافية|لا أعرف|مش عارف|مش قادر أجاوب|"
+    r"not enough info|insufficient information|don'?t have enough|cannot answer)",
+    re.IGNORECASE,
+)
+
+_JUDGE_SYSTEM = (
+    "أنت مُقيّم صارم لجودة إجابات مساعد داخلي للمدير. احكم فقط بناءً على السؤال "
+    "والمصادر المتاحة وإجابة المساعد، ولا تضف معلومات من عندك."
+)
+
+
+def _answer_insufficient(text: str) -> bool:
+    return bool(_INSUFFICIENT_RE.search(text or ""))
+
+
+def _judge_answer(question: str, context: str, answer: str) -> tuple[bool, str | None]:
+    """Ask DeepSeek to grade the answer. Returns (adequate, reason). If the judge
+    is unavailable it returns (True, None) so we never flag on judge failure."""
+    out = deepseek.complete(
+        [
+            {"role": "system", "content": _JUDGE_SYSTEM},
+            {
+                "role": "user",
+                "content": (
+                    f"السؤال:\n{question}\n\n"
+                    f"المصادر المتاحة للمساعد:\n{context[:1500]}\n\n"
+                    f"إجابة المساعد:\n{answer[:1500]}\n\n"
+                    "هل الإجابة صحيحة ودقيقة وواضحة وكافية فعلًا لفهم أو تنفيذ المطلوب بناءً على المصادر؟ "
+                    "اعتبرها غير كافية لو اعتذرت أو قالت إنها لا تملك معلومات، أو خمّنت، أو كانت ناقصة الخطوات العملية، أو عامة جدًا. "
+                    'ردّ بـJSON فقط: {"adequate": true|false, "reason": "سبب مختصر جدًا بالعربي"}'
+                ),
+            },
+        ]
+    )
+    if not out:
+        return (True, None)
+    try:
+        m = re.search(r"\{.*\}", out, re.S)
+        data = json.loads(m.group(0)) if m else {}
+        return (bool(data.get("adequate", True)), (str(data.get("reason") or "")[:500] or None))
+    except (json.JSONDecodeError, ValueError):
+        low = out.lower().replace(" ", "")
+        if '"adequate":false' in low:
+            return (False, out[:300])
+        return (True, None)
+
+
+def _log_gap(
+    conversation_id: int, question: str, context: str, route: str | None,
+    answer: str, source: str, detail: str | None,
+) -> None:
+    db.session.add(
+        KnowledgeGap(
+            conversation_id=conversation_id,
+            question=question,  # already redacted
+            context=redaction.redact_and_log(context[:1000], scope="gap"),
+            route=route,
+            assistant_answer=redaction.redact(answer[:2000]).text,
+            source=source,
+            detail=detail,
+            status="open",
+        )
+    )
 
 _SYSTEM = """أنت «مساعد وايت مون» الداخلي، مخصص لمدير المنصة فقط. مهمتك شرح كيف يعمل النظام وكيفية استخدامه خطوة بخطوة.
 
@@ -79,6 +153,17 @@ def _today_usage(user_id: int) -> UsageCounter:
         db.session.add(row)
         db.session.flush()
     return row
+
+
+def log_user_feedback(*, conversation_id: int, question: str, answer: str, route: str | None = None) -> None:
+    """Record a 👎 'الإجابة لم تفد' as a knowledge gap (#2) — the strongest
+    signal, logged even when retrieval/judge thought the answer was fine."""
+    clean_q = redaction.redact_and_log(question, scope="feedback")
+    _log_gap(
+        conversation_id, clean_q, context="", route=(route or "")[:300] or None,
+        answer=answer, source="user_feedback", detail="المستخدم: الإجابة لم تفد",
+    )
+    db.session.commit()
 
 
 def answer(conversation_id: int, question: str, *, route: str | None, actor_id: int) -> Iterator[str]:
@@ -139,9 +224,15 @@ def answer(conversation_id: int, question: str, *, route: str | None, actor_id: 
         yield delta
     full = "".join(buf).strip() or "—"
 
-    # 5) persist assistant reply + usage + knowledge-gap detection.
+    # 5) persist assistant reply + usage. Gap detection (#1): weak retrieval OR
+    #    the reply itself admitting it couldn't answer.
     top = max((h.score for h in hits), default=0.0)
-    is_gap = (not hits) or top < GAP_SCORE_THRESHOLD
+    retrieval_gap = (not hits) or top < GAP_SCORE_THRESHOLD
+    heuristic_gap = _answer_insufficient(full)
+    is_gap = retrieval_gap or heuristic_gap
+    source: str | None = "retrieval" if retrieval_gap else ("heuristic" if heuristic_gap else None)
+    detail: str | None = None
+
     db.session.add(
         AsstMessage(
             conversation_id=conversation.id,
@@ -156,15 +247,16 @@ def answer(conversation_id: int, question: str, *, route: str | None, actor_id: 
         )
     )
     usage.token_count += (len(clean_q) + len(full)) // 4  # rough estimate (slot already reserved)
-    if is_gap:
-        db.session.add(
-            KnowledgeGap(
-                conversation_id=conversation.id,
-                question=clean_q,  # already redacted
-                context=redaction.redact_and_log(context[:1000], scope="gap"),
-                route=clean_route,
-                status="open",
-            )
-        )
     conversation.updated_at = datetime.now(UTC)
     db.session.commit()
+
+    # 5b) LLM judge (#1, user's request): if not already flagged, ask DeepSeek to
+    #     grade correctness/accuracy/clarity/sufficiency and log a gap if poor.
+    if not is_gap and JUDGE_ENABLED:
+        adequate, reason = _judge_answer(clean_q, context, full)
+        if not adequate:
+            is_gap, source, detail = True, "judge", reason
+
+    if is_gap:
+        _log_gap(conversation.id, clean_q, context, clean_route, full, source or "retrieval", detail)
+        db.session.commit()

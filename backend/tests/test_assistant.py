@@ -147,6 +147,57 @@ def test_unanswerable_question_is_logged_as_gap(client, monkeypatch) -> None:
 
 # ---------------------------------------------------------------- daily cap
 
+def test_answer_insufficiency_heuristic() -> None:
+    from app.assistant.services.chat import _answer_insufficient
+
+    assert _answer_insufficient("للأسف، المصادر المتاحة عندي مش كافية أجاوبك")
+    assert _answer_insufficient("محتاج مصادر إضافية مش موجودة عندي")
+    assert _answer_insufficient("I don't have enough information")
+    assert not _answer_insufficient("تقدر تضيف فرع من صفحة الوكلاء والفروع، الخطوات: ...")
+
+
+def test_judge_flags_inadequate_answer_as_gap(client, monkeypatch) -> None:
+    """Even when retrieval was confident and the reply didn't admit failure, the
+    DeepSeek judge can flag the answer as inadequate → logged as a 'judge' gap."""
+    from app.assistant.services import retrieval
+
+    good_hit = retrieval.Hit(text="x", source_path="docs/x.md", source_type="doc", title="x", score=0.9)
+    monkeypatch.setattr("app.assistant.services.chat.retrieval.retrieve", lambda *a, **k: [good_hit])
+    monkeypatch.setattr("app.assistant.providers.deepseek.chat_stream", lambda m, **k: iter(["إجابة تبدو واثقة"]))
+    monkeypatch.setattr(
+        "app.assistant.providers.deepseek.complete",
+        lambda m, **k: '{"adequate": false, "reason": "ناقصة الخطوات العملية"}',
+    )
+    adm = _admin()
+    h = auth_header(client, email=adm.email)
+    cid = _mk_conversation(client, h)
+    _ask(client, h, cid, "إزاي أضيف رصيد صنف للفرع؟")
+
+    gaps = client.get("/assistant/gaps", headers=h).get_json()["items"]
+    judged = [g for g in gaps if g["source"] == "judge"]
+    assert judged and judged[0]["detail"] == "ناقصة الخطوات العملية"
+    assert judged[0]["assistant_answer"]  # the reply is stored for review
+
+
+def test_thumbs_down_feedback_logs_gap(client, monkeypatch) -> None:
+    monkeypatch.setattr("app.assistant.providers.deepseek.chat_stream", lambda m, **k: iter(["إجابة"]))
+    monkeypatch.setattr("app.assistant.providers.deepseek.complete", lambda m, **k: None)  # judge off
+    adm = _admin()
+    h = auth_header(client, email=adm.email)
+    cid = _mk_conversation(client, h)
+    _ask(client, h, cid, "سؤال")
+
+    r = client.post(
+        f"/assistant/conversations/{cid}/feedback",
+        json={"question": "سؤال", "answer": "إجابة", "route": "/admin/orders"},
+        headers=h,
+    )
+    assert r.status_code == 200
+    gaps = client.get("/assistant/gaps", headers=h).get_json()["items"]
+    fb = [g for g in gaps if g["source"] == "user_feedback"]
+    assert fb and fb[0]["route"] == "/admin/orders"
+
+
 def test_daily_cap_blocks_without_calling_model(client, monkeypatch) -> None:
     called = {"n": 0}
 

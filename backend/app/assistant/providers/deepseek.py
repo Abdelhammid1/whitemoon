@@ -46,6 +46,25 @@ def _mock_stream(messages: list[dict]) -> Iterator[str]:
         yield "المصادر التي كان سيُعتمد عليها:\n" + tail
 
 
+def complete(messages: list[dict], *, temperature: float = 0.0, max_tokens: int = 300) -> str | None:
+    """Non-streaming completion — used by the answer-quality judge. Returns the
+    text, or None when DeepSeek isn't configured or the call fails (caller then
+    skips judging)."""
+    key = _api_key()
+    if key is None:
+        return None
+    payload = {"model": _MODEL, "messages": messages, "temperature": temperature, "max_tokens": max_tokens}
+    headers = {"Authorization": f"Bearer {key}", "Content-Type": "application/json"}
+    try:
+        with httpx.Client(timeout=_TIMEOUT) as client:
+            resp = client.post(f"{_BASE_URL}/chat/completions", json=payload, headers=headers)
+        if resp.status_code != 200:
+            return None
+        return resp.json()["choices"][0]["message"]["content"]
+    except (httpx.HTTPError, KeyError, IndexError, ValueError):
+        return None
+
+
 def chat_stream(
     messages: list[dict], *, temperature: float = 0.2, max_tokens: int = 1200
 ) -> Iterator[str]:
