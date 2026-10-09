@@ -23,6 +23,9 @@ os.environ.setdefault(
     "postgresql+psycopg://wm:wm@localhost:5433/whitemoon",
 )
 os.environ.setdefault("OTP_PROVIDER", "console")
+# Run the assistant answer-quality judge inline (not in a background thread) so
+# gap-detection tests are deterministic.
+os.environ.setdefault("ASSISTANT_JUDGE_SYNC", "1")
 
 from app import create_app
 from app.accounting import seed as accounting_seed

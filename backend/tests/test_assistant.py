@@ -154,6 +154,9 @@ def test_answer_insufficiency_heuristic() -> None:
     assert _answer_insufficient("محتاج مصادر إضافية مش موجودة عندي")
     assert _answer_insufficient("I don't have enough information")
     assert not _answer_insufficient("تقدر تضيف فرع من صفحة الوكلاء والفروع، الخطوات: ...")
+    # Generic phrases inside a correct answer must NOT flag (false-positive fix).
+    assert not _answer_insufficient("لو بيانات العميل فيها معلومات ناقصة كمّلها، والباقي واضح")
+    assert not _answer_insufficient("لا أعرف سبب طلبك لكن الخطوات هي كذا وكذا")
 
 
 def test_judge_flags_inadequate_answer_as_gap(client, monkeypatch) -> None:
@@ -193,9 +196,15 @@ def test_thumbs_down_feedback_logs_gap(client, monkeypatch) -> None:
         headers=h,
     )
     assert r.status_code == 200
+    # Posting the same feedback again must NOT create a duplicate gap (#7 dedup).
+    client.post(
+        f"/assistant/conversations/{cid}/feedback",
+        json={"question": "سؤال", "answer": "إجابة", "route": "/admin/orders"},
+        headers=h,
+    )
     gaps = client.get("/assistant/gaps", headers=h).get_json()["items"]
     fb = [g for g in gaps if g["source"] == "user_feedback"]
-    assert fb and fb[0]["route"] == "/admin/orders"
+    assert len(fb) == 1 and fb[0]["route"] == "/admin/orders"
 
 
 def test_daily_cap_blocks_without_calling_model(client, monkeypatch) -> None:
