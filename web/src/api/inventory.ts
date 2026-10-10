@@ -1,4 +1,4 @@
-import { api, API_BASE, ApiError, tokenStore } from './client'
+import { api, API_BASE, ApiError, tokenStore, downloadFile, postForm } from './client'
 
 export type ProductStatus = 'active' | 'draft' | 'suspended'
 export type EtaCodeType = 'EGS' | 'GS1'
@@ -296,6 +296,39 @@ export async function createCodingRequest(body: {
 }
 export async function myCodingRequests() {
   return api<{ items: CodingRequest[] }>('/inventory/coding-requests/mine')
+}
+
+// --- bulk Excel update (T-39) ---
+export interface BulkRow {
+  barcode: string
+  name: string
+  status: 'green' | 'yellow' | 'red'
+  message: string
+}
+export interface BulkPreview {
+  rows: BulkRow[]
+  counts: { green: number; yellow: number; red: number }
+}
+export interface BulkApplyResult {
+  rows: BulkRow[]
+  applied: number
+  total: number
+}
+export async function downloadProductsTemplate() {
+  return downloadFile('/inventory/supplier/products/template.xlsx', 'whitemoon-products-template.xlsx')
+}
+export async function exportMyProducts() {
+  return downloadFile('/inventory/supplier/products/export.xlsx', 'whitemoon-my-products.xlsx')
+}
+export async function bulkPreviewProducts(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return postForm<BulkPreview>('/inventory/supplier/products/bulk?mode=preview', form)
+}
+export async function bulkApplyProducts(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  return postForm<BulkApplyResult>('/inventory/supplier/products/bulk?mode=apply', form)
 }
 // --- admin coding queue (T-31) ---
 export interface AdminCodingRequest extends CodingRequest {

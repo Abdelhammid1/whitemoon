@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, Spinner, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
@@ -6,10 +6,15 @@ import { Modal } from '../../components/Overlay'
 import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import {
-  supplierProducts, setSupplierProduct, createCodingRequest, type SupplierProduct,
+  supplierProducts, setSupplierProduct, createCodingRequest,
+  downloadProductsTemplate, exportMyProducts, bulkPreviewProducts, bulkApplyProducts,
+  type SupplierProduct, type BulkPreview,
 } from '../../api/inventory'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
+
+const BULK_TONE: Record<string, 'signal' | 'warning' | 'error'> = { green: 'signal', yellow: 'warning', red: 'error' }
+const BULK_AR: Record<string, string> = { green: 'جاهز', yellow: 'تنبيه', red: 'خطأ' }
 
 const selectCls =
   'bg-transparent border-b border-surface-container-high py-2 font-body text-body focus:outline-none focus:border-primary w-full'
@@ -38,6 +43,11 @@ export function SupplierProductsPage() {
   const [edit, setEdit] = useState<EditForm | null>(null)
   const [adding, setAdding] = useState(false)
   const [coding, setCoding] = useState<null | { name: string; barcode: string; brand: string; category: string; note: string }>(null)
+  // T-39 bulk Excel update.
+  const bulkRef = useRef<HTMLInputElement>(null)
+  const [bulkFile, setBulkFile] = useState<File | null>(null)
+  const [bulkPreview, setBulkPreview] = useState<BulkPreview | null>(null)
+  const [bulkBusy, setBulkBusy] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -86,6 +96,32 @@ export function SupplierProductsPage() {
     } finally { setBusy(false) }
   }
 
+  async function onBulkFile(file: File | null) {
+    if (!file) return
+    setBulkFile(file)
+    setBulkBusy(true)
+    try {
+      setBulkPreview(await bulkPreviewProducts(file))
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'تعذّرت قراءة الملف')
+    } finally {
+      setBulkBusy(false)
+      if (bulkRef.current) bulkRef.current.value = ''
+    }
+  }
+  async function applyBulk() {
+    if (!bulkFile) return
+    setBulkBusy(true)
+    try {
+      const r = await bulkApplyProducts(bulkFile)
+      toast.success(`حُفظ ${r.applied} من ${r.total} صف.`)
+      setBulkPreview(null); setBulkFile(null)
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'تعذّر الحفظ')
+    } finally { setBulkBusy(false) }
+  }
+
   async function submitCoding(e: FormEvent) {
     e.preventDefault()
     if (!coding) return
@@ -106,11 +142,15 @@ export function SupplierProductsPage() {
     <Wide>
       <div className="flex flex-wrap items-start justify-between gap-space-sm">
         <PageTitle title="منتجاتي" subtitle="السعر والكمية والخصم في شاشة واحدة — خصمك يجب أن يحقق أفضل سعر على المنصة." />
-        <div className="flex gap-space-sm">
+        <div className="flex flex-wrap gap-space-sm">
+          <Button onClick={() => void downloadProductsTemplate()} iconRight="download">قالب Excel</Button>
+          <Button onClick={() => void exportMyProducts()} iconRight="file_download">تصدير الحالي</Button>
+          <Button onClick={() => bulkRef.current?.click()} disabled={bulkBusy} iconRight="upload_file">{bulkBusy && !bulkPreview ? 'جارٍ القراءة…' : 'رفع من ملف'}</Button>
           <Button onClick={() => setCoding({ name: '', barcode: '', brand: '', category: '', note: '' })} iconRight="note_add">اطلب تكويد صنف</Button>
           <Button variant="primary" onClick={openAdd} iconRight="add">إضافة منتج</Button>
         </div>
       </div>
+      <input ref={bulkRef} type="file" accept=".xlsx" className="hidden" onChange={(e) => void onBulkFile(e.target.files?.[0] ?? null)} />
 
       <PageHelp pageKey="supplier-products" />
 
@@ -205,6 +245,35 @@ export function SupplierProductsPage() {
             <Field label="الفئة (اختياري)" value={coding.category} onChange={(e) => setCoding({ ...coding, category: e.target.value })} />
             <Field label="ملاحظة (اختياري)" value={coding.note} onChange={(e) => setCoding({ ...coding, note: e.target.value })} />
           </form>
+        )}
+      </Modal>
+
+      {/* T-39: bulk-update preview — colour-coded rows before saving. */}
+      <Modal open={bulkPreview !== null} onClose={() => { setBulkPreview(null); setBulkFile(null) }} title="معاينة التحديث بالملف" footer={
+        <>
+          <Button onClick={() => { setBulkPreview(null); setBulkFile(null) }}>إلغاء</Button>
+          <Button variant="primary" disabled={bulkBusy || !bulkPreview || bulkPreview.counts.green + bulkPreview.counts.yellow === 0} onClick={() => void applyBulk()}>
+            {bulkBusy ? 'جارٍ الحفظ…' : 'حفظ الصفوف الصالحة'}
+          </Button>
+        </>
+      }>
+        {bulkPreview && (
+          <div className="flex flex-col gap-space-md">
+            <div className="flex flex-wrap gap-space-sm">
+              <Pill tone="signal">جاهز {bulkPreview.counts.green}</Pill>
+              <Pill tone="warning">تنبيه {bulkPreview.counts.yellow}</Pill>
+              <Pill tone="error">خطأ {bulkPreview.counts.red}</Pill>
+            </div>
+            <p className="font-small text-small text-secondary">تُحفظ الصفوف «جاهز» و«تنبيه» فقط؛ الصفوف ذات الخطأ تُتجاهل. السبب مبيّن بكل صف.</p>
+            <div className="max-h-[50vh] overflow-auto">
+              <DataTable rows={bulkPreview.rows.map((r, i) => ({ ...r, _i: i }))} rowKey={(r) => r._i} columns={[
+                { header: 'الباركود', cell: (r) => <Mono>{r.barcode || '—'}</Mono> },
+                { header: 'الصنف', cell: (r) => <span className="text-on-surface">{r.name || '—'}</span> },
+                { header: 'الحالة', align: 'center', cell: (r) => <Pill tone={BULK_TONE[r.status] ?? 'neutral'}>{BULK_AR[r.status] ?? r.status}</Pill> },
+                { header: 'الملاحظة', cell: (r) => <span className="font-small text-small text-secondary">{r.message}</span> },
+              ]} />
+            </div>
+          </div>
         )}
       </Modal>
     </Wide>

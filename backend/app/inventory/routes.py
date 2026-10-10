@@ -318,6 +318,51 @@ def set_supplier_product(product_id: int):
     return jsonify(result)
 
 
+@bp.get("/supplier/products/template.xlsx")
+@require_permission("offer.manage")
+def supplier_products_template():
+    """T-39: download the bulk-update Excel template."""
+    from .services import bulk as bulk_svc
+
+    return bulk_svc.xlsx_response(bulk_svc.template_bytes(), "whitemoon-products-template.xlsx")
+
+
+@bp.get("/supplier/products/export.xlsx")
+@require_permission("offer.manage")
+def supplier_products_export():
+    """T-39: export the supplier's current products in the template shape."""
+    from .services import bulk as bulk_svc
+
+    return bulk_svc.xlsx_response(bulk_svc.export_bytes(_uid()), "whitemoon-my-products.xlsx")
+
+
+@bp.post("/supplier/products/bulk")
+@require_permission("offer.manage")
+def supplier_products_bulk():
+    """T-39: validate (mode=preview) or apply (mode=apply) a bulk-update file."""
+    from .services import bulk as bulk_svc
+
+    f = request.files.get("file")
+    if f is None or not f.filename:
+        raise BadRequest("مطلوب ملف Excel", code="file_required")
+    data = f.read(12 * 1024 * 1024 + 1)  # 12 MiB cap — ample for thousands of rows
+    if not data:
+        raise BadRequest("الملف فارغ", code="empty_file")
+    if len(data) > 12 * 1024 * 1024:
+        raise BadRequest("حجم الملف كبير جدًا", code="file_too_large")
+    try:
+        mode = request.args.get("mode", "preview")
+        if mode == "apply":
+            result = bulk_svc.apply(supplier_id=_uid(), data=data)
+            audit_emit("inventory.products.bulk_apply", actor_user_id=_uid(), target_type="supplier", target_id=_uid())
+            return jsonify(result)
+        return jsonify(bulk_svc.preview(supplier_id=_uid(), data=data))
+    except BadRequest:
+        raise
+    except Exception as e:
+        raise BadRequest("تعذّر قراءة الملف — تأكد أنه بصيغة Excel الصحيحة", code="bad_file") from e
+
+
 @bp.post("/coding-requests")
 @require_permission("offer.manage")
 def create_coding_request():
