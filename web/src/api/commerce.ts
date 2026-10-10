@@ -134,8 +134,11 @@ export const confirmOrder = (id: number) => transitionOrder(id, 'confirm')
 export const fulfillOrder = (id: number) => transitionOrder(id, 'fulfill')
 export const cancelOrder = (id: number) => transitionOrder(id, 'cancel')
 
-export async function checkout(payment_mode: 'cash' | 'deferred') {
-  return api<Order>('/commerce/checkout', { method: 'POST', body: { payment_mode } })
+export async function checkout(payment_mode: 'cash' | 'deferred', deferred_days?: number) {
+  return api<Order>('/commerce/checkout', {
+    method: 'POST',
+    body: { payment_mode, ...(deferred_days != null ? { deferred_days } : {}) },
+  })
 }
 export async function listOrders() {
   return api<{ items: Order[] }>('/commerce/orders')

@@ -331,6 +331,8 @@ def is_token_revoked(jti: str) -> bool:
 
 
 def user_summary(user: User) -> dict[str, Any]:
+    from .rbac import get_user_permissions
+
     return {
         "id": user.id,
         "kind": user.kind,
@@ -338,6 +340,9 @@ def user_summary(user: User) -> dict[str, Any]:
         "phone": user.phone,
         "email": user.email,
         "locale": user.locale,
+        # Effective permission codes (role grants + direct delegation), so the
+        # UI can gate capability-based screens/nav without hardcoding roles.
+        "permissions": sorted(get_user_permissions(user.id)),
     }
 
 

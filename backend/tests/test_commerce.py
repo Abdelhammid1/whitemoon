@@ -211,14 +211,21 @@ def test_checkout_deferred_creates_terms_and_spread(client) -> None:
     cust = create_user(kind="customer", email="c5@example.com", roles=("customer",))
     db.session.commit()
     cart_svc.add_item(customer_id=cust.id, offer_id=oa.id, qty=Decimal("10"))  # cash=1000
-    # Deferred terms are server-computed (10% markup placeholder) — not client input.
+    # Deferred terms are server-computed from the configurable annual-rate
+    # engine (T-28), not client input. A brand-new customer is white-tier
+    # (36%/yr default) and the default duration is 15 days:
+    #   fee = 1000 × 36% / 365 × 15 = 14.79  →  total 1014.79
     order = orders_svc.checkout(customer_id=cust.id, payment_mode="deferred")
     assert order.total_cash == Decimal("1000.0000")
-    assert order.total_deferred == Decimal("1100.0000")  # 1000 × 1.10
+    assert order.total_deferred == Decimal("1014.7900")
     from app.accounting.models import DeferredTerm
     term = db.session.execute(select(DeferredTerm).where(DeferredTerm.order_id == order.id)).scalar_one()
-    assert term.deferred_price == Decimal("1100.0000")
-    assert term.early_settlement_discount == Decimal("50.0000")  # spread 100 × 50%
+    assert term.deferred_price == Decimal("1014.7900")
+    assert term.fee == Decimal("14.7900")
+    assert term.annual_pct == Decimal("36.00")
+    assert term.days == 15
+    # Early-settlement discount is still a fixed 50% of the spread (fee).
+    assert term.early_settlement_discount == Decimal("7.3950")
 
 
 def test_expired_lock_reverts_to_current_price(client) -> None:

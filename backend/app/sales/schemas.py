@@ -57,3 +57,45 @@ class TierSettingIn(BaseModel):
         if isinstance(v, float):
             raise ValueError("float is forbidden for money; use string or Decimal")
         return v
+
+
+# ---------------------------------------------------------------- deferred (T-28)
+
+
+class DeferredSettingsIn(BaseModel):
+    annual_pct_general: Decimal | None = Field(default=None, ge=0, le=999)
+    default_days: int | None = Field(default=None, ge=1)
+    max_days: int | None = Field(default=None, ge=1)
+    allowed_days: list[int] | None = None
+
+    @field_validator("annual_pct_general", mode="before")
+    @classmethod
+    def _no_float(cls, v: object) -> object:
+        if isinstance(v, float):
+            raise ValueError("float is forbidden for a rate; use string or int")
+        return v
+
+
+class DeferredTierRateIn(BaseModel):
+    # null clears the override (→ use the general rate).
+    annual_pct: Decimal | None = Field(default=None, ge=0, le=999)
+
+    @field_validator("annual_pct", mode="before")
+    @classmethod
+    def _no_float(cls, v: object) -> object:
+        if isinstance(v, float):
+            raise ValueError("float is forbidden for a rate; use string or int")
+        return v
+
+
+class DeferredExceptionIn(BaseModel):
+    customer_id: int
+    annual_pct: Decimal = Field(ge=0, le=999)
+    reason: str = Field(min_length=5, max_length=1000)
+
+    @field_validator("annual_pct", mode="before")
+    @classmethod
+    def _no_float(cls, v: object) -> object:
+        if isinstance(v, float):
+            raise ValueError("float is forbidden for a rate; use string or int")
+        return v

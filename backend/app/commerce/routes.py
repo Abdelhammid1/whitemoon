@@ -122,7 +122,9 @@ def delete_cart_item(item_id: int):
 def checkout():
     payload = _parse(CheckoutIn)
     uid = _uid()
-    order = orders_svc.checkout(customer_id=uid, payment_mode=payload.payment_mode)
+    order = orders_svc.checkout(
+        customer_id=uid, payment_mode=payload.payment_mode, deferred_days=payload.deferred_days
+    )
     audit_emit("commerce.order.placed", actor_user_id=uid, target_type="order", target_id=order.id)
     return jsonify(orders_svc.serialize_order(order, for_customer=True)), 201
 
@@ -226,10 +228,24 @@ def _build_statement(customer_id: int, date_from: Any = None, date_to: Any = Non
     outstanding = credit_svc.outstanding(customer_id)
     limit = credit_svc.effective_limit(customer_id)
     tier = credit_svc.get_tier(customer_id)
+    # T-28: batch-load the deferred-term snapshots (fee / annual % / days) for the
+    # deferred orders so the statement can show the fee breakdown per order.
+    from ..accounting.models import DeferredTerm
+
+    deferred_order_ids = [o.id for o in orders if o.payment_mode == "deferred"]
+    terms: dict[int, DeferredTerm] = {}
+    if deferred_order_ids:
+        terms = {
+            t.order_id: t
+            for t in db.session.execute(
+                db.select(DeferredTerm).where(DeferredTerm.order_id.in_(deferred_order_ids))
+            ).scalars()
+        }
     # Light order rows (no sub-order/line lazy loads — the statement lists order
     # headers only, so this avoids an N+1 over a long order history).
-    order_rows = [
-        {
+    order_rows = []
+    for o in orders:
+        row: dict[str, Any] = {
             "id": o.id,
             "number": o.number,
             "status": o.status,
@@ -238,8 +254,12 @@ def _build_statement(customer_id: int, date_from: Any = None, date_to: Any = Non
             "total_deferred": str(o.total_deferred),
             "placed_at": o.placed_at.isoformat(),
         }
-        for o in orders
-    ]
+        t = terms.get(o.id)
+        if t is not None and t.fee is not None and t.annual_pct is not None:
+            row["deferred_fee"] = str(t.fee)
+            row["deferred_annual_pct"] = str(t.annual_pct)
+            row["deferred_days"] = t.days
+        order_rows.append(row)
     return {
         "customer_id": customer_id,
         "profile": {
@@ -430,6 +450,28 @@ def order_invoice(order_id: int):
         raise Forbidden("ليس طلبك", code="forbidden")
 
     data = orders_svc.serialize_order(order, for_customer=True)
+
+    # T-28: for a deferred order, show the transparent fee breakdown from the
+    # per-order snapshot (annual %, duration, computed fee) + the due date.
+    deferred_line = ""
+    if order.payment_mode == "deferred":
+        from ..accounting.models import DeferredTerm
+        from ..sales.models import CustomerDue
+
+        term = db.session.execute(
+            db.select(DeferredTerm).where(DeferredTerm.order_id == order.id)
+        ).scalar_one_or_none()
+        due = db.session.execute(
+            db.select(CustomerDue).where(CustomerDue.order_id == order.id)
+        ).scalar_one_or_none()
+        if term is not None and term.fee is not None and term.annual_pct is not None:
+            due_txt = f" — تستحق في {due.due_date.isoformat()}" if due is not None else ""
+            deferred_line = (
+                f"<tr><td>رسوم الأجل ({Decimal(term.annual_pct):g}% سنويًا × "
+                f"{term.days} يوم ÷ 365){escape(due_txt)}</td>"
+                f"<td class='num'>{doc.fmt_money(term.fee)}</td></tr>"
+            )
+
     product_ids = {ln["product_id"] for ln in data["lines"]}
     names = {
         p.id: p.name_ar
@@ -448,7 +490,18 @@ def order_invoice(order_id: int):
         for ln in data["lines"]
     ) or "<tr><td colspan='4'>لا توجد بنود</td></tr>"
 
-    total = Decimal(data["total_cash"]) + Decimal(data["total_deferred"])
+    is_deferred = order.payment_mode == "deferred"
+    if is_deferred:
+        totals_rows = (
+            f"<tr><td>السعر النقدي</td><td class='num'>{doc.fmt_money(data['total_cash'])}</td></tr>"
+            f"{deferred_line}"
+        )
+        grand_total = Decimal(data["total_deferred"])
+        total_label = "الإجمالي الآجل"
+    else:
+        totals_rows = ""
+        grand_total = Decimal(data["total_cash"])
+        total_label = "الإجمالي"
     body = (
         "<div class='head'>"
         "<div class='brand'>وايت مون<small>فاتورة طلب</small></div>"
@@ -465,10 +518,9 @@ def order_invoice(order_id: int):
         "</tr></thead><tbody>"
         f"{rows}</tbody></table>"
         "<table class='totals'><tbody>"
-        f"<tr><td>نقدي</td><td class='num'>{doc.fmt_money(data['total_cash'])}</td></tr>"
-        f"<tr><td>آجل</td><td class='num'>{doc.fmt_money(data['total_deferred'])}</td></tr>"
+        f"{totals_rows}"
         "</tbody><tfoot>"
-        f"<tr><td>الإجمالي</td><td class='num'>{doc.fmt_money(total)}</td></tr>"
+        f"<tr><td>{total_label}</td><td class='num'>{doc.fmt_money(grand_total)}</td></tr>"
         "</tfoot></table>"
         "<p style='color:#6b7280;font-size:11px'>جميع المبالغ بالجنيه المصري (ج.م). "
         "هذه فاتورة مبدئية؛ الفاتورة الضريبية الإلكترونية (ETA) تصدر في مرحلة لاحقة.</p>"

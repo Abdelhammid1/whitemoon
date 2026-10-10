@@ -18,21 +18,19 @@ from sqlalchemy import func, select
 
 from ...accounting.services import deferred as deferred_svc
 from ...accounting.services import events as journal
-from ...common.errors import BadRequest, Conflict, NotFound
+from ...common.errors import BadRequest, Conflict, Forbidden, NotFound
 from ...common.money import to_money
 from ...extensions import db
 from ...inventory.models import Product, SupplierOffer
 from ..models import Cart, Order, OrderLine, OrderSubOrder
 from . import pricelock
 
-# Deferred-pricing schedule — PLACEHOLDER values pending a schedule signed by
-# the finance lead (same rule as the Chart of Accounts / credit rules: a
-# business rule, never customer input nor developer discretion in prod).
-# docs/03-journal-map.md §2 + docs/04 note these must be approved before go-live.
-DEFERRED_MARKUP_PCT = Decimal("0.10")  # deferred_total = cash × (1 + markup)
+# Deferred pricing is now a configurable annual-rate engine (T-28): the fee,
+# duration, and per-tier/per-customer rate come from `sales.deferred_settings`
+# via `deferred_pricing`, never a code constant. Only the early-settlement
+# discount shape stays here (a fixed fraction of the fee, within a window).
 EARLY_DISCOUNT_PCT = Decimal("0.50")  # discount = spread × pct (0 ≤ disc < spread)
 EARLY_WINDOW_DAYS = 14
-CREDIT_NET_DAYS = 30  # deferred payment due date = placed + net days
 
 
 def _number() -> str:
@@ -43,11 +41,14 @@ def checkout(  # noqa: PLR0912, PLR0915 — cash/deferred × per-category × per
     *,
     customer_id: int,
     payment_mode: str,
+    deferred_days: int | None = None,
     entry_date: date | None = None,
 ) -> Order:
-    """Place the active cart. Financial terms (deferred price, discount,
-    window) are computed SERVER-SIDE from the approved schedule — never taken
-    from the client (US-3.4)."""
+    """Place the active cart. Financial terms (annual rate, fee, discount,
+    window) are computed SERVER-SIDE from the approved schedule (T-28) — never
+    taken from the client (US-3.4). For a deferred order the customer only
+    chooses a duration (`deferred_days`), validated against the allowed/max
+    days; the rate and fee are resolved from the deferred-pricing settings."""
     if payment_mode not in ("cash", "deferred"):
         raise BadRequest("payment_mode must be cash|deferred", code="bad_payment_mode")
 
@@ -94,9 +95,22 @@ def checkout(  # noqa: PLR0912, PLR0915 — cash/deferred × per-category × per
                 code="below_supplier_minimum",
             )
 
-    # Deferred terms are SERVER-COMPUTED from the approved schedule.
+    # Deferred terms are SERVER-COMPUTED from the configurable schedule (T-28):
+    # the annual rate resolves per customer/tier, and the fee is proportional to
+    # the chosen duration. A red customer (resolve → None) is blocked below by
+    # check_credit, consistent with the credit rules.
+    from ...sales.services import deferred_pricing as deferred_pricing_svc
+
+    annual_pct: Decimal | None = None
+    deferred_days_used = 0
     if payment_mode == "deferred":
-        d_total = to_money(total_cash * (Decimal("1") + DEFERRED_MARKUP_PCT))
+        annual_pct = deferred_pricing_svc.resolve_annual_pct(customer_id)
+        if annual_pct is None:
+            raise Forbidden("التصنيف الأحمر لا يسمح بالبيع الآجل — نقدي فقط", code="deferred_blocked_red")
+        s = deferred_pricing_svc.get_settings()
+        deferred_days_used = deferred_pricing_svc.validate_days(deferred_days or s.default_days)
+        fee = deferred_pricing_svc.compute_fee(total_cash, annual_pct, deferred_days_used)
+        d_total = to_money(total_cash + fee)
         spread = d_total - total_cash
         discount = to_money(spread * EARLY_DISCOUNT_PCT)
         before = date.today() + timedelta(days=EARLY_WINDOW_DAYS)
@@ -177,21 +191,27 @@ def checkout(  # noqa: PLR0912, PLR0915 — cash/deferred × per-category × per
             first_entry_id = posting.entry_id
     order.journal_entry_id = first_entry_id
 
-    # Deferred terms (Shariah) for the whole order.
+    # Deferred terms (Shariah) for the whole order, with the T-28 snapshot of
+    # the annual rate / duration / fee so a later rate change never alters a
+    # placed order.
     if payment_mode == "deferred":
-        deferred_svc.create(
+        term = deferred_svc.create(
             order_id=order.id,
             cash_price=total_cash,
             deferred_price=d_total,
             early_settlement_discount=discount,
             early_settlement_before=before,
         )
-        # Record the receivable that feeds the credit algorithm (US-5.1/5.3).
+        term.annual_pct = annual_pct
+        term.days = deferred_days_used
+        term.fee = to_money(d_total - total_cash)
+        # Record the receivable that feeds the credit algorithm (US-5.1/5.3),
+        # due on placed + the chosen duration.
         credit_svc.record_due(
             customer_id=customer_id,
             order_id=order.id,
             amount=d_total,
-            due_date=date.today() + timedelta(days=CREDIT_NET_DAYS),
+            due_date=date.today() + timedelta(days=deferred_days_used),
         )
 
     # Consume the price locks and close the cart.

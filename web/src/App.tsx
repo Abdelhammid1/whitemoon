@@ -42,6 +42,7 @@ import { StatementPage } from './pages/commerce/StatementPage'
 import { CreditPage } from './pages/credit/CreditPage'
 import { TierSettingsPage } from './pages/credit/TierSettingsPage'
 import { PaymentsPage } from './pages/credit/PaymentsPage'
+import { DeferredSettingsPage } from './pages/credit/DeferredSettingsPage'
 import { UploadReceiptPage } from './pages/credit/UploadReceiptPage'
 import { DunningPage } from './pages/credit/DunningPage'
 import { CompliancePage } from './pages/compliance/CompliancePage'
@@ -137,6 +138,7 @@ export function App() {
         <Route path="/credit" element={<ProtectedRoute roles={FINANCE}><CreditPage /></ProtectedRoute>} />
         <Route path="/credit/dunning" element={<ProtectedRoute roles={FINANCE}><DunningPage /></ProtectedRoute>} />
         <Route path="/credit/tiers" element={<ProtectedRoute roles={FINANCE}><TierSettingsPage /></ProtectedRoute>} />
+        <Route path="/credit/deferred-settings" element={<ProtectedRoute roles={FINANCE} perm="deferred.settings.manage"><DeferredSettingsPage /></ProtectedRoute>} />
         <Route path="/credit/payments" element={<ProtectedRoute roles={['admin', 'staff', 'agent', 'branch']}><PaymentsPage /></ProtectedRoute>} />
         <Route path="/compliance" element={<ProtectedRoute roles={FINANCE}><CompliancePage /></ProtectedRoute>} />
 

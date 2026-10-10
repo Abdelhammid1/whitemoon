@@ -21,6 +21,9 @@ from ..identity.services.rbac import has_permission, require_permission
 from .models import EscalationEvent, PaymentApproval
 from .schemas import (
     CollectPaymentIn,
+    DeferredExceptionIn,
+    DeferredSettingsIn,
+    DeferredTierRateIn,
     FreezeIn,
     OverrideIn,
     PaymentIn,
@@ -28,6 +31,7 @@ from .schemas import (
     TierSettingIn,
 )
 from .services import credit as credit_svc
+from .services import deferred_pricing as deferred_svc
 from .services import escalation as esc_svc
 from .services import payments as pay_svc
 
@@ -313,6 +317,111 @@ def payment_receipt(approval_id: int):
         mimetype=mime_for_key(row.receipt_key),
         headers={"X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox"},
     )
+
+
+# ------------------------------------------------------------ deferred engine (T-28)
+
+
+@bp.get("/deferred-settings")
+@require_permission("deferred.settings.manage")
+def get_deferred_settings():
+    return jsonify(deferred_svc.serialize_settings())
+
+
+@bp.put("/deferred-settings")
+@require_permission("deferred.settings.manage")
+def put_deferred_settings():
+    p = _parse(DeferredSettingsIn)
+    deferred_svc.update_settings(
+        annual_pct_general=p.annual_pct_general,
+        default_days=p.default_days,
+        max_days=p.max_days,
+        allowed_days=p.allowed_days,
+    )
+    audit_emit("deferred.settings.updated", actor_user_id=_uid(), target_type="deferred_settings", target_id=1)
+    db.session.commit()
+    return jsonify(deferred_svc.serialize_settings())
+
+
+@bp.put("/deferred-settings/tiers/<tier>")
+@require_permission("deferred.settings.manage")
+def put_deferred_tier(tier: str):
+    p = _parse(DeferredTierRateIn)
+    deferred_svc.set_tier_rate(tier=tier, annual_pct=p.annual_pct)
+    audit_emit("deferred.tier_rate.updated", actor_user_id=_uid(), target_type="deferred_tier", target_id=tier)
+    db.session.commit()
+    return jsonify(deferred_svc.serialize_settings())
+
+
+@bp.post("/deferred-settings/exceptions")
+@require_permission("deferred.settings.manage")
+def post_deferred_exception():
+    p = _parse(DeferredExceptionIn)
+    uid = _uid()
+    deferred_svc.set_exception(
+        customer_id=p.customer_id, annual_pct=p.annual_pct, reason=p.reason, set_by=uid
+    )
+    audit_emit("deferred.exception.set", actor_user_id=uid, target_type="customer", target_id=p.customer_id, reason=p.reason)
+    db.session.commit()
+    return jsonify(deferred_svc.serialize_settings())
+
+
+@bp.delete("/deferred-settings/exceptions/<int:customer_id>")
+@require_permission("deferred.settings.manage")
+def delete_deferred_exception(customer_id: int):
+    deferred_svc.delete_exception(customer_id=customer_id)
+    audit_emit("deferred.exception.removed", actor_user_id=_uid(), target_type="customer", target_id=customer_id)
+    db.session.commit()
+    return jsonify(deferred_svc.serialize_settings())
+
+
+@bp.post("/deferred-settings/review")
+@require_permission("deferred.settings.manage")
+def review_deferred_settings():
+    deferred_svc.mark_reviewed(reviewed_by=_uid())
+    audit_emit("deferred.settings.reviewed", actor_user_id=_uid(), target_type="deferred_settings", target_id=1)
+    db.session.commit()
+    return jsonify(deferred_svc.serialize_settings())
+
+
+@bp.get("/deferred-options")
+@jwt_required()
+def deferred_options():
+    """The current customer's deferred options for the cart (T-28): whether they
+    may defer at all (red → not allowed) and the selectable durations."""
+    uid = _uid()
+    annual = deferred_svc.resolve_annual_pct(uid)
+    s = deferred_svc.get_settings()
+    if annual is None:
+        return jsonify({
+            "allowed": False,
+            "reason": "التصنيف الأحمر لا يسمح بالبيع الآجل — نقدي فقط",
+            "allowed_days": [],
+            "default_days": s.default_days,
+        })
+    return jsonify({
+        "allowed": True,
+        "allowed_days": list(s.allowed_days),
+        "default_days": s.default_days,
+    })
+
+
+@bp.get("/deferred-quote")
+@jwt_required()
+def deferred_quote():
+    """Server-computed deferred quote for the cart (T-28). Red → allowed:false."""
+    uid = _uid()
+    try:
+        amount = Decimal(request.args.get("amount", ""))
+    except (ArithmeticError, ValueError):
+        raise BadRequest("مبلغ غير صالح", code="amount_invalid") from None
+    try:
+        days = int(request.args.get("days", ""))
+    except ValueError:
+        raise BadRequest("مدة غير صالحة", code="days_invalid") from None
+    if amount <= 0:
+        raise BadRequest("المبلغ يجب أن يكون موجبًا", code="amount_non_positive")
+    return jsonify(deferred_svc.quote(amount=amount, days=days, customer_id=uid))
 
 
 @bp.app_errorhandler(ApiError)

@@ -7,6 +7,7 @@ export interface Me {
   phone: string | null
   email: string | null
   locale: 'ar' | 'en'
+  permissions: string[]
 }
 
 export interface RegisterCustomerBody {

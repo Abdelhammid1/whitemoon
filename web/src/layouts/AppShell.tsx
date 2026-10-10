@@ -13,6 +13,8 @@ interface NavEntry {
   end?: boolean
   /** Optional per-item gate, narrower than the group's roles. */
   roles?: string[]
+  /** Optional capability gate: show only if the user holds this permission. */
+  perm?: string
 }
 interface NavGroup {
   label: string
@@ -57,6 +59,7 @@ const GROUPS: NavGroup[] = [
       { to: '/credit/dunning', label: 'المتابعة والتحصيل', icon: 'request_quote' },
       { to: '/credit/payments', label: 'اعتماد السداد', icon: 'price_check' },
       { to: '/credit/tiers', label: 'سقوف التصنيف', icon: 'tune' },
+      { to: '/credit/deferred-settings', label: 'إعدادات البيع الآجل', icon: 'payments', perm: 'deferred.settings.manage' },
       { to: '/compliance', label: 'جاهزية ETA', icon: 'verified' },
     ],
   },
@@ -137,6 +140,8 @@ export function AppShell() {
   const navigate = useNavigate()
   const location = useLocation()
   const role = user?.kind ?? 'customer'
+  const perms = user?.permissions ?? []
+  const hasPerm = (code?: string) => !code || perms.includes(code) || perms.includes('*')
 
   // Auto-show the onboarding page on first login only: never if the user has
   // hidden it, never twice (a per-user 'seen' flag), and never blocking — it is
@@ -214,7 +219,7 @@ export function AppShell() {
                 {g.label}
               </div>
               {g.items
-                .filter((it) => !it.roles || it.roles.includes(role))
+                .filter((it) => (!it.roles || it.roles.includes(role)) && hasPerm(it.perm))
                 .map((it) => (
                   <NavLink key={it.to} to={it.to} end={it.end} className={({ isActive }) => navItem(isActive)}>
                     <Icon name={it.icon} size={18} className="shrink-0" />

@@ -34,9 +34,12 @@ class UpdateCartItemIn(BaseModel):
 
 
 class CheckoutIn(BaseModel):
-    # Financial terms (deferred price, discount, window) are computed
+    # Financial terms (annual rate, fee, discount, window) are computed
     # server-side from the approved schedule — never accepted from the client.
+    # The customer only *chooses* a duration for a deferred order; it is
+    # validated against the allowed/max days (T-28). Ignored for cash.
     payment_mode: str = Field(pattern="^(cash|deferred)$")
+    deferred_days: int | None = Field(default=None, ge=1)
 
 
 class RfqIn(BaseModel):

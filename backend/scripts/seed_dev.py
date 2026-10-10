@@ -22,6 +22,14 @@ def main() -> None:
     with app.app_context():
         identity_seed.run()
         accounting_seed.run()
+        from app.sales.services import credit as credit_svc
+        from app.sales.services import deferred_pricing as deferred_svc
+
+        credit_svc.seed_tier_settings()
+        deferred_svc.seed_defaults()
+        from app.extensions import db
+
+        db.session.commit()
 
 
 if __name__ == "__main__":

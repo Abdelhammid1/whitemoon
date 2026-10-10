@@ -104,6 +104,63 @@ export async function payDue(dueId: number, paid_on: string) {
   return api<{ id: number; status: string; days_late: number }>(`/credit/dues/${dueId}/pay`, { method: 'POST', body: { paid_on } })
 }
 
+// ---------------------------------------------------------------- deferred engine (T-28)
+export interface DeferredSettings {
+  annual_pct_general: string
+  default_days: number
+  max_days: number
+  allowed_days: number[]
+  reviewed: boolean
+  reviewed_at: string | null
+  tier_rates: Record<string, string | null>
+  exceptions: { customer_id: number; annual_pct: string; reason: string }[]
+}
+export interface DeferredQuote {
+  allowed: boolean
+  reason?: string
+  annual_pct?: string
+  days?: number
+  amount?: string
+  fee?: string
+  total?: string
+  due_date?: string
+}
+export async function getDeferredSettings() {
+  return api<DeferredSettings>('/credit/deferred-settings')
+}
+export async function updateDeferredSettings(body: {
+  annual_pct_general?: string
+  default_days?: number
+  max_days?: number
+  allowed_days?: number[]
+}) {
+  return api<DeferredSettings>('/credit/deferred-settings', { method: 'PUT', body })
+}
+export async function setDeferredTierRate(tier: string, annual_pct: string | null) {
+  return api<DeferredSettings>(`/credit/deferred-settings/tiers/${tier}`, { method: 'PUT', body: { annual_pct } })
+}
+export async function setDeferredException(customer_id: number, annual_pct: string, reason: string) {
+  return api<DeferredSettings>('/credit/deferred-settings/exceptions', { method: 'POST', body: { customer_id, annual_pct, reason } })
+}
+export async function deleteDeferredException(customer_id: number) {
+  return api<DeferredSettings>(`/credit/deferred-settings/exceptions/${customer_id}`, { method: 'DELETE' })
+}
+export async function reviewDeferredSettings() {
+  return api<DeferredSettings>('/credit/deferred-settings/review', { method: 'POST' })
+}
+export async function getDeferredQuote(amount: string, days: number) {
+  return api<DeferredQuote>('/credit/deferred-quote', { query: { amount, days: String(days) } })
+}
+export interface DeferredOptions {
+  allowed: boolean
+  reason?: string
+  allowed_days: number[]
+  default_days: number
+}
+export async function getDeferredOptions() {
+  return api<DeferredOptions>('/credit/deferred-options')
+}
+
 export async function listTierSettings() {
   return api<{ items: TierSetting[] }>('/credit/tier-settings')
 }

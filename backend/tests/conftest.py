@@ -73,6 +73,9 @@ def _reset_db(app: Flask) -> Iterator[None]:
                 "partners.partner_deposits, "
                 "partners.partner_terms, "
                 "sales.escalation_events, "
+                "sales.deferred_customer_exceptions, "
+                "sales.deferred_tier_rates, "
+                "sales.deferred_settings, "
                 "sales.customer_dues, "
                 "sales.credit_overrides, "
                 "sales.payment_approvals, "
@@ -129,6 +132,8 @@ def _reset_db(app: Flask) -> Iterator[None]:
         accounting_seed.seed_event_map()
         from app.sales.services import credit as _credit
         _credit.seed_tier_settings()
+        from app.sales.services import deferred_pricing as _deferred
+        _deferred.seed_defaults()
         from app.inventory.services import categories as _categories
         _categories.seed_defaults()
         db.session.commit()

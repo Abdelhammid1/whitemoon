@@ -20,7 +20,12 @@ from ..identity.models import CustomerProfile, SupplierProfile, TotpSecret, User
 from ..inventory.models import Category, Product, StockBalance, SupplierOffer
 from ..logistics.models import DeliverySlot, Shipment
 from ..pos.models import PosSale
-from ..sales.models import CreditTierSetting, CustomerCreditTier, PaymentApproval
+from ..sales.models import (
+    CreditTierSetting,
+    CustomerCreditTier,
+    DeferredSetting,
+    PaymentApproval,
+)
 
 bp = Blueprint("onboarding", __name__, url_prefix="/onboarding")
 
@@ -47,6 +52,12 @@ def _admin(uid: int) -> list[dict[str, Any]]:
         _task("accounts", "تهيئة دليل الحسابات", "/accounting/chart", _exists(Account)),
         _task("period", "فتح الفترة المالية", "/accounting/periods", _exists(Period, Period.is_closed.is_(False))),
         _task("tiers", "ضبط سقوف التصنيف الائتماني", "/credit/tiers", _exists(CreditTierSetting)),
+        _task(
+            "deferred",
+            "مراجعة إعدادات البيع الآجل",
+            "/credit/deferred-settings",
+            _exists(DeferredSetting, DeferredSetting.reviewed.is_(True)),
+        ),
         _task("team", "إضافة الموظفين والوكلاء", "/admin/users", _exists(User, User.kind.in_(("staff", "agent", "branch")))),
         _task("suppliers", "اعتماد الموردين", "/admin/suppliers/pending", _exists(SupplierProfile, SupplierProfile.approval_status == "approved")),
         _task("slots", "فتح مواعيد التوصيل", "/logistics", _exists(DeliverySlot)),

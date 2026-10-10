@@ -5,9 +5,11 @@ import { useAuth } from './AuthContext'
 interface Props {
   children: ReactNode
   roles?: string[]
+  /** If set, the user must hold this permission code (or the `*` wildcard). */
+  perm?: string
 }
 
-export function ProtectedRoute({ children, roles }: Props) {
+export function ProtectedRoute({ children, roles, perm }: Props) {
   const { user, loading } = useAuth()
   const location = useLocation()
 
@@ -24,6 +26,10 @@ export function ProtectedRoute({ children, roles }: Props) {
   }
 
   if (roles && !roles.includes(user.kind)) {
+    return <Navigate to="/" replace />
+  }
+
+  if (perm && !(user.permissions?.includes(perm) || user.permissions?.includes('*'))) {
     return <Navigate to="/" replace />
   }
 

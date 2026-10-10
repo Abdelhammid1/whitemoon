@@ -28,6 +28,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Integer,
     Numeric,
     String,
     UniqueConstraint,
@@ -242,6 +243,12 @@ class DeferredTerm(Base, TimestampMixin):
     discount_applied: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False
     )
+    # T-28 snapshot: the annual rate %, duration in days, and computed fee this
+    # order was priced at — so a later rate change never alters a placed order.
+    # Nullable: orders placed before T-28 have no snapshot.
+    annual_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    days: Mapped[int | None] = mapped_column(Integer)
+    fee: Mapped[Decimal | None] = mapped_column(Numeric(18, 4))
 
 
 # ---------------------------------------------------------------- Bank receipts (US-3.3)

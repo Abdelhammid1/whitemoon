@@ -7,6 +7,7 @@ import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import { checkout, getCart, removeCartItem, updateCartItem, type Cart } from '../../api/commerce'
+import { getDeferredQuote, getDeferredOptions, type DeferredQuote, type DeferredOptions } from '../../api/credit'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
 import { PageHelp } from '../../components/PageHelp'
@@ -19,6 +20,12 @@ export function CartPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [confirm, setConfirm] = useState<null | 'cash' | 'deferred'>(null)
+  // Deferred: options (allowed + durations), the chosen duration, and the
+  // server-computed quote for it.
+  const [deferredDays, setDeferredDays] = useState<number | null>(null)
+  const [options, setOptions] = useState<DeferredOptions | null>(null)
+  const [quote, setQuote] = useState<DeferredQuote | null>(null)
+  const [quoteLoading, setQuoteLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -29,6 +36,36 @@ export function CartPage() {
   }, [])
 
   useEffect(() => { void load() }, [load])
+
+  // When the deferred modal opens, fetch the customer's options (allowed +
+  // durations) and pre-select the default duration. Reset on close.
+  useEffect(() => {
+    if (confirm !== 'deferred') { setOptions(null); setQuote(null); setDeferredDays(null); return }
+    let active = true
+    getDeferredOptions()
+      .then((o) => {
+        if (!active) return
+        setOptions(o)
+        if (o.allowed && o.allowed_days.length) {
+          const d = o.allowed_days.includes(o.default_days) ? o.default_days : o.allowed_days[0]
+          if (d != null) setDeferredDays(d)
+        }
+      })
+      .catch(() => active && setOptions({ allowed: false, reason: 'تعذّر جلب خيارات الأجل', allowed_days: [], default_days: 0 }))
+    return () => { active = false }
+  }, [confirm])
+
+  // Recompute the (server-side) quote whenever the chosen duration changes.
+  useEffect(() => {
+    if (confirm !== 'deferred' || deferredDays == null || !cart) return
+    let active = true
+    setQuoteLoading(true)
+    getDeferredQuote(cart.total, deferredDays)
+      .then((q) => { if (active) setQuote(q) })
+      .catch(() => { if (active) setQuote(null) })
+      .finally(() => { if (active) setQuoteLoading(false) })
+    return () => { active = false }
+  }, [confirm, deferredDays, cart])
 
   async function remove(itemId: number) {
     setBusy(true)
@@ -51,7 +88,7 @@ export function CartPage() {
   async function placeOrder(mode: 'cash' | 'deferred') {
     setBusy(true)
     try {
-      const order = await checkout(mode)
+      const order = await checkout(mode, mode === 'deferred' ? deferredDays ?? undefined : undefined)
       toast.success(`تم إنشاء الطلب ${order.number}.`)
       navigate(`/orders/${order.id}`)
     } catch (err) {
@@ -257,26 +294,72 @@ export function CartPage() {
         footer={
           <>
             <Button onClick={() => setConfirm(null)}>إلغاء</Button>
-            <Button variant="primary" onClick={() => placeOrder(confirm as 'cash' | 'deferred')} disabled={busy}>تأكيد</Button>
+            <Button
+              variant="primary"
+              onClick={() => placeOrder(confirm as 'cash' | 'deferred')}
+              disabled={busy || (confirm === 'deferred' && (options?.allowed === false || deferredDays == null))}
+            >
+              تأكيد
+            </Button>
           </>
         }
       >
         {confirm === 'deferred' ? (
           <div className="flex flex-col gap-space-md">
-            <div className="p-space-sm rounded-lg bg-surface-container-low flex items-start gap-space-xs font-small text-small text-secondary">
-              <Icon name="smart_toy" size={16} className="text-on-surface-variant shrink-0 mt-0.5" />
-              <span>
-                الشروط المالية للآجل (السعر، الخصم، الموعد) تُحتسب على الخادم تلقائيًا بناءً على تقييمك
-                الائتماني، وتخضع للمراجعة التلقائية للسقف عند الإصدار — وقد يُرفض الطلب إذا تجاوز سقفك
-                الائتماني.
-              </span>
-            </div>
-            <div className="flex justify-between items-center font-body text-body text-secondary">
-              <span>إجمالي الطلب الحالي</span>
-              <span className="font-headline-2 text-headline-2 text-primary">
-                <Mono className="text-primary">{formatMoney(cart?.total ?? '0')} ج.م</Mono>
-              </span>
-            </div>
+            {options?.allowed === false ? (
+              <InlineError message={options.reason ?? 'البيع الآجل غير متاح لحسابك حاليًا.'} />
+            ) : (
+              <>
+                <div className="p-space-sm rounded-lg bg-surface-container-low flex items-start gap-space-xs font-small text-small text-secondary">
+                  <Icon name="smart_toy" size={16} className="text-on-surface-variant shrink-0 mt-0.5" />
+                  <span>
+                    رسوم الأجل تُحتسب على الخادم: قيمة الطلب × النسبة السنوية ÷ 365 × عدد الأيام. اختر
+                    المدة لترى الرسوم والإجمالي. يخضع الطلب لمراجعة السقف الائتماني عند الإصدار.
+                  </span>
+                </div>
+                <div className="flex flex-col gap-space-xs">
+                  <span className="font-small text-small text-secondary">مدة الأجل</span>
+                  <div className="flex flex-wrap gap-space-xs">
+                    {(options?.allowed_days ?? []).map((d) => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setDeferredDays(d)}
+                        className={`px-3 py-1.5 rounded-lg border font-body text-body transition-colors ${
+                          deferredDays === d
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-surface-container-high text-secondary hover:text-primary'
+                        }`}
+                      >
+                        {d} يوم
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="rounded-xl bg-surface-container p-space-md flex flex-col gap-1">
+                  <div className="flex justify-between items-center text-secondary">
+                    <span>قيمة الطلب (نقدًا)</span>
+                    <Mono className="text-primary">{formatMoney(cart?.total ?? '0')} ج.م</Mono>
+                  </div>
+                  <div className="flex justify-between items-center text-secondary">
+                    <span>رسوم الأجل{quote?.annual_pct ? ` (${quote.annual_pct}% سنويًا × ${quote.days} يوم)` : ''}</span>
+                    <Mono className="text-primary">{quoteLoading ? '…' : formatMoney(quote?.fee ?? '0')} ج.م</Mono>
+                  </div>
+                  <div className="flex justify-between items-baseline pt-space-xs mt-space-xs border-t border-surface-container-high">
+                    <span className="font-headline-2 text-headline-2 text-primary">الإجمالي الآجل</span>
+                    <span className="font-headline-2 text-headline-2 text-primary">
+                      <Mono className="text-primary">{quoteLoading ? '…' : formatMoney(quote?.total ?? cart?.total ?? '0')} ج.م</Mono>
+                    </span>
+                  </div>
+                  {quote?.due_date && (
+                    <div className="flex justify-between items-center text-secondary font-small text-small">
+                      <span>تاريخ الاستحقاق</span>
+                      <span className="font-mono-body text-mono-body text-primary" dir="ltr">{quote.due_date}</span>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         ) : (
           <p className="font-body text-body text-secondary">

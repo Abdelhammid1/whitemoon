@@ -14,6 +14,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -183,6 +184,71 @@ class PaymentApproval(Base, TimestampMixin):
         String(20), nullable=False, default="collector", server_default="collector"
     )
     receipt_key: Mapped[str | None] = mapped_column(String(255))
+
+
+class DeferredSetting(Base, TimestampMixin):
+    """Single-row configuration for the flexible deferred-pricing engine (T-28).
+
+    `annual_pct_general` is the baseline annual rate; a per-tier rate
+    (`DeferredTierRate`) or a per-customer exception (`DeferredCustomerException`)
+    overrides it. `allowed_days` lists the selectable durations; `default_days`
+    pre-selects one and `max_days` caps any value. `reviewed` stays False until
+    an authorised admin confirms the suggested defaults (the yellow banner), so
+    the onboarding checklist can flag it.
+    """
+
+    __tablename__ = "deferred_settings"
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_deferred_settings_singleton"),
+        CheckConstraint("annual_pct_general >= 0", name="ck_deferred_settings_pct_nonneg"),
+        CheckConstraint("default_days > 0 and max_days > 0", name="ck_deferred_settings_days_pos"),
+        {"schema": "sales"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, default=1)
+    annual_pct_general: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    default_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    max_days: Mapped[int] = mapped_column(Integer, nullable=False)
+    allowed_days: Mapped[list[int]] = mapped_column(JSON, nullable=False)
+    reviewed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    reviewed_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("identity.users.id"))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class DeferredTierRate(Base, TimestampMixin):
+    """Optional per-colour annual-rate override (T-28). A NULL `annual_pct`
+    means "no override — use the general rate". `red` not being allowed to defer
+    is enforced by the credit rules, not by a rate here."""
+
+    __tablename__ = "deferred_tier_rates"
+    __table_args__ = (
+        CheckConstraint("tier in ('white','green','yellow','red')", name="ck_deferred_tier_rates_tier"),
+        CheckConstraint("annual_pct is null or annual_pct >= 0", name="ck_deferred_tier_rates_pct"),
+        {"schema": "sales"},
+    )
+
+    tier: Mapped[str] = mapped_column(String(10), primary_key=True)
+    annual_pct: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+
+
+class DeferredCustomerException(Base, TimestampMixin):
+    """A per-customer annual-rate exception (T-28) — a deliberate, reasoned
+    decision that overrides both the tier rate and the general rate."""
+
+    __tablename__ = "deferred_customer_exceptions"
+    __table_args__ = (
+        UniqueConstraint("customer_id", name="uq_deferred_customer_exceptions"),
+        CheckConstraint("annual_pct >= 0", name="ck_deferred_customer_exceptions_pct"),
+        {"schema": "sales"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    customer_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("identity.users.id"), nullable=False
+    )
+    annual_pct: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    reason: Mapped[str] = mapped_column(String(1000), nullable=False)
+    set_by: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("identity.users.id"))
 
 
 class EscalationEvent(Base):
