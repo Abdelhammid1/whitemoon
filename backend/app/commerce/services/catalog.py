@@ -7,26 +7,51 @@ supplier behind the price is not exposed in any field.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import and_, case, func, or_, select
 
 from ...extensions import db
 from ...inventory.models import Product, SupplierOffer
 
 
+def _effective_price_expr():
+    """SQL expression for an offer's price today, honouring an active discount
+    (T-30): the discounted price while the discount window is open, else the
+    unit price. Rounded to 4 dp to match the money convention."""
+    today = date.today()
+    active = and_(
+        SupplierOffer.discount_kind != "none",
+        SupplierOffer.discount_value.isnot(None),
+        or_(SupplierOffer.discount_start.is_(None), SupplierOffer.discount_start <= today),
+        or_(SupplierOffer.discount_end.is_(None), SupplierOffer.discount_end >= today),
+    )
+    raw = case(
+        (
+            and_(active, SupplierOffer.discount_kind == "percent"),
+            SupplierOffer.unit_price * (1 - SupplierOffer.discount_value / 100),
+        ),
+        (and_(active, SupplierOffer.discount_kind == "price"), SupplierOffer.discount_value),
+        else_=SupplierOffer.unit_price,
+    )
+    return func.round(raw, 4)
+
+
 def _best_offer_subq():
-    """Lowest active offer per product — carries its opaque offer id and price.
-    The id lets a customer add to cart without ever seeing the supplier."""
+    """Lowest active EFFECTIVE price per product — carries its opaque offer id
+    and price. The id lets a customer add to cart without ever seeing the
+    supplier. A promotional discount (T-30) lowers the effective price here."""
+    eff = _effective_price_expr()
     return (
         select(
             SupplierOffer.product_id.label("pid"),
             SupplierOffer.id.label("offer_id"),
-            SupplierOffer.unit_price.label("best_price"),
+            eff.label("best_price"),
         )
         .where(SupplierOffer.is_active.is_(True))
         .distinct(SupplierOffer.product_id)
-        .order_by(SupplierOffer.product_id, SupplierOffer.unit_price.asc(), SupplierOffer.id.asc())
+        .order_by(SupplierOffer.product_id, eff.asc(), SupplierOffer.id.asc())
         .subquery()
     )
 

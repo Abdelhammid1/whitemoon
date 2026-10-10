@@ -14,6 +14,7 @@ from ...common.errors import BadRequest, Conflict, NotFound
 from ...common.money import to_money
 from ...extensions import db
 from ...inventory.models import Product, SupplierOffer
+from ...inventory.services import offers as offers_svc
 from ..models import Cart, CartItem
 from . import pricelock
 
@@ -55,9 +56,10 @@ def add_item(*, customer_id: int, offer_id: int, qty: Decimal) -> CartItem:
     )
     db.session.add(item)
     db.session.flush()
-    # Lock the current price for the reserved quantity.
+    # Lock the current EFFECTIVE price (honouring an active discount) for the
+    # reserved quantity (T-30).
     pricelock.create_lock(
-        offer_id=offer_id, cart_item_id=item.id, qty=qty, price=offer.unit_price
+        offer_id=offer_id, cart_item_id=item.id, qty=qty, price=offers_svc.effective_price(offer)
     )
     db.session.commit()
     return item
@@ -80,7 +82,7 @@ def update_qty(*, customer_id: int, item_id: int, qty: Decimal) -> CartItem:
     if lock is not None and new_qty <= to_money(lock.locked_qty):
         locked_price = lock.locked_price
     else:
-        locked_price = offer.unit_price
+        locked_price = offers_svc.effective_price(offer)
     pricelock.release_lock_for_cart_item(item.id)
     pricelock.create_lock(offer_id=offer.id, cart_item_id=item.id, qty=new_qty, price=locked_price)
     db.session.commit()
@@ -115,9 +117,10 @@ def serialize_cart(customer_id: int) -> dict[str, Any]:
         if lock is not None:
             unit_price = lock.locked_price
         else:
-            # Lock expired → fall back to the supplier's current live price.
+            # Lock expired → fall back to the supplier's current live EFFECTIVE
+            # price (honouring an active discount).
             offer = db.session.get(SupplierOffer, item.supplier_offer_id)
-            unit_price = offer.unit_price if offer else Decimal("0")
+            unit_price = offers_svc.effective_price(offer) if offer else Decimal("0")
         line_total = to_money(item.qty) * to_money(unit_price)
         total += line_total
         items.append(

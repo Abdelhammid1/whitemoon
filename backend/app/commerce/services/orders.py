@@ -72,9 +72,12 @@ def checkout(  # noqa: PLR0912, PLR0915 — cash/deferred × per-category × per
                 f"عرض لم يعد متاحًا في السلة (منتج {item.product_id})",
                 code="offer_unavailable",
             )
-        # Honour a LIVE lock only; an expired hold reverts to the live price.
+        # Honour a LIVE lock only; an expired hold reverts to the live EFFECTIVE
+        # price (honouring an active discount — T-30).
+        from ...inventory.services import offers as offers_svc
+
         lock = pricelock.lock_for_cart_item(item.id)
-        unit_price = to_money(lock.locked_price) if lock is not None else to_money(offer.unit_price)
+        unit_price = to_money(lock.locked_price) if lock is not None else offers_svc.effective_price(offer)
         line_total = to_money(item.qty) * unit_price
         by_supplier[offer.supplier_id].append((item, unit_price, line_total))
         cash_by_category[product.category] += line_total

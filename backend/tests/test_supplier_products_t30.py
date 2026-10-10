@@ -108,6 +108,9 @@ def test_catalog_shows_lowest_price_no_supplier(client) -> None:
 
     item = catalog_svc.get_product(prod.id)
     assert item is not None
+    # The discount is real: the customer-facing best price is the discounted 80,
+    # and it points at b's (opaque) offer — with no supplier identity leaked.
+    assert item["best_price"] == "80.0000"
     assert "supplier_id" not in item and "supplier" not in item
 
 
