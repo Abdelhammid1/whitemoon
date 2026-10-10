@@ -58,6 +58,13 @@ export function PaymentsPage() {
     catch (err) { toast.error(err instanceof ApiError ? err.message : 'تعذّر فتح الإيصال') }
   }
 
+  function reject(id: number) {
+    const reason = window.prompt('سبب رفض الإيصال (يظهر للعميل):', '')
+    if (reason === null) return // cancelled
+    if (reason.trim().length < 3) { toast.error('اكتب سببًا واضحًا للرفض.'); return }
+    void act(() => rejectPayment(id, reason.trim()), 'رُفض.')
+  }
+
   return (
     <Wide>
       <PageTitle title="اعتماد السداد" subtitle="تحصيل يُعتمد بمستوى واحد قبل الشركة — لا يعتمد المحصِّل تحصيله بنفسه." />
@@ -98,7 +105,7 @@ export function PaymentsPage() {
                       )}
                       {r.status === 'pending' && (
                         <>
-                          <button className="text-danger font-small-medium hover:underline disabled:opacity-40" onClick={() => act(() => rejectPayment(r.id, 'مرفوض من المراجعة'), 'رُفض.')} disabled={busy}>رفض</button>
+                          <button className="text-danger font-small-medium hover:underline disabled:opacity-40" onClick={() => reject(r.id)} disabled={busy}>رفض</button>
                           <button className="text-primary font-small-medium hover:underline disabled:opacity-40" onClick={() => act(() => approvePayment(r.id), 'اعتُمد.')} disabled={busy}>اعتماد</button>
                         </>
                       )}

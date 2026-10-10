@@ -90,6 +90,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: '/pos', label: 'نقطة البيع', icon: 'point_of_sale' },
       { to: '/pos/sales', label: 'مبيعاتي', icon: 'receipt_long' },
+      { to: '/credit/payments', label: 'اعتماد السداد', icon: 'price_check' },
     ],
   },
   {

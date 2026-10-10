@@ -110,6 +110,13 @@ def list_dues(customer_id: int):
     return jsonify({"items": [credit_svc.serialize_due(d) for d in credit_svc.list_dues(customer_id)]})
 
 
+@bp.get("/dues/mine")
+@jwt_required()
+def my_dues():
+    """The caller's own OPEN dues, for the payment-upload due selector (T-29)."""
+    return jsonify({"items": credit_svc.open_dues_for_customer(_uid())})
+
+
 @bp.post("/dues/<int:due_id>/pay")
 @require_permission("credit.manage")
 def pay_due(due_id: int):
@@ -167,9 +174,17 @@ def collect_payment():
 def list_payments():
     uid = _uid()
     status = request.args.get("status")
-    # Finance/admin see all; a partner/collector sees only what they collected.
-    scope = None if has_permission(uid, "user.read") else uid
-    rows = pay_svc.list_approvals(status=status, collected_by=scope)
+    # Finance/admin (user.read) see everything. An approver without user.read
+    # (agent/branch) sees their own collections PLUS every customer-uploaded
+    # receipt awaiting approval (T-29); a plain collector sees only their own.
+    if has_permission(uid, "user.read"):
+        rows = pay_svc.list_approvals(status=status)
+    else:
+        rows = pay_svc.list_approvals(
+            status=status,
+            collected_by=uid,
+            include_customer_uploads=has_permission(uid, "payment.approve"),
+        )
     return jsonify({"items": [pay_svc.serialize(r) for r in rows]})
 
 

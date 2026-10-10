@@ -464,6 +464,43 @@ def set_override(*, customer_id: int, credit_limit: Decimal, reason: str, set_by
     return ov
 
 
+def open_dues_for_customer(customer_id: int) -> list[dict[str, Any]]:
+    """Open dues for the customer's payment-upload selector (T-29): amount, due
+    date, order number, and the LIVE days-overdue (not the settled `days_late`,
+    which is only written once a due is paid). Oldest due first."""
+    from ...commerce.models import Order
+
+    today = _today()
+    rows = db.session.execute(
+        select(CustomerDue)
+        .where(CustomerDue.customer_id == customer_id, CustomerDue.status == "open")
+        .order_by(CustomerDue.due_date.asc(), CustomerDue.id.asc())
+    ).scalars().all()
+    order_ids = {d.order_id for d in rows if d.order_id is not None}
+    numbers: dict[int, str] = {}
+    if order_ids:
+        numbers = {
+            oid: num
+            for oid, num in db.session.execute(
+                select(Order.id, Order.number).where(Order.id.in_(order_ids))
+            ).all()
+        }
+    out: list[dict[str, Any]] = []
+    for d in rows:
+        overdue = (today - d.due_date).days
+        out.append(
+            {
+                "id": d.id,
+                "amount": str(to_money(d.amount)),
+                "due_date": d.due_date.isoformat(),
+                "order_id": d.order_id,
+                "order_number": numbers.get(d.order_id) if d.order_id is not None else None,
+                "days_overdue": overdue if overdue > 0 else 0,
+            }
+        )
+    return out
+
+
 def list_dues(customer_id: int) -> list[CustomerDue]:
     return list(
         db.session.execute(

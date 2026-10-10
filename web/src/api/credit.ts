@@ -70,6 +70,19 @@ export async function listDues(customerId: number) {
   return api<{ items: Due[] }>(`/credit/customers/${customerId}/dues`)
 }
 
+/** T-29: the caller's own OPEN dues, for the payment-upload selector. */
+export interface MyDue {
+  id: number
+  amount: string
+  due_date: string
+  order_id: number | null
+  order_number: string | null
+  days_overdue: number
+}
+export async function getMyDues() {
+  return api<{ items: MyDue[] }>('/credit/dues/mine')
+}
+
 export interface DunningRow {
   customer_id: number
   display_name: string | null

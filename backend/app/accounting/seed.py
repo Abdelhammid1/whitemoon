@@ -180,6 +180,19 @@ EVENT_MAP = (
         "إقفال التحصيل المعلّق OCR",
     ),
 
+    # 6 — payment.received (T-29): a customer's uploaded bank-transfer receipt is
+    # approved and settles a deferred due. Money lands in the bank; the deferred
+    # receivable is cleared. (Cash orders create no due, so the credit leg is
+    # always the deferred receivable 1132.)
+    (
+        "payment.received", 1, "debit", "1112", None, "amount",
+        "البنك الجاري — تحصيل تحويل العميل",
+    ),
+    (
+        "payment.received", 2, "credit", "1132", None, "amount",
+        "إقفال ذمة العميل الآجلة",
+    ),
+
     # 7 — payment.early_discount.applied
     (
         "payment.early_discount.applied", 1, "debit", "4300", None, "discount",

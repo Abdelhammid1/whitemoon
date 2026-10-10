@@ -137,7 +137,7 @@ export function App() {
         <Route path="/credit" element={<ProtectedRoute roles={FINANCE}><CreditPage /></ProtectedRoute>} />
         <Route path="/credit/dunning" element={<ProtectedRoute roles={FINANCE}><DunningPage /></ProtectedRoute>} />
         <Route path="/credit/tiers" element={<ProtectedRoute roles={FINANCE}><TierSettingsPage /></ProtectedRoute>} />
-        <Route path="/credit/payments" element={<ProtectedRoute roles={FINANCE}><PaymentsPage /></ProtectedRoute>} />
+        <Route path="/credit/payments" element={<ProtectedRoute roles={['admin', 'staff', 'agent', 'branch']}><PaymentsPage /></ProtectedRoute>} />
         <Route path="/compliance" element={<ProtectedRoute roles={FINANCE}><CompliancePage /></ProtectedRoute>} />
 
         <Route path="/partners" element={<ProtectedRoute roles={FINANCE}><PartnersPage /></ProtectedRoute>} />
