@@ -19,6 +19,7 @@ from .models import (
     Role,
     SupplierProfile,
     User,
+    UserPermission,
     UserRole,
 )
 from .schemas import (
@@ -457,3 +458,73 @@ def impersonate_stop(grant_id: int):
     admin_id = _current_admin_id()
     imp_svc.stop(admin_user_id=admin_id, grant_id=grant_id)
     return jsonify({"status": "stopped"})
+
+
+# ---------------------------------------------------------------- per-user permission delegation
+
+# Permissions an admin may delegate to a specific user (curated — not every code).
+DELEGATABLE_PERMISSIONS: tuple[tuple[str, str], ...] = (
+    ("deferred.settings.manage", "إدارة إعدادات البيع الآجل"),
+)
+
+
+@bp.get("/users/<int:user_id>/permissions")
+@require_permission("admin.high")
+def get_user_permissions(user_id: int):
+    user = db.session.get(User, user_id)
+    if user is None:
+        raise NotFound("المستخدم غير موجود", code="user_not_found")
+    direct = list(
+        db.session.execute(
+            select(UserPermission.permission_code).where(UserPermission.user_id == user_id)
+        ).scalars()
+    )
+    return jsonify(
+        {
+            "direct": direct,
+            "delegatable": [{"code": c, "label": lbl} for c, lbl in DELEGATABLE_PERMISSIONS],
+        }
+    )
+
+
+@bp.post("/users/<int:user_id>/permissions")
+@require_permission("admin.high")
+def grant_user_permission(user_id: int):
+    code = (request.get_json(silent=True) or {}).get("code")
+    if code not in {c for c, _ in DELEGATABLE_PERMISSIONS}:
+        raise BadRequest("صلاحية غير قابلة للتفويض", code="not_delegatable")
+    if db.session.get(User, user_id) is None:
+        raise NotFound("المستخدم غير موجود", code="user_not_found")
+    existing = db.session.execute(
+        select(UserPermission.id).where(
+            UserPermission.user_id == user_id, UserPermission.permission_code == code
+        )
+    ).first()
+    if existing is None:
+        db.session.add(
+            UserPermission(user_id=user_id, permission_code=code, granted_by=_current_admin_id())
+        )
+        audit_emit(
+            "user.permission.grant", actor_user_id=_current_admin_id(),
+            target_type="user", target_id=user_id, reason=code,
+        )
+        db.session.commit()
+    return jsonify({"user_id": user_id, "code": code, "granted": True})
+
+
+@bp.delete("/users/<int:user_id>/permissions/<code>")
+@require_permission("admin.high")
+def revoke_user_permission(user_id: int, code: str):
+    row = db.session.execute(
+        select(UserPermission).where(
+            UserPermission.user_id == user_id, UserPermission.permission_code == code
+        )
+    ).scalar_one_or_none()
+    if row is not None:
+        db.session.delete(row)
+        audit_emit(
+            "user.permission.revoke", actor_user_id=_current_admin_id(),
+            target_type="user", target_id=user_id, reason=code,
+        )
+        db.session.commit()
+    return jsonify({"user_id": user_id, "code": code, "granted": False})

@@ -4,7 +4,10 @@ import { Narrow } from '../../layouts/AppShell'
 import { PageTitle, Pill, Button, Field, Spinner, SectionHeader, EmptyState, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { PageHelp } from '../../components/PageHelp'
-import { getUser, listAudit, updateUserProfile, type UserDetail, type AuditRow } from '../../api/admin'
+import {
+  getUser, listAudit, updateUserProfile, getUserPermissions, grantUserPermission,
+  revokeUserPermission, type UserDetail, type AuditRow, type UserPermissions,
+} from '../../api/admin'
 import { ApiError } from '../../api/client'
 import { useToast } from '../../components/Toast'
 import { formatDate } from '../../lib/format'
@@ -151,6 +154,12 @@ export function UserDetailPage() {
         </section>
       )}
 
+      {['staff', 'admin', 'agent', 'branch'].includes(user.kind) && (
+        <section className="mt-space-xl">
+          <PermissionsSection userId={uid} />
+        </section>
+      )}
+
       <section className="mt-space-xl">
         <SectionHeader title="النشاط الأخير" />
         {activity.length === 0 ? (
@@ -170,5 +179,61 @@ export function UserDetailPage() {
         )}
       </section>
     </Narrow>
+  )
+}
+
+function PermissionsSection({ userId }: { userId: number }) {
+  const toast = useToast()
+  const [data, setData] = useState<UserPermissions | null>(null)
+  const [busy, setBusy] = useState('')
+
+  async function load() {
+    try {
+      setData(await getUserPermissions(userId))
+    } catch {
+      /* non-senior viewer — leave empty */
+    }
+  }
+  useEffect(() => { void load() }, [userId])
+
+  async function toggle(code: string, on: boolean) {
+    setBusy(code)
+    try {
+      if (on) await grantUserPermission(userId, code)
+      else await revokeUserPermission(userId, code)
+      toast.success('تم تحديث الصلاحيات.')
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'تعذّر التحديث')
+    } finally {
+      setBusy('')
+    }
+  }
+
+  if (!data) return null
+  return (
+    <>
+      <SectionHeader title="صلاحيات مخصّصة" />
+      <Card className="mt-space-md flex flex-col gap-space-sm">
+        <p className="font-small text-small text-secondary">
+          امنح هذا المستخدم صلاحيات إضافية فوق دوره. يُسجَّل كل تغيير في التدقيق.
+        </p>
+        {data.delegatable.map((p) => {
+          const has = data.direct.includes(p.code)
+          return (
+            <div key={p.code} className="flex items-center justify-between gap-space-md border-t border-surface-container-high pt-space-sm first:border-0 first:pt-0">
+              <span className="font-body text-body text-on-surface">{p.label}</span>
+              <Button
+                variant={has ? 'destructive' : 'primary'}
+                disabled={busy === p.code}
+                onClick={() => void toggle(p.code, !has)}
+              >
+                {has ? 'إلغاء' : 'منح'}
+              </Button>
+            </div>
+          )
+        })}
+      </Card>
+    </>
   )
 }

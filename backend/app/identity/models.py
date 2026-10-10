@@ -233,6 +233,29 @@ class UserRole(Base):
     role: Mapped[Role] = relationship()
 
 
+class UserPermission(Base):
+    """A permission granted directly to one user (delegation), in addition to
+    whatever their roles grant. Lets an admin delegate a specific capability
+    (e.g. deferred.settings.manage) to a chosen employee without changing roles."""
+
+    __tablename__ = "user_permissions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "permission_code", name="uq_user_permissions"),
+        Index("ix_user_permissions_user", "user_id"),
+        {"schema": "identity"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("identity.users.id"), nullable=False
+    )
+    permission_code: Mapped[str] = mapped_column(String(100), nullable=False)
+    granted_by: Mapped[int | None] = mapped_column(BigInteger)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default="now()"
+    )
+
+
 # ---------------------------------------------------------------- OTP + 2FA
 
 

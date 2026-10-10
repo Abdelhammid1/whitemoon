@@ -39,6 +39,20 @@ export async function getUser(userId: number) {
   return api<UserDetail>(`/admin/users/${userId}`)
 }
 
+export interface UserPermissions {
+  direct: string[]
+  delegatable: { code: string; label: string }[]
+}
+export async function getUserPermissions(userId: number) {
+  return api<UserPermissions>(`/admin/users/${userId}/permissions`)
+}
+export async function grantUserPermission(userId: number, code: string) {
+  return api<{ granted: boolean }>(`/admin/users/${userId}/permissions`, { method: 'POST', body: { code } })
+}
+export async function revokeUserPermission(userId: number, code: string) {
+  return api<{ granted: boolean }>(`/admin/users/${userId}/permissions/${code}`, { method: 'DELETE' })
+}
+
 export interface Role {
   code: string
   name_ar: string

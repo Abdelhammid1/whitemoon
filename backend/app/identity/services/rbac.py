@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from ...common.errors import Forbidden
 from ...extensions import db
-from ..models import Permission, Role, RolePermission, UserRole
+from ..models import Permission, Role, RolePermission, UserPermission, UserRole
 
 
 def has_permission(user_id: int, code: str) -> bool:
@@ -30,7 +30,13 @@ def has_permission(user_id: int, code: str) -> bool:
         .where(UserRole.user_id == user_id, Permission.code.in_([code, "*"]))
         .limit(1)
     )
-    return db.session.execute(stmt).scalar_one_or_none() is not None
+    if db.session.execute(stmt).scalar_one_or_none() is not None:
+        return True
+    # Direct per-user grant (delegation), in addition to role grants.
+    direct = select(UserPermission.id).where(
+        UserPermission.user_id == user_id, UserPermission.permission_code == code
+    ).limit(1)
+    return db.session.execute(direct).scalar_one_or_none() is not None
 
 
 def get_user_permissions(user_id: int) -> set[str]:
@@ -42,7 +48,29 @@ def get_user_permissions(user_id: int) -> set[str]:
         .where(UserRole.user_id == user_id)
         .distinct()
     )
-    return {row for row in db.session.execute(stmt).scalars().all()}
+    perms = {row for row in db.session.execute(stmt).scalars().all()}
+    direct = db.session.execute(
+        select(UserPermission.permission_code).where(UserPermission.user_id == user_id)
+    ).scalars().all()
+    perms.update(direct)
+    return perms
+
+
+def users_with_permission(code: str) -> set[int]:
+    """All user ids that hold `code` — through a role (including the `*`
+    wildcard) or a direct per-user grant. Used to fan out notifications to
+    everyone who can act on something (e.g. payment approvers)."""
+    role_based = (
+        select(UserRole.user_id)
+        .join(Role, Role.id == UserRole.role_id)
+        .join(RolePermission, RolePermission.role_id == Role.id)
+        .join(Permission, Permission.id == RolePermission.permission_id)
+        .where(Permission.code.in_([code, "*"]))
+    )
+    ids = set(db.session.execute(role_based).scalars().all())
+    direct = select(UserPermission.user_id).where(UserPermission.permission_code == code)
+    ids.update(db.session.execute(direct).scalars().all())
+    return ids
 
 
 def require_permission(code: str) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
