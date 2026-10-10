@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from html import escape
 from typing import Any
 
@@ -80,6 +80,38 @@ def catalog_product(product_id: int):
 @jwt_required()
 def catalog_related(product_id: int):
     return jsonify({"items": catalog_svc.related_products(product_id)})
+
+
+@bp.get("/catalog/quick-search")
+@jwt_required()
+def catalog_quick_search():
+    """T-43 «طلب سريع»: typo-tolerant search + filters + sort for bulk buyers."""
+    def _dec(name: str):
+        raw = request.args.get(name)
+        if raw is None or raw == "":
+            return None
+        try:
+            return Decimal(str(raw))
+        except (InvalidOperation, ValueError):
+            return None
+
+    items = catalog_svc.quick_search(
+        q=request.args.get("q"),
+        category=request.args.get("category"),
+        brand=request.args.get("brand"),
+        price_min=_dec("price_min"),
+        price_max=_dec("price_max"),
+        in_stock_only=request.args.get("in_stock") in ("1", "true", "yes"),
+        sort=request.args.get("sort", "relevance"),
+        limit=min(int(request.args.get("limit", "50") or 50), 200),
+    )
+    return jsonify({"items": items})
+
+
+@bp.get("/catalog/filter-options")
+@jwt_required()
+def catalog_filter_options():
+    return jsonify(catalog_svc.filter_options())
 
 
 # ================================================================ cart

@@ -124,6 +124,7 @@ const GROUPS: NavGroup[] = [
     roles: ['customer'],
     items: [
       { to: '/catalog', label: 'الكتالوج', icon: 'storefront' },
+      { to: '/quick-order', label: 'طلب سريع', icon: 'bolt' },
       { to: '/cart', label: 'سلتي', icon: 'shopping_cart' },
       { to: '/orders', label: 'طلباتي', icon: 'list_alt' },
       { to: '/rfq', label: 'طلب عرض سعر', icon: 'request_quote' },

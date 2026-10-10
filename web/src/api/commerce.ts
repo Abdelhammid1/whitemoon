@@ -21,6 +21,44 @@ export async function relatedProducts(productId: number) {
   return api<{ items: CatalogProduct[] }>(`/catalog/products/${productId}/related`)
 }
 
+// T-43 quick order: typo-tolerant search + filters.
+export interface QuickSearchItem {
+  product_id: number
+  sku: string
+  name_ar: string
+  category: string
+  brand: string | null
+  barcode: string | null
+  unit: string
+  image_url: string | null
+  best_price: string
+  best_offer_id: number
+  moq: string
+  available: string
+}
+export interface QuickSearchParams {
+  q?: string
+  category?: string
+  brand?: string
+  price_min?: string
+  price_max?: string
+  in_stock?: string
+  sort?: 'relevance' | 'price_asc' | 'price_desc' | 'name'
+  limit?: string
+}
+export async function quickSearch(params: QuickSearchParams) {
+  return api<{ items: QuickSearchItem[] }>('/catalog/quick-search', {
+    query: params as Record<string, string | undefined>,
+  })
+}
+export interface FilterOptions {
+  brands: string[]
+  categories: { code: string; name_ar: string }[]
+}
+export async function catalogFilterOptions() {
+  return api<FilterOptions>('/catalog/filter-options')
+}
+
 export interface ProductDetail extends CatalogProduct {
   subcategory: string | null
   brand: string | null

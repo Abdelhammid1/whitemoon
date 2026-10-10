@@ -31,6 +31,7 @@ import { BalanceSheetPage } from './pages/accounting/reports/BalanceSheetPage'
 import { CashFlowPage } from './pages/accounting/reports/CashFlowPage'
 import { GeneralLedgerPage } from './pages/accounting/reports/GeneralLedgerPage'
 import { CatalogPage } from './pages/commerce/CatalogPage'
+import { QuickOrderPage } from './pages/commerce/QuickOrderPage'
 import { ProductDetailPage } from './pages/commerce/ProductDetailPage'
 import { SupplierOrdersPage } from './pages/commerce/SupplierOrdersPage'
 import { CartPage } from './pages/commerce/CartPage'
@@ -97,6 +98,7 @@ export function App() {
         <Route path="/account/password" element={<ChangePasswordPage />} />
 
         <Route path="/catalog" element={<CatalogPage />} />
+        <Route path="/quick-order" element={<QuickOrderPage />} />
         <Route path="/catalog/:id" element={<ProductDetailPage />} />
         <Route path="/cart" element={<CartPage />} />
         <Route path="/orders" element={<OrdersPage />} />
