@@ -82,12 +82,14 @@ def test_sort_price(client) -> None:
     assert prices == sorted(prices)
 
 
-def test_row_carries_unit_moq_available(client) -> None:
+def test_row_carries_unit_moq_instock(client) -> None:
     p, _ = _mk(name="زيت طعام", price="80", stock="12")
     row = next(r for r in catalog_svc.quick_search(q="زيت") if r["product_id"] == p.id)
     assert row["unit"] and row["best_offer_id"]
-    assert Decimal(row["available"]) == Decimal("12")
+    assert row["in_stock"] is True
     assert "moq" in row
+    # The hidden supplier's exact quantity is never exposed.
+    assert "available" not in row and "supplier_id" not in row
 
 
 def test_filter_options_and_endpoint(client) -> None:

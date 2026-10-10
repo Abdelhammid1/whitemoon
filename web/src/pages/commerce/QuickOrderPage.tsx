@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
-import { Button, Spinner, EmptyState, InlineError } from '../../components/ui'
+import { Button, Spinner, EmptyState, InlineError, Pill } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
 import { Icon } from '../../components/Icon'
 import { PageHelp } from '../../components/PageHelp'
@@ -205,8 +205,8 @@ export function QuickOrderPage() {
               { header: 'السعر', align: 'end', cell: (it) => <Mono>{formatMoney(it.best_price)} / {it.unit}</Mono> },
               {
                 header: 'المتاح', align: 'end',
-                cell: (it) => Number(it.available) > 0
-                  ? <Mono>{Number(it.available)} {it.unit}</Mono>
+                cell: (it) => it.in_stock
+                  ? <Pill tone="signal">متاح</Pill>
                   : <span className="font-small text-small text-secondary">نفد</span>,
               },
               {

@@ -245,7 +245,9 @@ def quick_search(
             "best_price": str(bp),
             "best_offer_id": offer_id,
             "moq": str(moq),
-            "available": str(avail),
+            # Only WHETHER it is in stock — never the (hidden) supplier's exact
+            # on-hand quantity, which would leak their operational data.
+            "in_stock": Decimal(str(avail)) > 0,
         }
         for (p, bp, offer_id, moq, avail) in rows
     ]

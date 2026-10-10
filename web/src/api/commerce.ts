@@ -34,7 +34,7 @@ export interface QuickSearchItem {
   best_price: string
   best_offer_id: number
   moq: string
-  available: string
+  in_stock: boolean
 }
 export interface QuickSearchParams {
   q?: string
