@@ -623,3 +623,35 @@ def is_partner_self(user_id: int, partner_id: int) -> bool:
         user_id == partner_id
         and db.session.get(ChannelPartnerProfile, partner_id) is not None
     )
+
+
+def default_partner_for_customer(customer_id: int) -> ChannelPartnerProfile | None:
+    """The agent/branch whose territory (geo_scope) covers this customer's
+    geo_area — the order's default source (T-33). Returns a partner only when
+    EXACTLY ONE covers the area (an ambiguous or empty match → company-direct).
+    An agent is preferred over a branch when both match."""
+    cp = db.session.get(CustomerProfile, customer_id)
+    if cp is None or not cp.geo_area:
+        return None
+    area = cp.geo_area.strip()
+    matches = list(
+        db.session.execute(
+            select(ChannelPartnerProfile).where(ChannelPartnerProfile.geo_scope == area)
+        ).scalars()
+    )
+    if not matches:
+        return None
+    agents = [m for m in matches if m.type == "agent"]
+    pool = agents or matches
+    return pool[0] if len(pool) == 1 else None
+
+
+def order_source(partner_user_id: int | None) -> dict[str, Any]:
+    """Resolve an order's source (T-33): company-direct, or an agent/branch by
+    name. Never leaks a supplier — this is the channel partner, not a supplier."""
+    if partner_user_id is None:
+        return {"type": "company", "user_id": None, "name": "الشركة"}
+    prof = db.session.get(ChannelPartnerProfile, partner_user_id)
+    if prof is None:
+        return {"type": "company", "user_id": None, "name": "الشركة"}
+    return {"type": prof.type, "user_id": partner_user_id, "name": prof.display_name}

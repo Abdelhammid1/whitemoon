@@ -24,6 +24,10 @@ import { PageHelp } from '../../components/PageHelp'
 const STATUS_AR: Record<string, string> = {
   pending: 'قيد الانتظار', confirmed: 'مؤكد', fulfilled: 'منفَّذ', cancelled: 'ملغى',
 }
+const SUB_STATUS_AR: Record<string, string> = {
+  pending: 'قيد الانتظار', confirmed: 'مؤكد', preparing: 'قيد التجهيز', cancelled: 'ملغى',
+}
+const SOURCE_AR: Record<string, string> = { company: 'الشركة مباشرة', agent: 'وكيل', branch: 'فرع' }
 
 function plusDaysIso(days: number): string {
   const d = new Date()
@@ -135,6 +139,12 @@ export function OrderDetailPage() {
         </Pill>
         <span className="font-body text-body text-secondary">{order.payment_mode === 'deferred' ? 'آجل' : 'نقدي'}</span>
         <span className="font-mono-body text-mono-body text-secondary">{formatDate(order.placed_at)}</span>
+        {order.source && (
+          <Pill tone="neutral">
+            المصدر: {SOURCE_AR[order.source.type] ?? order.source.type}
+            {order.source.type !== 'company' ? ` — ${order.source.name}` : ''}
+          </Pill>
+        )}
         <Button className="ms-auto" iconRight="picture_as_pdf" onClick={() => void openInvoice()}>
           فاتورة PDF
         </Button>
@@ -197,8 +207,11 @@ export function OrderDetailPage() {
             {subOrders.map((s) => (
               <Card key={s.id} padded={false} className="overflow-hidden">
                 <div className="flex items-center justify-between gap-space-md px-space-lg py-space-md border-b border-surface-container-high">
-                  <span className="font-body-medium text-body-medium text-on-surface">
+                  <span className="font-body-medium text-body-medium text-on-surface inline-flex items-center gap-space-sm">
                     مورّد <Mono>#{s.supplier_id}</Mono>
+                    <Pill tone={s.status === 'cancelled' ? 'error' : s.status === 'pending' ? 'warning' : 'signal'}>
+                      {SUB_STATUS_AR[s.status] ?? s.status}
+                    </Pill>
                   </span>
                   <span className="font-small text-small text-secondary">
                     الإجمالي الفرعي <Mono>{formatMoney(s.subtotal)}</Mono>
@@ -231,6 +244,25 @@ export function OrderDetailPage() {
                 { header: 'الإجمالي', align: 'end', cell: (l) => <Mono>{formatMoney(l.line_total)}</Mono> },
               ]}
             />
+          </Card>
+        )}
+        {/* Customer: per-part status without supplier identity (T-33). */}
+        {!subOrders && order.parts && order.parts.length > 0 && (
+          <Card className="mt-space-md flex flex-col gap-space-sm">
+            <span className="font-small text-small text-secondary">يُقسَّم طلبك إلى أجزاء حسب الموردين (هوياتهم محجوبة) — حالة كل جزء:</span>
+            <div className="flex flex-col divide-y divide-surface-container">
+              {order.parts.map((p, i) => (
+                <div key={i} className="flex items-center justify-between py-space-sm">
+                  <span className="font-body text-body text-on-surface">الجزء {i + 1}</span>
+                  <span className="flex items-center gap-space-md">
+                    <Mono className="text-secondary">{formatMoney(p.subtotal)}</Mono>
+                    <Pill tone={p.status === 'cancelled' ? 'error' : p.status === 'pending' ? 'warning' : 'signal'}>
+                      {SUB_STATUS_AR[p.status] ?? p.status}
+                    </Pill>
+                  </span>
+                </div>
+              ))}
+            </div>
           </Card>
         )}
       </section>

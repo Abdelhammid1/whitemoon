@@ -69,6 +69,12 @@ export interface OrderLine {
   unit_price: string
   line_total: string
 }
+/** Order source (T-33): company-direct, or an agent/branch by name. */
+export interface OrderSource {
+  type: 'company' | 'agent' | 'branch'
+  user_id: number | null
+  name: string
+}
 export interface Order {
   id: number
   number: string
@@ -77,7 +83,10 @@ export interface Order {
   total_cash: string
   total_deferred: string
   placed_at: string
+  source?: OrderSource
   lines?: OrderLine[]
+  /** Customer view: each supplier part's status, no supplier identity (T-33). */
+  parts?: { status: string; subtotal: string }[]
   /** Present on the admin/staff view instead of `lines`. */
   sub_orders?: AdminSubOrder[]
 }
@@ -97,6 +106,7 @@ export interface AdminOrderLine {
 export interface AdminSubOrder {
   id: number
   supplier_id: number
+  status: string
   subtotal: string
   lines: AdminOrderLine[]
 }
@@ -110,6 +120,7 @@ export interface AdminOrder {
   placed_at: string
   customer_id: number
   customer_name: string | null
+  source?: OrderSource
   sub_orders: AdminSubOrder[]
 }
 

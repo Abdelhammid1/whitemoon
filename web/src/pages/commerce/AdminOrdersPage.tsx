@@ -176,6 +176,10 @@ export function AdminOrdersPage() {
                     o.customer_name ?? <Mono>#{o.customer_id}</Mono>,
                 },
                 {
+                  header: 'المصدر',
+                  cell: (o) => <span className="font-small text-small text-secondary">{o.source?.name ?? 'الشركة'}</span>,
+                },
+                {
                   header: 'الحالة',
                   align: 'center',
                   cell: (o) => (

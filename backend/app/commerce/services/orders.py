@@ -130,6 +130,14 @@ def checkout(  # noqa: PLR0912, PLR0915 — cash/deferred × per-category × per
         customer_id=customer_id, order_amount=d_total, deferred=(payment_mode == "deferred")
     )
 
+    # Order source (T-33): attribute the order to the customer's territory
+    # agent/branch when exactly one covers them, else company-direct. This is
+    # the basis for the partner's commission accrual (realized_sales reads
+    # Order.partner_user_id).
+    from ...partners.services import partners as partners_svc
+
+    source_partner = partners_svc.default_partner_for_customer(customer_id)
+
     # Create the order shell.
     order = Order(
         number="PENDING",
@@ -139,6 +147,7 @@ def checkout(  # noqa: PLR0912, PLR0915 — cash/deferred × per-category × per
         total_cash=total_cash,
         total_deferred=d_total,
         credit_check_at=datetime.now(UTC),
+        partner_user_id=source_partner.user_id if source_partner is not None else None,
     )
     db.session.add(order)
     db.session.flush()
@@ -222,7 +231,27 @@ def checkout(  # noqa: PLR0912, PLR0915 — cash/deferred × per-category × per
         pricelock.consume_lock_for_cart_item(item.id)
     cart.status = "checked_out"
     db.session.commit()
+    _notify_suppliers_of_order(order)
     return order
+
+
+def _notify_suppliers_of_order(order: Order) -> None:
+    """Each supplier gets an independent notification for THEIR part only — the
+    order number and their sub-order subtotal, never any customer data (T-33).
+    Never raises — a notification failure must not undo a placed order."""
+    try:
+        from ...notifications.services import notify as notify_svc
+
+        for sub in order.sub_orders:
+            notify_svc.notify(
+                user_id=sub.supplier_id,
+                title="طلب جديد يخص أصنافك",
+                body=f"لديك جزء جديد في الطلب {order.number} بقيمة {to_money(sub.subtotal)} ج.م — جهّزه من لوحة الطلبات.",
+                type_="suborder_new",
+                channel="in_app",
+            )
+    except Exception:  # pragma: no cover - defensive
+        pass
 
 
 def list_orders(customer_id: int, limit: int = 50) -> list[Order]:
@@ -279,6 +308,7 @@ def serialize_admin_rows(orders: list[Order]) -> list[dict[str, Any]]:
     """Light list rows (no sub-order/line breakdown) with batch-loaded customer
     names — for the admin orders table (T-13)."""
     from ...identity.models import CustomerProfile
+    from ...partners.services import partners as partners_svc
 
     ids = {o.customer_id for o in orders}
     names: dict[int, str] = {}
@@ -300,6 +330,7 @@ def serialize_admin_rows(orders: list[Order]) -> list[dict[str, Any]]:
             "placed_at": o.placed_at.isoformat(),
             "customer_id": o.customer_id,
             "customer_name": names.get(o.customer_id),
+            "source": partners_svc.order_source(o.partner_user_id),
         }
         for o in orders
     ]
@@ -404,7 +435,10 @@ def supplier_dashboard(supplier_id: int, limit: int = 100) -> list[dict[str, Any
 
 
 def serialize_order(order: Order, *, for_customer: bool) -> dict[str, Any]:
-    """Customer view hides suppliers; admin view includes sub-order suppliers."""
+    """Customer view hides suppliers; admin view includes sub-order suppliers.
+    Both carry the order source (T-33): company / agent / branch, by name."""
+    from ...partners.services import partners as partners_svc
+
     base: dict[str, Any] = {
         "id": order.id,
         "number": order.number,
@@ -413,9 +447,11 @@ def serialize_order(order: Order, *, for_customer: bool) -> dict[str, Any]:
         "total_cash": str(order.total_cash),
         "total_deferred": str(order.total_deferred),
         "placed_at": order.placed_at.isoformat(),
+        "source": partners_svc.order_source(order.partner_user_id),
     }
     if for_customer:
-        # No supplier breakdown — just the lines merged.
+        # No supplier breakdown — merged lines + per-part status (no supplier
+        # identity): the customer sees «من أين الطلب» and each part's status.
         lines: list[dict[str, Any]] = []
         for sub in order.sub_orders:
             for ln in sub.lines:
@@ -428,11 +464,16 @@ def serialize_order(order: Order, *, for_customer: bool) -> dict[str, Any]:
                     }
                 )
         base["lines"] = lines
+        base["parts"] = [
+            {"status": sub.status, "subtotal": str(sub.subtotal)}
+            for sub in order.sub_orders
+        ]
     else:
         base["sub_orders"] = [
             {
                 "id": sub.id,
                 "supplier_id": sub.supplier_id,
+                "status": sub.status,
                 "subtotal": str(sub.subtotal),
                 "lines": [
                     {
