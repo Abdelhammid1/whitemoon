@@ -83,6 +83,31 @@ def test_agent_approver_sees_customer_upload_in_queue(client) -> None:
     assert any(it["source"] == "customer" and it["due_id"] == due.id for it in items)
 
 
+def test_out_of_scope_agent_cannot_see_or_view_receipt(client) -> None:
+    """Territory isolation (T-01): an approver in another geo must not see a
+    customer's upload in the queue, nor fetch its receipt image."""
+    from app.sales.services import payments as pay_svc
+
+    cid = _customer(geo="alex")
+    agent = create_user(kind="agent", email=_uniq("agt"), roles=("agent",))
+    db.session.add(ChannelPartnerProfile(user_id=agent.id, type="agent", display_name="وكيل", geo_scope="cairo"))
+    db.session.commit()
+    due = _deferred_due(cid)
+    row = pay_svc.upload_customer_receipt(
+        customer_id=cid, due_id=due.id, amount=Decimal("1000"), paid_on=date.today(),
+        receipt_key="receipts/x.png",
+    )
+
+    h = auth_header(client, email=agent.email)
+    listing = client.get("/credit/payments?status=pending", headers=h)
+    assert listing.status_code == 200
+    assert all(it["id"] != row.id for it in listing.get_json()["items"])
+
+    # And the receipt image is not reachable by an out-of-scope partner.
+    rcpt = client.get(f"/credit/payments/{row.id}/receipt", headers=h)
+    assert rcpt.status_code == 403
+
+
 def test_approve_settles_due_posts_gl_and_notifies_customer(client) -> None:
     from app.sales.services import payments as pay_svc
 

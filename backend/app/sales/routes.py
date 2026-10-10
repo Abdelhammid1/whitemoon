@@ -175,16 +175,25 @@ def list_payments():
     uid = _uid()
     status = request.args.get("status")
     # Finance/admin (user.read) see everything. An approver without user.read
-    # (agent/branch) sees their own collections PLUS every customer-uploaded
-    # receipt awaiting approval (T-29); a plain collector sees only their own.
+    # (agent/branch) sees their own collections PLUS customer-uploaded receipts
+    # awaiting approval (T-29) — but a partner is scoped to their own territory
+    # (T-01), so they never see uploads of customers outside their geo scope.
+    # A plain collector sees only their own.
     if has_permission(uid, "user.read"):
         rows = pay_svc.list_approvals(status=status)
     else:
+        is_approver = has_permission(uid, "payment.approve")
         rows = pay_svc.list_approvals(
-            status=status,
-            collected_by=uid,
-            include_customer_uploads=has_permission(uid, "payment.approve"),
+            status=status, collected_by=uid, include_customer_uploads=is_approver
         )
+        if is_approver:
+            from ..partners.services import partners as partners_svc
+
+            if partners_svc.is_partner(uid):
+                rows = [
+                    r for r in rows
+                    if r.collected_by == uid or partners_svc.customer_in_scope(uid, r.customer_id)
+                ]
     return jsonify({"items": [pay_svc.serialize(r) for r in rows]})
 
 
@@ -281,10 +290,19 @@ def payment_receipt(approval_id: int):
     row = db.session.get(PaymentApproval, approval_id)
     if row is None or not row.receipt_key:
         raise NotFound("لا يوجد إيصال", code="receipt_not_found")
-    # Finance reviewers see any receipt (the review queue); otherwise only the
-    # customer who actually uploaded it — not merely anyone sharing customer_id.
-    is_reviewer = has_permission(uid, "payment.approve")
+    # Finance reviewers (user.read) see any receipt (the review queue). An
+    # approver without user.read is a partner — scoped to their own territory
+    # (T-01), so they may only view receipts of in-scope customers or their own
+    # collections, never anyone sharing a customer_id across territories.
     is_uploader = row.collected_by == uid and row.customer_id == uid
+    is_reviewer = has_permission(uid, "user.read")
+    if not is_reviewer and has_permission(uid, "payment.approve"):
+        from ..partners.services import partners as partners_svc
+
+        if partners_svc.is_partner(uid):
+            is_reviewer = row.collected_by == uid or partners_svc.customer_in_scope(uid, row.customer_id)
+        else:
+            is_reviewer = True
     if not is_reviewer and not is_uploader:
         raise Forbidden("غير مصرح", code="forbidden")
     blob = storage.load(row.receipt_key)
