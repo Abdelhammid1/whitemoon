@@ -389,12 +389,37 @@ def list_devices(user_id: int) -> list[dict[str, Any]]:
     ]
 
 
-def revoke_device(*, user_id: int, session_id: int) -> None:
+def _revoke_access_sessions(
+    user_id: int, *, device: str | None = None, ip: str | None = None, keep_jti: str | None = None
+) -> None:
+    """Also revoke the matching live ACCESS sessions so a revoked device is cut
+    off immediately (is_token_revoked blocklists them) instead of lingering
+    until the short access token expires. Scoped by device+ip when given."""
+    stmt = select(Session).where(
+        Session.user_id == user_id,
+        Session.kind == "access",
+        Session.revoked_at.is_(None),
+    )
+    if device is not None:
+        stmt = stmt.where(Session.device == device)
+    if ip is not None:
+        stmt = stmt.where(Session.ip == ip)
+    now = datetime.now(UTC)
+    for s in db.session.execute(stmt).scalars().all():
+        if keep_jti is not None and s.jwt_jti == keep_jti:
+            continue
+        s.revoked_at = now
+
+
+def revoke_device(*, user_id: int, session_id: int, keep_jti: str | None = None) -> None:
     row = db.session.get(Session, session_id)
     if row is None or row.user_id != user_id:
         raise NotFound("Device not found", code="device_not_found")
     if row.revoked_at is None:
         row.revoked_at = datetime.now(UTC)
+        # Cut off that device's live access token(s) too (same device+ip), but
+        # never the caller's own current session (`keep_jti`).
+        _revoke_access_sessions(user_id, device=row.device, ip=row.ip, keep_jti=keep_jti)
         audit.emit(
             "auth.device_revoked", actor_user_id=user_id, target_type="session", target_id=session_id
         )
@@ -402,8 +427,9 @@ def revoke_device(*, user_id: int, session_id: int) -> None:
 
 
 def revoke_all_devices(*, user_id: int, keep_jti: str | None = None) -> int:
-    """Revoke every remembered device (optionally keeping the caller's own
-    session). Returns how many were revoked."""
+    """Revoke every remembered device and its live access tokens (keeping the
+    caller's own access session, `keep_jti`, so the page stays usable). Returns
+    how many remembered devices were revoked."""
     rows = db.session.execute(
         select(Session).where(
             Session.user_id == user_id,
@@ -415,11 +441,11 @@ def revoke_all_devices(*, user_id: int, keep_jti: str | None = None) -> int:
     now = datetime.now(UTC)
     n = 0
     for s in rows:
-        if keep_jti is not None and s.jwt_jti == keep_jti:
-            continue
         s.revoked_at = now
         n += 1
     if n:
+        # Sign out everywhere: revoke all live access tokens except the caller's.
+        _revoke_access_sessions(user_id, keep_jti=keep_jti)
         audit.emit(
             "auth.devices_revoked_all", actor_user_id=user_id, target_type="user", target_id=user_id
         )

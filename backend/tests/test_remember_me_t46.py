@@ -97,6 +97,30 @@ def test_remembered_session_has_long_expiry(client) -> None:
     assert s.expires_at > datetime.now(UTC) + timedelta(days=25)
 
 
+def test_revoke_device_cuts_off_that_device_access_now(client) -> None:
+    create_user(kind="customer", email="rm-x@wm.eg", roles=("customer",))
+    caller = _login(client, "rm-x@wm.eg", True)   # device 1 (the one doing the revoke)
+    other = _login(client, "rm-x@wm.eg", True)    # device 2 (newest)
+    h1, h2 = _auth(caller), _auth(other)
+    # Newest-first: items[0] is device 2.
+    did2 = client.get("/auth/devices", headers=h1).get_json()["items"][0]["id"]
+    client.delete(f"/auth/devices/{did2}", headers=h1)
+    # Device 2's live access token is blocklisted at once — not after TTL …
+    assert client.get("/auth/me", headers=h2).status_code == 401
+    # … while the caller stays signed in.
+    assert client.get("/auth/me", headers=h1).status_code == 200
+
+
+def test_revoke_all_keeps_caller_but_clears_devices(client) -> None:
+    create_user(kind="customer", email="rm-y@wm.eg", roles=("customer",))
+    b1 = _login(client, "rm-y@wm.eg", True)
+    _login(client, "rm-y@wm.eg", True)  # a second device
+    h = _auth(b1)
+    assert client.delete("/auth/devices", headers=h).status_code == 200
+    assert client.get("/auth/me", headers=h).status_code == 200  # caller kept
+    assert client.get("/auth/devices", headers=h).get_json()["items"] == []
+
+
 def test_verify_password_step_up(client) -> None:
     u = create_user(kind="customer", email="rm-v@wm.eg", roles=("customer",))
     auth_svc.verify_password_or_raise(u.id, "secret-pw-123")  # ok, no raise

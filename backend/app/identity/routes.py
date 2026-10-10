@@ -173,14 +173,16 @@ def list_devices():
 @bp.delete("/devices/<int:session_id>")
 @jwt_required()
 def revoke_device(session_id: int):
-    auth_svc.revoke_device(user_id=_current_uid(), session_id=session_id)
+    auth_svc.revoke_device(
+        user_id=_current_uid(), session_id=session_id, keep_jti=get_jwt().get("jti")
+    )
     return jsonify({"status": "revoked"})
 
 
 @bp.delete("/devices")
 @jwt_required()
 def revoke_all_devices():
-    n = auth_svc.revoke_all_devices(user_id=_current_uid())
+    n = auth_svc.revoke_all_devices(user_id=_current_uid(), keep_jti=get_jwt().get("jti"))
     return jsonify({"status": "revoked", "count": n})
 
 
