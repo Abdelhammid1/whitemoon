@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useScrollEdges } from '../lib/useScrollEdges'
 
 type Align = 'start' | 'end' | 'center'
 
@@ -29,6 +30,9 @@ const ALIGN: Record<Align, string> = {
  * single hairline, no zebra striping.
  */
 export function DataTable<Row>({ columns, rows, rowKey, onRowClick, empty }: Props<Row>) {
+  // T-35: fade the edge a wide table is still scrollable toward, so it is
+  // apparent there are more columns off-screen (common on phones).
+  const { ref, before, after } = useScrollEdges<HTMLDivElement>('x')
   if (rows.length === 0) {
     return (
       <div className="py-space-xl text-center font-body text-body text-secondary">
@@ -37,7 +41,14 @@ export function DataTable<Row>({ columns, rows, rowKey, onRowClick, empty }: Pro
     )
   }
   return (
-    <div className="w-full overflow-x-auto">
+    <div className="relative w-full">
+      {before && (
+        <div className="pointer-events-none absolute inset-y-0 start-0 z-10 w-6 bg-gradient-to-l from-black/[0.06] to-transparent" />
+      )}
+      {after && (
+        <div className="pointer-events-none absolute inset-y-0 end-0 z-10 w-6 bg-gradient-to-r from-black/[0.06] to-transparent" />
+      )}
+      <div ref={ref} className="w-full overflow-x-auto">
       <table className="w-full border-collapse">
         <thead>
           <tr className="bg-surface-container-low border-b border-surface-container-high">
@@ -73,6 +84,7 @@ export function DataTable<Row>({ columns, rows, rowKey, onRowClick, empty }: Pro
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   )
 }

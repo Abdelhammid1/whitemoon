@@ -145,6 +145,37 @@ export function AppShell() {
   const perms = user?.permissions ?? []
   const hasPerm = (code?: string) => !code || perms.includes(code) || perms.includes('*')
 
+  // T-35: show a bottom fade + down-chevron (with a «+N عناصر» count) while the
+  // nav still has links below the fold, hiding it once scrolled to the bottom.
+  const navRef = useRef<HTMLElement | null>(null)
+  const [navScroll, setNavScroll] = useState({ before: false, after: false, below: 0 })
+  useEffect(() => {
+    const el = navRef.current
+    if (!el) return
+    const measure = () => {
+      const before = el.scrollTop > 1
+      const fold = el.scrollTop + el.clientHeight
+      const after = fold < el.scrollHeight - 1
+      let below = 0
+      if (after) {
+        el.querySelectorAll<HTMLElement>('a[href]').forEach((a) => {
+          if (a.offsetTop >= fold - 4) below++
+        })
+      }
+      setNavScroll((p) => (p.before === before && p.after === after && p.below === below ? p : { before, after, below }))
+    }
+    measure()
+    el.addEventListener('scroll', measure, { passive: true })
+    const ro = new ResizeObserver(measure)
+    ro.observe(el)
+    window.addEventListener('resize', measure)
+    return () => {
+      el.removeEventListener('scroll', measure)
+      ro.disconnect()
+      window.removeEventListener('resize', measure)
+    }
+  }, [role, perms])
+
   // Auto-show the onboarding page on first login only: never if the user has
   // hidden it, never twice (a per-user 'seen' flag), and never blocking — it is
   // a one-time redirect. All storage access is guarded. Runs once per mount.
@@ -198,7 +229,8 @@ export function AppShell() {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto px-space-sm pb-space-sm flex flex-col gap-space-xs">
+        <div className="relative flex-1 min-h-0">
+        <nav ref={navRef} className="h-full overflow-y-auto px-space-sm pb-space-sm flex flex-col gap-space-xs">
           {/* Onboarding — first entry, every role, outside the role-gated groups */}
           <NavLink to="/start" className={({ isActive }) => navItem(isActive)}>
             <Icon name="rocket_launch" size={18} className="shrink-0" />
@@ -231,6 +263,19 @@ export function AppShell() {
             </div>
           ))}
         </nav>
+        {navScroll.before && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-5 bg-gradient-to-b from-surface-container-lowest to-transparent" />
+        )}
+        {navScroll.after && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center">
+            <div className="h-7 w-full bg-gradient-to-t from-surface-container-lowest to-transparent" />
+            <div className="-mt-4 mb-1 flex items-center gap-1 rounded-full border border-surface-container-high bg-surface-container-high/95 px-2 py-0.5 font-small text-[11px] text-secondary">
+              <Icon name="keyboard_arrow_down" size={14} />
+              {navScroll.below > 0 && <span>+{navScroll.below} عناصر</span>}
+            </div>
+          </div>
+        )}
+        </div>
 
         {/* Account */}
         <div className="p-space-sm border-t border-surface-container-high">
