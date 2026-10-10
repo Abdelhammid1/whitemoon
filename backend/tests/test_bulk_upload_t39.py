@@ -6,8 +6,10 @@ import io
 import uuid
 from decimal import Decimal
 
-from openpyxl import Workbook
+import pytest
+from openpyxl import Workbook, load_workbook
 
+from app.common.errors import BadRequest
 from app.extensions import db
 from app.inventory.models import SupplierOffer
 from app.inventory.services import bulk as bulk_svc
@@ -90,6 +92,26 @@ def test_apply_updates_only_valid_rows(client) -> None:
     assert o1 is not None and Decimal(str(o1.unit_price)) == Decimal("60.0000")
     o2 = _offer(p2.id, sup.id)
     assert o2 is not None and o2.discount_kind == "percent"
+
+
+def test_export_neutralizes_formula_injection(client) -> None:
+    sup = create_user(kind="supplier", email=_uniq("sup"), roles=("supplier",))
+    p = products_svc.create_product(sku=f"P-{uuid.uuid4().hex[:5]}", name_ar="=HYPERLINK(\"evil\")", category="food", barcode=B1, created_by=1)
+    offers_svc.upsert_offer(supplier_id=sup.id, product_id=p.id, unit_price=Decimal("100"))
+    db.session.commit()
+    ws = load_workbook(io.BytesIO(bulk_svc.export_bytes(sup.id))).active
+    assert ws is not None
+    names = [r[1] for r in ws.iter_rows(min_row=2, values_only=True)]
+    # The dangerous name is stored as data (leading apostrophe), not a formula.
+    assert any(isinstance(n, str) and n.startswith("'=") for n in names)
+
+
+def test_row_cap_rejects_huge_sheet(client) -> None:
+    sup, _p1, _p2 = _setup()
+    data = _book([[B1, "صنف١", 1, 10, 0, ""] for _ in range(bulk_svc._MAX_ROWS + 2)])
+    with pytest.raises(BadRequest) as e:
+        bulk_svc.preview(supplier_id=sup.id, data=data)
+    assert e.value.code == "too_many_rows"
 
 
 def test_bulk_endpoint_preview(client) -> None:

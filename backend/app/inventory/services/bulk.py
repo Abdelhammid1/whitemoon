@@ -21,12 +21,24 @@ from typing import Any
 from sqlalchemy import select
 
 from ...extensions import db
-from ...common.errors import ApiError
+from ...common.errors import ApiError, BadRequest
 from ..models import Product
 from . import offers as offers_svc
 
 HEADERS = ["الباركود", "الاسم", "الكمية", "السعر", "الحد الأدنى", "الخصم"]
 _MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+# Cap the rows we will parse so a crafted/huge (zip-bomb) sheet can't exhaust
+# memory/CPU — a real bulk edit is hundreds of rows, not tens of thousands.
+_MAX_ROWS = 5000
+
+
+def _xlsx_safe(v: str) -> str:
+    """Neutralise CSV/formula injection on EXPORT: a cell beginning with
+    = + - @ (or a control char) is run as a formula by Excel/Sheets, so
+    user-controlled text is prefixed with a single quote to stay data."""
+    if v and v[0] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + v
+    return v
 
 
 def _sheet(wb_active: Any) -> None:
@@ -66,8 +78,8 @@ def export_bytes(supplier_id: int) -> bytes:
         elif offer.get("discount_kind") == "price" and offer.get("discount_value"):
             disc = str(Decimal(offer["discount_value"]).normalize())
         ws.append([
-            p["barcode"] or "",
-            p["name"] or "",
+            _xlsx_safe(p["barcode"] or ""),
+            _xlsx_safe(p["name"] or ""),
             float(Decimal(p["on_hand"])),
             float(Decimal(offer["unit_price"])) if offer.get("unit_price") else "",
             float(Decimal(offer["moq"])) if offer.get("moq") else 0,
@@ -161,13 +173,22 @@ def _rows(data: bytes) -> list[list[Any]]:
     ws = wb.active
     assert ws is not None
     out: list[list[Any]] = []
-    for i, row in enumerate(ws.iter_rows(values_only=True)):
-        if i == 0:
-            continue  # header
-        if row is None or all(c is None or str(c).strip() == "" for c in row):
-            continue  # blank line
-        out.append(list(row))
-    wb.close()
+    try:
+        for i, row in enumerate(ws.iter_rows(values_only=True)):
+            if i == 0:
+                continue  # header
+            if row is None or all(c is None or str(c).strip() == "" for c in row):
+                continue  # blank line
+            # Only the first six columns matter; drop the rest so a sheet
+            # padded with thousands of wide columns can't blow up memory.
+            out.append(list(row[:6]))
+            if len(out) > _MAX_ROWS:
+                raise BadRequest(
+                    f"الملف يتجاوز الحد الأقصى ({_MAX_ROWS} صف) — قسّمه إلى ملفات أصغر",
+                    code="too_many_rows",
+                )
+    finally:
+        wb.close()
     return out
 
 
