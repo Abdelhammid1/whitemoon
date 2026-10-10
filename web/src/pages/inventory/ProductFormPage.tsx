@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, SectionHeader, Spinner, Card, InlineError } from '../../components/ui'
 import { Icon } from '../../components/Icon'
@@ -8,11 +8,21 @@ import { useToast } from '../../components/Toast'
 import { API_BASE, ApiError } from '../../api/client'
 import {
   createProduct, updateProduct, getProductDetail, uploadProductImage,
-  deleteProductImage, setPrimaryProductImage, listCategories,
+  deleteProductImage, setPrimaryProductImage, listCategories, findSimilarProducts,
   PRODUCT_CATEGORIES,
-  type Category, type ProductStatus, type EtaCodeType,
+  type Category, type ProductStatus, type EtaCodeType, type SimilarProduct,
   type ProductInput, type ProductVariantInput, type ProductImageInput, type InitialBatchInput,
 } from '../../api/inventory'
+
+/** Prefill passed from the coding queue's «إنشاء منتج من الطلب» (T-31). */
+interface CodingPrefill {
+  coding_request_id?: number
+  name_ar?: string
+  barcode?: string
+  brand?: string
+  category?: string
+  image_url?: string
+}
 
 /* ----------------------------------------------------------------- helpers */
 
@@ -91,8 +101,12 @@ export function ProductFormPage() {
   const productId = id ? Number(id) : null
   const isEdit = productId != null
   const navigate = useNavigate()
+  const location = useLocation()
   const toast = useToast()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const prefill = (location.state as CodingPrefill | null) ?? null
+  const [codingRequestId, setCodingRequestId] = useState<number | null>(prefill?.coding_request_id ?? null)
+  const [similar, setSimilar] = useState<SimilarProduct[]>([])
 
   const [categories, setCategories] = useState<Category[]>(PRODUCT_CATEGORIES)
   const [loading, setLoading] = useState(isEdit)
@@ -123,6 +137,34 @@ export function ProductFormPage() {
   useEffect(() => {
     setForm((f) => (f.category ? f : { ...f, category: categories[0]?.code ?? 'food' }))
   }, [categories])
+
+  // Prefill from a coding request (T-31), create mode only. Runs once.
+  useEffect(() => {
+    if (isEdit || !prefill) return
+    setForm((f) => ({
+      ...f,
+      name_ar: prefill.name_ar ?? f.name_ar,
+      barcode: prefill.barcode ?? f.barcode,
+      brand: prefill.brand ?? f.brand,
+      category: prefill.category ?? f.category,
+    }))
+    setCodingRequestId(prefill.coding_request_id ?? null)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Duplicate warning (T-31): look for products with the same barcode or a
+  // close name before creating. Create mode only; debounced.
+  useEffect(() => {
+    if (isEdit) return
+    const name = form.name_ar.trim()
+    const barcode = form.barcode.trim()
+    if (name.length < 3 && !barcode) { setSimilar([]); return }
+    const t = setTimeout(() => {
+      findSimilarProducts({ name: name || undefined, barcode: barcode || undefined })
+        .then((r) => setSimilar(r.items))
+        .catch(() => setSimilar([]))
+    }, 400)
+    return () => clearTimeout(t)
+  }, [form.name_ar, form.barcode, isEdit])
 
   // Load the product on edit.
   useEffect(() => {
@@ -212,7 +254,8 @@ export function ProductFormPage() {
   /* ------------------------------------------------------------- submit */
   function validate(): string | null {
     if (!form.name_ar.trim()) return 'الاسم بالعربية مطلوب'
-    if (!form.sku.trim()) return 'SKU مطلوب'
+    // SKU is OPTIONAL (T-31): left empty, the backend generates a WM-NNNNNN
+    // internal code, or uses the barcode as identity.
     if (!form.category) return 'الفئة مطلوبة'
     // New products need at least one image; a legacy product being edited may
     // have only image_url and no gallery rows — don't block its save.
@@ -234,13 +277,14 @@ export function ProductFormPage() {
         ...(v.pack?.trim() ? { pack: v.pack.trim() } : {}),
       }))
     const body: ProductInput = {
-      sku: form.sku.trim(),
       name_ar: form.name_ar.trim(),
       category: form.category,
       unit: form.unit.trim() || 'piece',
       status: form.status,
       food_expiry_tracked: form.food_expiry_tracked,
       eta_code_type: form.eta_code_type,
+      ...(form.sku.trim() ? { sku: form.sku.trim() } : {}),
+      ...(codingRequestId != null ? { coding_request_id: codingRequestId } : {}),
       ...(form.name_en.trim() ? { name_en: form.name_en.trim() } : {}),
       ...(form.subcategory.trim() ? { subcategory: form.subcategory.trim() } : {}),
       ...(form.brand.trim() ? { brand: form.brand.trim() } : {}),
@@ -349,9 +393,21 @@ export function ProductFormPage() {
             <Field label="الاسم بالإنجليزية (اختياري)" dir="ltr" value={form.name_en} onChange={(e) => set('name_en', e.target.value)} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
-            <Field label="SKU" dir="ltr" mono value={form.sku} onChange={(e) => set('sku', e.target.value)} required />
-            <Field label="الباركود (اختياري)" dir="ltr" mono value={form.barcode} onChange={(e) => set('barcode', e.target.value)} />
+            <Field label="SKU (اختياري)" dir="ltr" mono value={form.sku} onChange={(e) => set('sku', e.target.value)}
+              hint="يُولَّد تلقائيًا إن تُرك فارغًا: WM-NNNNNN للمنتج المحلي، أو الباركود للمنتج العالمي" />
+            <Field label="الباركود (اختياري)" dir="ltr" mono value={form.barcode} onChange={(e) => set('barcode', e.target.value)}
+              hint="EAN-13 أو UPC-A — يُتحقق من رقم المراجعة وفريد بين المنتجات" />
           </div>
+          {!isEdit && similar.length > 0 && (
+            <div className="rounded-xl border-r-4 border-warning bg-warning/5 p-space-md flex flex-col gap-1">
+              <span className="font-body-medium text-body-medium text-on-surface">⚠ قد يكون هذا الصنف مكررًا — منتجات مشابهة:</span>
+              {similar.slice(0, 5).map((s) => (
+                <span key={s.id} className="font-small text-small text-secondary">
+                  {s.name_ar} <span dir="ltr" className="font-mono-body">[{s.barcode ?? s.sku}]</span>
+                </span>
+              ))}
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-space-md">
             <SelectField label="الفئة" value={form.category} onChange={(v) => set('category', v)}>
               {categories.map((c) => <option key={c.code} value={c.code}>{c.label}</option>)}

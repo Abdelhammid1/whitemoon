@@ -69,6 +69,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: '/inventory/categories', label: 'الفئات', icon: 'category' },
       { to: '/inventory/products', label: 'المنتجات والمخزون', icon: 'inventory_2' },
+      { to: '/inventory/coding-queue', label: 'طابور التكويد', icon: 'assignment_add' },
       { to: '/inventory/stock', label: 'أرصدة المخزون', icon: 'warehouse' },
       { to: '/inventory/reorder', label: 'تنبيهات إعادة الطلب', icon: 'notification_important' },
       { to: '/inventory/transfers', label: 'إذون التحويل', icon: 'swap_horiz' },

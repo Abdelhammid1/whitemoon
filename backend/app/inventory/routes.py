@@ -81,11 +81,14 @@ def _uid() -> int:
 @require_permission("product.manage")
 def create_product():
     body: Any = request.get_json(silent=True) or {}
-    for req in ("sku", "name_ar", "category"):
+    # sku is OPTIONAL (T-31): a global barcode is the identity, and a local
+    # product with no barcode gets an auto WM-NNNNNN internal code.
+    for req in ("name_ar", "category"):
         if not str(body.get(req) or "").strip():
             raise BadRequest(f"{req} is required", code="validation_error")
     product = products_svc.create_product(
-        sku=body["sku"], name_ar=body["name_ar"], category=body["category"],
+        sku=(str(body.get("sku")).strip() if body.get("sku") else None),
+        name_ar=body["name_ar"], category=body["category"],
         unit=body.get("unit") or "piece", name_en=body.get("name_en"),
         eta_code=body.get("eta_code"), eta_code_type=body.get("eta_code_type"),
         eta_ready=bool(body.get("eta_ready")), tax_rate=body.get("tax_rate"),
@@ -98,7 +101,23 @@ def create_product():
         images=body.get("images") or [], initial_batch=body.get("initial_batch"),
     )
     audit_emit("inventory.product.create", actor_user_id=_uid(), target_type="product", target_id=product.id)
+    # Created from a supplier's coding request → link + mark coded + notify (T-31).
+    coding_request_id = body.get("coding_request_id")
+    if coding_request_id:
+        coding_svc.mark_coded(request_id=int(coding_request_id), product_id=product.id)
+        audit_emit("inventory.coding_request.coded", actor_user_id=_uid(), target_type="coding_request", target_id=int(coding_request_id))
     return jsonify(products_svc.serialize(product)), 201
+
+
+@bp.get("/products/similar")
+@require_permission("product.manage")
+def products_similar():
+    """Possible duplicates for a new product (T-31) — warn before creating."""
+    return jsonify({
+        "items": products_svc.find_similar(
+            name=request.args.get("name"), barcode=request.args.get("barcode")
+        )
+    })
 
 
 @bp.put("/products/<int:product_id>")
@@ -327,6 +346,33 @@ def create_coding_request():
 def my_coding_requests():
     items = coding_svc.list_for_supplier(_uid())
     return jsonify({"items": [coding_svc.serialize(r) for r in items]})
+
+
+# ---- admin coding queue (T-31) ----
+
+
+@bp.get("/coding-requests")
+@require_permission("product.manage")
+def list_coding_requests():
+    items = coding_svc.list_all(status=request.args.get("status"))
+    return jsonify({"items": [coding_svc.serialize(r) for r in items]})
+
+
+@bp.post("/coding-requests/<int:request_id>/review")
+@require_permission("product.manage")
+def review_coding_request(request_id: int):
+    row = coding_svc.mark_in_review(request_id=request_id)
+    audit_emit("inventory.coding_request.review", actor_user_id=_uid(), target_type="coding_request", target_id=request_id)
+    return jsonify(coding_svc.serialize(row))
+
+
+@bp.post("/coding-requests/<int:request_id>/reject")
+@require_permission("product.manage")
+def reject_coding_request(request_id: int):
+    body: Any = request.get_json(silent=True) or {}
+    row = coding_svc.reject(request_id=request_id, reason=str(body.get("reason") or ""))
+    audit_emit("inventory.coding_request.reject", actor_user_id=_uid(), target_type="coding_request", target_id=request_id, reason=row.reject_reason)
+    return jsonify(coding_svc.serialize(row))
 
 
 # ================================================================ stock

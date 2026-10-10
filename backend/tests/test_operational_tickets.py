@@ -103,7 +103,7 @@ def test_product_variant_and_fields(client) -> None:
 
     p = products_svc.create_product(
         sku=f"V-{uuid.uuid4().hex[:6]}", name_ar="قميص", category="clothing", created_by=1,
-        brand="براند", barcode="6221000000001", description="وصف", subcategory="قمصان",
+        brand="براند", barcode="6221000000003", description="وصف", subcategory="قمصان",
     )
     products_svc.add_variant(product_id=p.id, sku=f"V-{uuid.uuid4().hex[:6]}-L", barcode=None, size="L", color="أزرق")
     data = products_svc.serialize(products_svc.get_product(p.id))

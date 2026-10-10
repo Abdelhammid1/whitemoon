@@ -153,6 +153,7 @@ export interface ProductInput {
   variants?: ProductVariantInput[]
   images?: ProductImageInput[]
   initial_batch?: InitialBatchInput
+  coding_request_id?: number // T-31: created from a supplier coding request
 }
 
 export async function createProduct(body: ProductInput) {
@@ -295,6 +296,31 @@ export async function createCodingRequest(body: {
 }
 export async function myCodingRequests() {
   return api<{ items: CodingRequest[] }>('/inventory/coding-requests/mine')
+}
+// --- admin coding queue (T-31) ---
+export interface AdminCodingRequest extends CodingRequest {
+  supplier_id: number
+  image_url: string | null
+  note: string | null
+}
+export async function listCodingRequests(status?: string) {
+  return api<{ items: AdminCodingRequest[] }>('/inventory/coding-requests', { query: status ? { status } : undefined })
+}
+export async function reviewCodingRequest(id: number) {
+  return api<AdminCodingRequest>(`/inventory/coding-requests/${id}/review`, { method: 'POST' })
+}
+export async function rejectCodingRequest(id: number, reason: string) {
+  return api<AdminCodingRequest>(`/inventory/coding-requests/${id}/reject`, { method: 'POST', body: { reason } })
+}
+export interface SimilarProduct {
+  id: number
+  sku: string
+  name_ar: string
+  barcode: string | null
+  category: string | null
+}
+export async function findSimilarProducts(params: { name?: string; barcode?: string }) {
+  return api<{ items: SimilarProduct[] }>('/inventory/products/similar', { query: params })
 }
 
 export async function stockBalances(params: { supplier_id?: number; location_type?: string }) {

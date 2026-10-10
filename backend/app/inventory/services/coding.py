@@ -87,3 +87,80 @@ def list_for_supplier(supplier_id: int) -> list[ProductCodingRequest]:
             .order_by(ProductCodingRequest.id.desc())
         ).scalars()
     )
+
+
+# ---------------------------------------------------------------- admin queue (T-31)
+
+
+def list_all(*, status: str | None = None, limit: int = 200) -> list[ProductCodingRequest]:
+    from sqlalchemy import select
+
+    stmt = select(ProductCodingRequest).order_by(ProductCodingRequest.id.desc()).limit(limit)
+    if status:
+        stmt = stmt.where(ProductCodingRequest.status == status)
+    return list(db.session.execute(stmt).scalars())
+
+
+def _get(request_id: int) -> ProductCodingRequest:
+    from ...common.errors import NotFound
+
+    row = db.session.get(ProductCodingRequest, request_id)
+    if row is None:
+        raise NotFound("طلب التكويد غير موجود", code="coding_request_not_found")
+    return row
+
+
+def _notify_supplier(row: ProductCodingRequest, *, title: str, body: str, type_: str) -> None:
+    try:
+        from ...notifications.services import notify as notify_svc
+
+        notify_svc.notify(user_id=row.supplier_id, title=title, body=body, type_=type_, channel="in_app")
+    except Exception:  # pragma: no cover
+        pass
+
+
+def mark_coded(*, request_id: int, product_id: int) -> ProductCodingRequest:
+    """Link a request to the product that was created from it (T-31)."""
+    from ...common.errors import Conflict
+
+    row = _get(request_id)
+    if row.status == "coded":
+        raise Conflict("الطلب مُكوَّد بالفعل", code="already_coded")
+    row.status = "coded"
+    row.product_id = product_id
+    db.session.commit()
+    _notify_supplier(
+        row,
+        title="تم تكويد الصنف",
+        body=f"أُضيف الصنف «{row.name}» إلى الكتالوج ويمكنك الآن عرضه وتسعيره.",
+        type_="coding_coded",
+    )
+    return row
+
+
+def reject(*, request_id: int, reason: str) -> ProductCodingRequest:
+    from ...common.errors import BadRequest, Conflict
+
+    if len((reason or "").strip()) < 3:
+        raise BadRequest("سبب الرفض مطلوب", code="reason_required")
+    row = _get(request_id)
+    if row.status in ("coded", "rejected"):
+        raise Conflict("لا يمكن رفض طلب مُغلق", code="not_open")
+    row.status = "rejected"
+    row.reject_reason = reason.strip()
+    db.session.commit()
+    _notify_supplier(
+        row,
+        title="رُفض طلب التكويد",
+        body=f"لم يُقبل طلب تكويد «{row.name}». السبب: {reason.strip()}",
+        type_="coding_rejected",
+    )
+    return row
+
+
+def mark_in_review(*, request_id: int) -> ProductCodingRequest:
+    row = _get(request_id)
+    if row.status == "new":
+        row.status = "in_review"
+        db.session.commit()
+    return row

@@ -50,7 +50,7 @@ def _check_unique_variant_skus(skus: list[str], *, exclude_product_id: int | Non
 
 def create_product(
     *,
-    sku: str,
+    sku: str | None = None,
     name_ar: str,
     category: str,
     unit: str = "piece",
@@ -77,6 +77,17 @@ def create_product(
     categories_svc.assert_assignable(category)
     if status not in _STATUSES:
         raise Conflict(f"status must be one of {_STATUSES}", code="bad_status")
+
+    # Barcode identity (T-31): a global barcode is validated by its check digit
+    # and must be unique; a local product with no barcode gets an auto WM code.
+    from . import barcode as barcode_svc
+
+    if barcode:
+        barcode = barcode_svc.validate_barcode(barcode)
+        if barcode_svc.barcode_in_use(barcode):
+            raise Conflict("الباركود مستخدم لمنتج آخر", code="barcode_exists")
+    if not sku:
+        sku = barcode if barcode else barcode_svc.next_internal_code()
     if db.session.execute(select(Product).where(Product.sku == sku)).scalar_one_or_none():
         raise Conflict("SKU already exists", code="sku_exists")
 
@@ -129,6 +140,28 @@ def create_product(
 
     db.session.commit()
     return product
+
+
+def find_similar(*, name: str | None = None, barcode: str | None = None, limit: int = 5) -> list[dict[str, Any]]:
+    """Possible duplicates for a new product (T-31): an exact barcode match or a
+    close name match. Used to warn before creating, preventing duplicates."""
+    matches: dict[int, Product] = {}
+    if barcode:
+        bc = barcode.strip()
+        if bc:
+            for p in db.session.execute(
+                select(Product).where(Product.barcode == bc).limit(limit)
+            ).scalars():
+                matches[p.id] = p
+    if name and name.strip():
+        for p in db.session.execute(
+            select(Product).where(Product.name_ar.ilike(f"%{name.strip()}%")).limit(limit)
+        ).scalars():
+            matches[p.id] = p
+    return [
+        {"id": p.id, "sku": p.sku, "name_ar": p.name_ar, "barcode": p.barcode, "category": p.category}
+        for p in list(matches.values())[:limit]
+    ]
 
 
 def _add_batch(product_id: int, b: dict[str, Any]) -> None:
