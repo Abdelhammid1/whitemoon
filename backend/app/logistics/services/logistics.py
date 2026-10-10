@@ -211,7 +211,32 @@ def update_status(*, shipment_id: int, status: str, actor_user_id: int) -> Shipm
         s.shipped_at = _now()
     audit_emit("logistics.shipment.status", actor_user_id=actor_user_id, target_type="shipment", target_id=s.id)
     db.session.commit()
+    _notify_customer_shipment(s, status)
     return s
+
+
+def _notify_customer_shipment(shipment: Shipment, status: str) -> None:
+    """Notify the order's customer of a delivery-stage change (T-44). Never
+    raises. Only the customer-visible stages carry a message."""
+    stage = {
+        "in_transit": ("طلبك في الطريق", "طلبك في الطريق إليك الآن — يمكنك تتبّع الشحنة."),
+        "delivered": ("تم تسليم طلبك", "تم تسليم طلبك بنجاح. شكرًا لك."),
+    }.get(status)
+    if stage is None:
+        return
+    try:
+        from ...commerce.models import Order
+        from ...notifications.services import notify as notify_svc
+
+        order = db.session.get(Order, shipment.order_id)
+        if order is None:
+            return
+        notify_svc.notify(
+            user_id=order.customer_id, title=stage[0], body=stage[1],
+            type_="delivery_stage", channel="in_app",
+        )
+    except Exception:  # pragma: no cover - defensive
+        pass
 
 
 def update_location(*, shipment_id: int, lat: Decimal, lng: Decimal) -> Shipment:
@@ -221,9 +246,13 @@ def update_location(*, shipment_id: int, lat: Decimal, lng: Decimal) -> Shipment
     s.current_lat = lat
     s.current_lng = lng
     s.location_updated_at = _now()
+    became_in_transit = False
     if s.status in ("scheduled", "shipped"):
         s.status = "in_transit"
+        became_in_transit = True
     db.session.commit()
+    if became_in_transit:  # notify only on the transition, not every GPS ping
+        _notify_customer_shipment(s, "in_transit")
     return s
 
 
@@ -301,6 +330,7 @@ def confirm_delivery(
         s.signature = signature
     audit_emit("logistics.delivery.confirmed", actor_user_id=delivered_by, target_type="shipment", target_id=s.id)
     db.session.commit()
+    _notify_customer_shipment(s, "delivered")
     return s
 
 

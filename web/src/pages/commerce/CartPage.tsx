@@ -7,7 +7,7 @@ import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import { checkout, getCart, removeCartItem, updateCartItem, type Cart } from '../../api/commerce'
-import { getDeferredQuote, getDeferredOptions, type DeferredQuote, type DeferredOptions } from '../../api/credit'
+import { getDeferredQuote, getDeferredOptions, getMyCredit, type DeferredQuote, type DeferredOptions, type MyCredit } from '../../api/credit'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
 import { PageHelp } from '../../components/PageHelp'
@@ -26,6 +26,7 @@ export function CartPage() {
   const [options, setOptions] = useState<DeferredOptions | null>(null)
   const [quote, setQuote] = useState<DeferredQuote | null>(null)
   const [quoteLoading, setQuoteLoading] = useState(false)
+  const [credit, setCredit] = useState<MyCredit | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -33,6 +34,7 @@ export function CartPage() {
     try { setCart(await getCart()) }
     catch (err) { setError(err instanceof ApiError ? err.message : 'تعذّر التحميل') }
     finally { setLoading(false) }
+    try { setCredit(await getMyCredit()) } catch { /* bar is best-effort */ }
   }, [])
 
   useEffect(() => { void load() }, [load])
@@ -358,6 +360,20 @@ export function CartPage() {
                     </div>
                   )}
                 </div>
+                {/* T-45: pre-confirm warning + suggestions when the order would
+                    exceed the available deferred limit — no sudden rejection. */}
+                {credit && Number(quote?.total ?? cart?.total ?? 0) > Number(credit.available) && (
+                  <div className="rounded-xl border-r-4 border-warning bg-warning/5 p-space-md flex flex-col gap-1">
+                    <span className="font-body-medium text-body-medium text-on-surface">
+                      هذا الطلب يتجاوز المتاح لك للأجل (<bdi dir="ltr">{formatMoney(credit.available)}</bdi> ج.م). يمكنك:
+                    </span>
+                    <ul className="font-small text-small text-secondary list-disc ps-5 space-y-0.5">
+                      <li>إتمام الطلب <strong>نقدًا</strong> بدلاً من الآجل.</li>
+                      <li><strong>تقليل الكمية</strong> حتى يدخل ضمن حدّك.</li>
+                      <li><strong>سداد مستحقاتك</strong> لرفع المتاح من سقفك.</li>
+                    </ul>
+                  </div>
+                )}
               </>
             )}
           </div>

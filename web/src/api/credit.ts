@@ -42,6 +42,13 @@ export interface PaymentApproval {
 export async function getCustomerCredit(id: number) {
   return api<CreditTier>(`/credit/customers/${id}`)
 }
+/** T-45: the signed-in customer's own credit standing (always-on bar). */
+export interface MyCredit extends CreditTier {
+  available: string
+}
+export async function getMyCredit() {
+  return api<MyCredit>('/credit/me')
+}
 export async function recomputeCredit(id: number) {
   return api<CreditTier>(`/credit/customers/${id}/recompute`, { method: 'POST' })
 }

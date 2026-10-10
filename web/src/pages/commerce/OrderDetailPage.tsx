@@ -29,6 +29,16 @@ const SUB_STATUS_AR: Record<string, string> = {
 }
 const SOURCE_AR: Record<string, string> = { company: 'الشركة مباشرة', agent: 'وكيل', branch: 'فرع' }
 
+// T-44: the five customer-facing stages, left→right.
+const STAGES = ['تم الطلب', 'مؤكد', 'جاري التجهيز', 'في الطريق', 'تم التسليم']
+function stageIndex(orderStatus: string, shipmentStatus?: string | null): number {
+  if (shipmentStatus === 'delivered') return 4
+  if (shipmentStatus === 'in_transit') return 3
+  if (orderStatus === 'fulfilled') return 2
+  if (orderStatus === 'confirmed') return 1
+  return 0
+}
+
 function plusDaysIso(days: number): string {
   const d = new Date()
   d.setDate(d.getDate() + days)
@@ -173,6 +183,32 @@ export function OrderDetailPage() {
               إلغاء
             </Button>
           )}
+        </Card>
+      )}
+
+      {/* Progress bar (T-44): تم الطلب ← مؤكد ← جاري التجهيز ← في الطريق ← تم التسليم */}
+      {order.status === 'cancelled' ? (
+        <Card className="mt-space-lg"><span className="font-body text-body text-danger">هذا الطلب ملغى.</span></Card>
+      ) : (
+        <Card className="mt-space-lg">
+          <div className="flex items-center justify-between gap-1">
+            {STAGES.map((label, i) => {
+              const cur = stageIndex(order.status, shipment?.status)
+              const done = i <= cur
+              return (
+                <div key={label} className="flex-1 flex flex-col items-center gap-1 text-center">
+                  <div className="flex items-center w-full">
+                    <span className={`h-0.5 flex-1 ${i === 0 ? 'opacity-0' : done ? 'bg-primary' : 'bg-surface-container-high'}`} />
+                    <span className={`w-6 h-6 shrink-0 rounded-full flex items-center justify-center text-[12px] ${done ? 'bg-primary text-on-primary' : 'bg-surface-container text-secondary'}`}>
+                      {i < cur ? <Icon name="check" size={14} /> : i + 1}
+                    </span>
+                    <span className={`h-0.5 flex-1 ${i === STAGES.length - 1 ? 'opacity-0' : i < cur ? 'bg-primary' : 'bg-surface-container-high'}`} />
+                  </div>
+                  <span className={`font-small text-[11px] ${done ? 'text-primary' : 'text-secondary'}`}>{label}</span>
+                </div>
+              )
+            })}
+          </div>
         </Card>
       )}
 

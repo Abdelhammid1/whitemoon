@@ -371,7 +371,37 @@ def transition_order(order_id: int, action: str, *, actor_id: int | None = None)
     for sub in order.sub_orders:
         sub.status = sub_to
     db.session.commit()
+    _notify_customer_stage(order, order_to)
     return order
+
+
+# Customer-facing order stages (T-44): placed → confirmed → preparing → in
+# transit → delivered. Order transitions cover the first three; the last two
+# come from the shipment (logistics). A notification fires at each stage.
+_STAGE_MSG: dict[str, tuple[str, str]] = {
+    "confirmed": ("تم تأكيد طلبك", "تم تأكيد طلبك {num} وسيُجهَّز قريبًا."),
+    "fulfilled": ("جارٍ تجهيز طلبك", "طلبك {num} قيد التجهيز الآن."),
+    "cancelled": ("أُلغي طلبك", "نأسف، أُلغي طلبك {num}."),
+}
+
+
+def _notify_customer_stage(order: Order, order_to: str) -> None:
+    """Notify the customer of an order-stage change (T-44). Never raises."""
+    msg = _STAGE_MSG.get(order_to)
+    if msg is None:
+        return
+    try:
+        from ...notifications.services import notify as notify_svc
+
+        notify_svc.notify(
+            user_id=order.customer_id,
+            title=msg[0],
+            body=msg[1].format(num=order.number),
+            type_="order_stage",
+            channel="in_app",
+        )
+    except Exception:  # pragma: no cover - defensive
+        pass
 
 
 def _reverse_order_financials(order: Order, *, posted_by: int | None) -> None:

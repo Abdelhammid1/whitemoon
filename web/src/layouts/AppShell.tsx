@@ -1,10 +1,12 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { Icon } from '../components/Icon'
 import logoUrl from '../assets/white-moon-logo.png'
 import { ImpersonationBanner } from '../components/ImpersonationBanner'
 import { AssistantWidget } from '../components/assistant/AssistantWidget'
+import { getMyCredit, type MyCredit } from '../api/credit'
+import { formatMoney } from '../lib/format'
 
 interface NavEntry {
   to: string
@@ -251,12 +253,40 @@ export function AppShell() {
 
       <div className="mr-[276px]">
         <ImpersonationBanner />
+        {role === 'customer' && <CustomerCreditBar />}
         <main className="max-w-[1040px] mx-auto pt-[40px] px-[32px] pb-[96px] min-h-screen">
           <Outlet />
         </main>
       </div>
       {/* Admin AI assistant dock — self-gates to admins, carries the current route */}
       <AssistantWidget />
+    </div>
+  )
+}
+
+const CREDIT_TIER_AR: Record<string, string> = { green: 'أخضر', white: 'أبيض', yellow: 'أصفر', red: 'أحمر' }
+
+/** T-45: always-on balance bar for customers — available deferred headroom,
+ *  limit, and tier. Silent on failure (never blocks the shell). */
+function CustomerCreditBar() {
+  const [c, setC] = useState<MyCredit | null>(null)
+  useEffect(() => {
+    let active = true
+    getMyCredit().then((d) => { if (active) setC(d) }).catch(() => { /* non-blocking */ })
+    return () => { active = false }
+  }, [])
+  if (!c) return null
+  const blocked = c.tier === 'red' || Number(c.available) <= 0
+  return (
+    <div className={`w-full px-[32px] py-2 border-b border-surface-container-high flex flex-wrap items-center justify-center gap-space-sm font-small text-small ${blocked ? 'bg-warning/10 text-on-surface' : 'bg-surface-container-low text-secondary'}`}>
+      <span>
+        المتاح لك للأجل{' '}
+        <bdi dir="ltr" className="font-mono-medium text-primary">{formatMoney(c.available)}</bdi>{' '}
+        من{' '}
+        <bdi dir="ltr" className="font-mono-medium">{formatMoney(c.effective_limit)}</bdi> ج.م
+      </span>
+      <span>— تصنيفك: {CREDIT_TIER_AR[c.tier] ?? c.tier}</span>
+      {c.order_block_level >= 4 && <span className="text-danger">الطلبات موقوفة حتى تسوية المتأخرات</span>}
     </div>
   )
 }

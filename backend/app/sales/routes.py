@@ -121,6 +121,18 @@ def my_dues():
     return jsonify({"items": credit_svc.open_dues_for_customer(_uid())})
 
 
+@bp.get("/me")
+@jwt_required()
+def my_credit():
+    """The caller's own credit standing for the always-on balance bar (T-45):
+    tier, effective limit, outstanding, and the available deferred headroom."""
+    data = credit_svc.serialize_tier(_uid())
+    data["available"] = str(
+        Decimal(data["effective_limit"]) - Decimal(data["outstanding"])
+    )
+    return jsonify(data)
+
+
 @bp.post("/dues/<int:due_id>/pay")
 @require_permission("credit.manage")
 def pay_due(due_id: int):
