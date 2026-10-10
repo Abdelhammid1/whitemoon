@@ -4,7 +4,7 @@ import { Button, Card, EmptyState, InlineError, PageTitle, Pill, Spinner } from 
 import { PageHelp } from '../components/PageHelp'
 import { useToast } from '../components/Toast'
 import { ApiError } from '../api/client'
-import { formatDate } from '../lib/format'
+import { formatDateTime } from '../lib/format'
 import { answerGap, listGaps, type KnowledgeGap } from '../api/assistant'
 
 const TABS: { code: string; label: string }[] = [
@@ -102,7 +102,7 @@ export function KnowledgeGapsPage() {
                 </div>
                 <div className="flex flex-wrap gap-space-md font-small text-small text-secondary">
                   {g.route && <span>الصفحة: {g.route}</span>}
-                  <span>{formatDate(g.created_at)}</span>
+                  <span>{formatDateTime(g.created_at)}</span>
                 </div>
                 {g.detail && (
                   <p className="font-small text-small text-warning">سبب الرصد: {g.detail}</p>

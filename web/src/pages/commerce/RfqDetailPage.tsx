@@ -7,7 +7,7 @@ import { useToast } from '../../components/Toast'
 import { useAuth } from '../../auth/AuthContext'
 import { getRfq, listRfqOffers, submitRfqOffer, type Rfq, type RfqOffer } from '../../api/commerce'
 import { ApiError } from '../../api/client'
-import { formatDate, formatMoney, formatNumber } from '../../lib/format'
+import { formatDate, formatDateTime, formatMoney, formatNumber } from '../../lib/format'
 import { PageHelp } from '../../components/PageHelp'
 
 const STATUS_AR: Record<string, string> = { open: 'مفتوح', closed: 'مغلق', awarded: 'تم الترسية', cancelled: 'ملغى' }
@@ -138,7 +138,7 @@ export function RfqDetailPage() {
                     },
                     { header: 'السعر', align: 'end', cell: (o) => <Mono>{formatMoney(o.unit_price)}</Mono> },
                     { header: 'الحد الأدنى', align: 'end', cell: (o) => <Mono>{formatNumber(o.moq)}</Mono> },
-                    { header: 'تاريخ العرض', align: 'end', cell: (o) => <Mono>{formatDate(o.submitted_at)}</Mono> },
+                    { header: 'تاريخ العرض', align: 'end', cell: (o) => <Mono>{formatDateTime(o.submitted_at)}</Mono> },
                   ]}
                 />
               </Card>

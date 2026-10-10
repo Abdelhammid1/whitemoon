@@ -6,7 +6,7 @@ import { DataTable, Mono } from '../../components/DataTable'
 import { listOrders, reorder, type Order } from '../../api/commerce'
 import { ApiError } from '../../api/client'
 import { useToast } from '../../components/Toast'
-import { formatDate, formatMoney } from '../../lib/format'
+import { formatDateTime, formatMoney } from '../../lib/format'
 import { PageHelp } from '../../components/PageHelp'
 
 const STATUS: Record<string, { ar: string; tone: 'signal' | 'warning' | 'neutral' | 'error' }> = {
@@ -68,7 +68,7 @@ export function OrdersPage() {
                 { header: 'الدفع', cell: (o) => (o.payment_mode === 'deferred' ? 'آجل' : 'نقدي') },
                 { header: 'الإجمالي', align: 'end', cell: (o) => <Mono>{formatMoney(o.payment_mode === 'deferred' ? o.total_deferred : o.total_cash)}</Mono> },
                 { header: 'الحالة', align: 'center', cell: (o) => <Pill tone={STATUS[o.status]?.tone ?? 'neutral'}>{STATUS[o.status]?.ar ?? o.status}</Pill> },
-                { header: 'التاريخ', align: 'end', cell: (o) => <Mono>{formatDate(o.placed_at)}</Mono> },
+                { header: 'التاريخ', align: 'end', cell: (o) => <Mono>{formatDateTime(o.placed_at)}</Mono> },
                 {
                   header: '', align: 'end',
                   cell: (o) => o.status !== 'cancelled' ? (

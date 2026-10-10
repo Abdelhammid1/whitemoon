@@ -8,7 +8,7 @@ import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import { adminListOrders, openOrderInvoice, type AdminOrder, type OrderStatus } from '../../api/commerce'
 import { ApiError } from '../../api/client'
-import { formatDate, formatMoney } from '../../lib/format'
+import { formatDateTime, formatMoney } from '../../lib/format'
 
 type Tone = 'warning' | 'brand' | 'signal' | 'error' | 'neutral'
 
@@ -197,7 +197,7 @@ export function AdminOrdersPage() {
                     </Mono>
                   ),
                 },
-                { header: 'التاريخ', align: 'end', cell: (o) => <Mono>{formatDate(o.placed_at)}</Mono> },
+                { header: 'التاريخ', align: 'end', cell: (o) => <Mono>{formatDateTime(o.placed_at)}</Mono> },
                 {
                   header: 'الفاتورة',
                   align: 'center',

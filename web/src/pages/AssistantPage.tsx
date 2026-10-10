@@ -6,7 +6,7 @@ import { Icon } from '../components/Icon'
 import { PageHelp } from '../components/PageHelp'
 import { useToast } from '../components/Toast'
 import { ApiError } from '../api/client'
-import { formatDate } from '../lib/format'
+import { formatDateTime } from '../lib/format'
 import {
   getConversation,
   getStatus,
@@ -89,7 +89,7 @@ export function AssistantPage() {
             >
               {c.title || 'محادثة'}
               {c.updated_at && (
-                <span className="block font-small text-[11px] text-outline">{formatDate(c.updated_at)}</span>
+                <span className="block font-small text-[11px] text-outline">{formatDateTime(c.updated_at)}</span>
               )}
             </button>
           ))

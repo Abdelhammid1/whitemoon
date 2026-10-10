@@ -7,7 +7,7 @@ import { useToast } from '../../components/Toast'
 import { useAuth } from '../../auth/AuthContext'
 import { listChannels, listNotifications, markAllRead, markRead, sendNotification, type Notification } from '../../api/notifications'
 import { ApiError } from '../../api/client'
-import { formatDate } from '../../lib/format'
+import { formatDateTime } from '../../lib/format'
 import { PageHelp } from '../../components/PageHelp'
 
 const CHANNEL_AR: Record<string, string> = {
@@ -122,7 +122,7 @@ export function NotificationsPage() {
                     </div>
                   </div>
                   {n.body && <span className="font-body text-body text-secondary">{n.body}</span>}
-                  <span className="font-mono-body text-mono-body text-secondary" dir="ltr">{formatDate(n.created_at)}</span>
+                  <span className="font-mono-body text-mono-body text-secondary" dir="ltr">{formatDateTime(n.created_at)}</span>
                 </div>
               </button>
             ))}

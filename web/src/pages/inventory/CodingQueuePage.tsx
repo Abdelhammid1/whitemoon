@@ -7,7 +7,7 @@ import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import { listCodingRequests, rejectCodingRequest, type AdminCodingRequest } from '../../api/inventory'
 import { ApiError } from '../../api/client'
-import { formatDate } from '../../lib/format'
+import { formatDateTime } from '../../lib/format'
 
 const STATUS: Record<string, { ar: string; tone: 'signal' | 'warning' | 'error' | 'neutral' }> = {
   new: { ar: 'جديد', tone: 'warning' },
@@ -79,7 +79,7 @@ export function CodingQueuePage() {
             { header: 'الصنف', cell: (r) => <span className="font-body-medium text-body-medium text-primary">{r.name}</span> },
             { header: 'الباركود', cell: (r) => r.barcode ? <Mono>{r.barcode}</Mono> : <span className="text-secondary">—</span> },
             { header: 'المورد', cell: (r) => <Mono>{r.supplier_id}</Mono> },
-            { header: 'التاريخ', cell: (r) => <Mono>{formatDate(r.created_at)}</Mono> },
+            { header: 'التاريخ', cell: (r) => <Mono>{formatDateTime(r.created_at)}</Mono> },
             { header: 'الحالة', align: 'center', cell: (r) => <Pill tone={STATUS[r.status]?.tone ?? 'neutral'}>{STATUS[r.status]?.ar ?? r.status}</Pill> },
             {
               header: '', align: 'end',

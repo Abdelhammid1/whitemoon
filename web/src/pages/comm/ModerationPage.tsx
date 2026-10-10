@@ -9,7 +9,7 @@ import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
 import { listFlagged, listMessages, type FlaggedConversation, type Message } from '../../api/comm'
 import { ApiError } from '../../api/client'
-import { formatDate } from '../../lib/format'
+import { formatDateTime } from '../../lib/format'
 
 const ROLE_AR: Record<string, string> = {
   customer: 'العميل', supplier: 'المورد', admin: 'الإدارة', moderator: 'الإدارة', staff: 'الإدارة',
@@ -142,7 +142,7 @@ export function ModerationPage() {
                     )}
                   </span>
                   <span className="font-mono-body text-mono-body text-secondary" dir="ltr">
-                    {formatDate(m.created_at)}
+                    {formatDateTime(m.created_at)}
                   </span>
                 </div>
                 {m.body && <p className="font-body text-body text-on-surface">{m.body}</p>}

@@ -7,7 +7,7 @@ import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import { listShipments, setShipmentStatus, type Shipment } from '../../api/logistics'
 import { ApiError } from '../../api/client'
-import { formatDate } from '../../lib/format'
+import { formatDateTime } from '../../lib/format'
 
 const STATUS_AR: Record<string, string> = {
   scheduled: 'بالجدول',
@@ -172,7 +172,7 @@ export function ShipmentsPage() {
                   align: 'center',
                   cell: (s) => (s.carrier_type === 'internal' ? 'أسطول داخلي' : 'شحن خارجي'),
                 },
-                { header: 'تاريخ الإنشاء', align: 'center', cell: (s) => <Mono>{formatDate(s.created_at)}</Mono> },
+                { header: 'تاريخ الإنشاء', align: 'center', cell: (s) => <Mono>{formatDateTime(s.created_at)}</Mono> },
                 { header: 'الإجراءات', align: 'end', cell: actions },
               ]}
             />

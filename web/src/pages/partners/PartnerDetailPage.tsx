@@ -13,7 +13,7 @@ import {
   type Accrual, type AccrualStatement, type Deposit, type LedgerEntry, type LedgerSummary, type PartnerTerms,
 } from '../../api/partners'
 import { ApiError } from '../../api/client'
-import { formatMoney, formatDate, todayIso } from '../../lib/format'
+import { formatMoney, formatDateTime, todayIso } from '../../lib/format'
 import { PageHelp } from '../../components/PageHelp'
 
 /* movement → Arabic label + balance-effect tone (+1 = partner owes us more) */
@@ -186,7 +186,7 @@ export function PartnerDetailPage() {
         {/* كل الحركات */}
         <Card padded={false} className="mt-space-md overflow-hidden">
           <DataTable rows={ledger?.items ?? []} rowKey={(e) => e.id} empty="لا توجد حركات." columns={[
-            { header: 'التاريخ', cell: (e) => <Mono>{e.created_at ? formatDate(e.created_at) : '—'}</Mono> },
+            { header: 'التاريخ', cell: (e) => <Mono>{e.created_at ? formatDateTime(e.created_at) : '—'}</Mono> },
             { header: 'البيان', cell: (e) => (
               <div className="flex flex-col">
                 <span>{ledgerLabel(e)}</span>

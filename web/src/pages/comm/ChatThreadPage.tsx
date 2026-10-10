@@ -6,7 +6,7 @@ import { Icon } from '../../components/Icon'
 import { useToast } from '../../components/Toast'
 import { listMessages, sendMessage, type Message } from '../../api/comm'
 import { ApiError } from '../../api/client'
-import { formatDate } from '../../lib/format'
+import { formatDateTime } from '../../lib/format'
 import { PageHelp } from '../../components/PageHelp'
 
 function roleLabel(role: string) {
@@ -21,7 +21,7 @@ function MessageRow({ m }: { m: Message }) {
         <div className="flex items-center gap-space-sm mb-space-xs">
           <Pill tone="error">رسالة محجوبة آلياً</Pill>
           <span className="font-mono-body text-mono-body text-secondary" dir="ltr">
-            {formatDate(m.created_at)}
+            {formatDateTime(m.created_at)}
           </span>
         </div>
         <div className="w-full max-w-[620px] rounded-xl border border-danger/25 bg-danger-weak p-space-md">
@@ -48,7 +48,7 @@ function MessageRow({ m }: { m: Message }) {
       <div className="flex flex-col items-end self-end max-w-[78%]">
         <div className="flex items-center gap-space-sm mb-space-xs">
           <span className="font-mono-body text-mono-body text-secondary" dir="ltr">
-            {formatDate(m.created_at)}
+            {formatDateTime(m.created_at)}
           </span>
           <span className="font-small-medium text-small-medium text-primary">أنا</span>
         </div>
@@ -77,7 +77,7 @@ function MessageRow({ m }: { m: Message }) {
           {roleLabel(m.sender_role)}
         </span>
         <span className="font-mono-body text-mono-body text-secondary" dir="ltr">
-          {formatDate(m.created_at)}
+          {formatDateTime(m.created_at)}
         </span>
       </div>
       <div className="px-space-md py-space-sm rounded-xl rounded-tl-sm border border-surface-container-high bg-surface-container text-on-surface shadow-card-sm font-body text-body leading-relaxed whitespace-pre-wrap">

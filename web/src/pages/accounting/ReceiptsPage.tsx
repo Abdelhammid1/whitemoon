@@ -7,7 +7,7 @@ import { Modal } from '../../components/Overlay'
 import { fetchReceiptImageUrl, listReceipts, resolveReceipt, uploadReceiptFile, type ReceiptRow } from '../../api/accounting'
 import { ApiError } from '../../api/client'
 import { PageHelp } from '../../components/PageHelp'
-import { formatDate, formatMoney } from '../../lib/format'
+import { formatDateTime, formatMoney } from '../../lib/format'
 import { RECEIPT_STATUS_AR, label } from '../../lib/labels'
 
 interface Result { receipt_id: number; status: string; ocr_amount: string | null; ocr_reference: string | null }
@@ -204,7 +204,7 @@ export function ReceiptsPage() {
               { header: 'مبلغ القراءة', align: 'end', cell: (r) => <Mono>{r.ocr_amount ? formatMoney(r.ocr_amount) : '—'}</Mono> },
               { header: 'مرجع القراءة', cell: (r) => <Mono>{r.ocr_reference ?? '—'}</Mono> },
               { header: 'طلب مطابق', align: 'center', cell: (r) => <Mono>{r.matched_order_id ?? '—'}</Mono> },
-              { header: 'رُفع', align: 'end', cell: (r) => <Mono>{r.uploaded_at ? formatDate(r.uploaded_at) : '—'}</Mono> },
+              { header: 'رُفع', align: 'end', cell: (r) => <Mono>{r.uploaded_at ? formatDateTime(r.uploaded_at) : '—'}</Mono> },
             ]}
           />
           </Card>

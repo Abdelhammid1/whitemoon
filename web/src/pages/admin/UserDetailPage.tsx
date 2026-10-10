@@ -10,7 +10,7 @@ import {
 } from '../../api/admin'
 import { ApiError } from '../../api/client'
 import { useToast } from '../../components/Toast'
-import { formatDate } from '../../lib/format'
+import { formatDate, formatDateTime } from '../../lib/format'
 import { USER_STATUS_AR, label } from '../../lib/labels'
 
 const KIND_AR: Record<string, string> = {
@@ -170,7 +170,7 @@ export function UserDetailPage() {
               rows={activity}
               rowKey={(e) => e.id}
               columns={[
-                { header: 'الوقت', cell: (e) => <Mono>{formatDate(e.at)}</Mono> },
+                { header: 'الوقت', cell: (e) => <Mono>{formatDateTime(e.at)}</Mono> },
                 { header: 'الإجراء', cell: (e) => <Pill tone="neutral">{e.action}</Pill> },
                 { header: 'الهدف', cell: (e) => <span className="font-body text-body text-secondary">{e.target_type ?? '—'} {e.target_id ? `#${e.target_id}` : ''}</span> },
               ]}

@@ -19,7 +19,7 @@ import {
 } from '../../api/commerce'
 import { availableSlots, bookSlot, trackShipment, type Shipment, type Slot } from '../../api/logistics'
 import { ApiError } from '../../api/client'
-import { formatDate, formatMoney, todayIso } from '../../lib/format'
+import { formatDateTime, formatMoney, todayIso } from '../../lib/format'
 import { PageHelp } from '../../components/PageHelp'
 
 const STATUS_AR: Record<string, string> = {
@@ -167,7 +167,7 @@ export function OrderDetailPage() {
           {STATUS_AR[order.status] ?? order.status}
         </Pill>
         <span className="font-body text-body text-secondary">{order.payment_mode === 'deferred' ? 'آجل' : 'نقدي'}</span>
-        <span className="font-mono-body text-mono-body text-secondary">{formatDate(order.placed_at)}</span>
+        <span className="font-mono-body text-mono-body text-secondary">{formatDateTime(order.placed_at)}</span>
         {order.source && (
           <Pill tone="neutral">
             المصدر: {SOURCE_AR[order.source.type] ?? order.source.type}

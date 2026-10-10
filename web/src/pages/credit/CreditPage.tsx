@@ -13,7 +13,7 @@ import {
 } from '../../api/credit'
 import { customerStatement, type CustomerStatement } from '../../api/commerce'
 import { ApiError } from '../../api/client'
-import { formatDate, formatMoney, todayIso } from '../../lib/format'
+import { formatDate, formatDateTime, formatMoney, todayIso } from '../../lib/format'
 import { ORDER_STATUS_AR, label } from '../../lib/labels'
 
 type Tone = 'signal' | 'warning' | 'error' | 'neutral'
@@ -253,7 +253,7 @@ export function CreditPage() {
                   },
                   { header: 'نوع الإجراء / المسوغ', cell: (e) => e.trigger_reason },
                   { header: 'تلقائي', align: 'center', cell: (e) => (e.is_automatic ? <Pill tone="neutral">آلي</Pill> : <Pill tone="gold">يدوي</Pill>) },
-                  { header: 'التاريخ', align: 'end', cell: (e) => <Mono>{formatDate(e.triggered_at)}</Mono> },
+                  { header: 'التاريخ', align: 'end', cell: (e) => <Mono>{formatDateTime(e.triggered_at)}</Mono> },
                 ]} />
               </Card>
             )}

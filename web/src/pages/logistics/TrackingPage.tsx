@@ -7,7 +7,7 @@ import { Mono } from '../../components/DataTable'
 import { ShipmentMap } from '../../components/ShipmentMap'
 import { trackShipment, type Shipment } from '../../api/logistics'
 import { ApiError } from '../../api/client'
-import { formatDate } from '../../lib/format'
+import { formatDateTime } from '../../lib/format'
 import { PageHelp } from '../../components/PageHelp'
 
 const STEPS = ['scheduled', 'shipped', 'in_transit', 'delivered'] as const
@@ -153,13 +153,13 @@ export function TrackingPage() {
           <div className="flex flex-col">
             <span className="font-small text-small text-secondary">تاريخ التسليم</span>
             <span className="font-mono-body text-mono-body text-primary mt-1" dir="ltr">
-              {ship.delivered_at ? formatDate(ship.delivered_at) : '—'}
+              {ship.delivered_at ? formatDateTime(ship.delivered_at) : '—'}
             </span>
           </div>
           <div className="flex flex-col">
             <span className="font-small text-small text-secondary">آخر تحديث للموقع</span>
             <span className="font-mono-body text-mono-body text-primary mt-1" dir="ltr">
-              {ship.location_updated_at ? formatDate(ship.location_updated_at) : '—'}
+              {ship.location_updated_at ? formatDateTime(ship.location_updated_at) : '—'}
             </span>
           </div>
         </Card>
@@ -196,7 +196,7 @@ export function TrackingPage() {
               <h2 className="font-headline-2 text-headline-2 text-primary">الموقع الحي للمندوب</h2>
               {ship.location_updated_at && (
                 <span className="font-mono-body text-small text-secondary" dir="ltr">
-                  {formatDate(ship.location_updated_at)}
+                  {formatDateTime(ship.location_updated_at)}
                 </span>
               )}
             </div>
@@ -225,10 +225,10 @@ export function TrackingPage() {
                         {state === 'failed' ? STATUS_AR.failed : desc.title}
                       </span>
                       {s === 'delivered' && ship.delivered_at && state === 'done' && (
-                        <span className="font-mono-body text-mono-body text-secondary" dir="ltr">{formatDate(ship.delivered_at)}</span>
+                        <span className="font-mono-body text-mono-body text-secondary" dir="ltr">{formatDateTime(ship.delivered_at)}</span>
                       )}
                       {isActive && ship.location_updated_at && (
-                        <span className="font-mono-body text-mono-body text-primary font-medium" dir="ltr">{formatDate(ship.location_updated_at)}</span>
+                        <span className="font-mono-body text-mono-body text-primary font-medium" dir="ltr">{formatDateTime(ship.location_updated_at)}</span>
                       )}
                     </div>
                     <p className="font-small text-small text-secondary mt-0.5">{desc.note}</p>
