@@ -14,9 +14,8 @@ from ...common.errors import Conflict, Forbidden, NotFound
 from ...common.money import to_money
 from ...extensions import db
 from ...inventory.models import Product, StockBalance, SupplierOffer
+from ...settings import service as settings
 from ..models import Order, OrderSubOrder
-
-DISCOUNT_EXPIRY_SOON_DAYS = 7
 
 # Supplier-driven sub-order transitions (parallel to the admin order lifecycle):
 # the supplier acknowledges their part, then marks it ready for handover.
@@ -70,7 +69,7 @@ def action_summary(supplier_id: int) -> dict[str, Any]:
     ]
 
     # 3) Discounts ending soon.
-    soon = date.today() + timedelta(days=DISCOUNT_EXPIRY_SOON_DAYS)
+    soon = date.today() + timedelta(days=settings.get_int("supplier.discount_expiry_soon_days"))
     disc_rows = db.session.execute(
         select(SupplierOffer, Product.name_ar)
         .join(Product, Product.id == SupplierOffer.product_id)

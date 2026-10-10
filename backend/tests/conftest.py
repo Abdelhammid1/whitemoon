@@ -108,6 +108,8 @@ def _reset_db(app: Flask) -> Iterator[None]:
                 "accounting.periods, "
                 "accounting.accounts, "
                 "audit.events, "
+                "identity.system_setting_changes, "
+                "identity.system_settings, "
                 "identity.impersonation_grants, "
                 "identity.sessions, "
                 "identity.backup_codes, "

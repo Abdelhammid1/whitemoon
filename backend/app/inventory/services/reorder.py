@@ -17,10 +17,11 @@ from sqlalchemy import select
 from ...common.errors import Conflict, NotFound
 from ...common.money import to_money
 from ...extensions import db
+from ...settings import service as settings
 from ..models import ReorderAlert, StockBalance
 
-# Hours an alert may sit at a level before it climbs the chain (docs/EPIC 4).
-ESCALATE_AFTER_HOURS = 24
+# Hours an alert may sit at a level before it climbs the chain (docs/EPIC 4) is
+# tunable in «إعدادات النظام» (T-37), key `inventory.reorder_escalate_after_hours`.
 # Top of the chain: level 4 = the supplier (restock request).
 MAX_LEVEL = 4
 
@@ -77,13 +78,19 @@ def _notify_restock(bal: StockBalance) -> None:
     )
 
 
-def escalate(*, min_hours_at_level: int = ESCALATE_AFTER_HOURS) -> dict[str, int]:
+def escalate(*, min_hours_at_level: int | None = None) -> dict[str, int]:
     """Advance the reorder chain (docs/EPIC 4): an open alert at level < 4 whose
     stock is still low and has sat at its level ≥ min_hours climbs one level
     (1 customer/branch → 2 agent → 3 company → 4 supplier). A recovered balance
-    closes its alert. Level 4 notifies the supplier. Run on a schedule."""
+    closes its alert. Level 4 notifies the supplier. Run on a schedule. When
+    `min_hours_at_level` is omitted the tunable default (T-37) applies."""
+    hours = (
+        min_hours_at_level
+        if min_hours_at_level is not None
+        else settings.get_int("inventory.reorder_escalate_after_hours")
+    )
     now = datetime.now(UTC)
-    cutoff = now - timedelta(hours=min_hours_at_level)
+    cutoff = now - timedelta(hours=hours)
     open_alerts = db.session.execute(
         select(ReorderAlert).where(ReorderAlert.acknowledged_at.is_(None))
     ).scalars().all()

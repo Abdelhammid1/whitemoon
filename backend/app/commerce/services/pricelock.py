@@ -16,10 +16,11 @@ from sqlalchemy import select
 from ...common.errors import Conflict
 from ...common.money import to_money
 from ...extensions import db
+from ...settings import service as settings
 from ..models import PriceLock
 
-# Default hold duration for a reserved cart quantity.
-HOLD_MINUTES = 60
+# Hold duration for a reserved cart quantity is tunable in «إعدادات النظام»
+# (T-37), key `cart.price_lock_minutes`.
 
 
 def _now() -> datetime:
@@ -44,7 +45,7 @@ def create_lock(
         cart_item_id=cart_item_id,
         locked_qty=to_money(qty),
         locked_price=to_money(price),
-        expires_at=_now() + timedelta(minutes=HOLD_MINUTES),
+        expires_at=_now() + timedelta(minutes=settings.get_int("cart.price_lock_minutes")),
     )
     db.session.add(lock)
     db.session.flush()

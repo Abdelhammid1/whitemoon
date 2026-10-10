@@ -22,15 +22,15 @@ from ...common.errors import BadRequest, Conflict, Forbidden, NotFound
 from ...common.money import to_money
 from ...extensions import db
 from ...inventory.models import Product, SupplierOffer
+from ...settings import service as settings
 from ..models import Cart, Order, OrderLine, OrderSubOrder
 from . import pricelock
 
 # Deferred pricing is now a configurable annual-rate engine (T-28): the fee,
 # duration, and per-tier/per-customer rate come from `sales.deferred_settings`
-# via `deferred_pricing`, never a code constant. Only the early-settlement
-# discount shape stays here (a fixed fraction of the fee, within a window).
-EARLY_DISCOUNT_PCT = Decimal("0.50")  # discount = spread × pct (0 ≤ disc < spread)
-EARLY_WINDOW_DAYS = 14
+# via `deferred_pricing`, never a code constant. The early-settlement discount
+# shape (fraction of the spread + window) is tunable in «إعدادات النظام» (T-37),
+# keys `orders.early_discount_fraction` / `orders.early_window_days`.
 
 
 def _number() -> str:
@@ -115,8 +115,8 @@ def checkout(  # noqa: PLR0912, PLR0915 — cash/deferred × per-category × per
         fee = deferred_pricing_svc.compute_fee(total_cash, annual_pct, deferred_days_used)
         d_total = to_money(total_cash + fee)
         spread = d_total - total_cash
-        discount = to_money(spread * EARLY_DISCOUNT_PCT)
-        before = date.today() + timedelta(days=EARLY_WINDOW_DAYS)
+        discount = to_money(spread * settings.get_decimal("orders.early_discount_fraction"))
+        before = date.today() + timedelta(days=settings.get_int("orders.early_window_days"))
     else:
         d_total = total_cash
         discount = Decimal("0")

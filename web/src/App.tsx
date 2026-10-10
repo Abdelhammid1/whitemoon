@@ -18,6 +18,7 @@ import { UserDetailPage } from './pages/admin/UserDetailPage'
 import { PendingSuppliersPage } from './pages/admin/PendingSuppliersPage'
 import { ImpersonationPage } from './pages/admin/ImpersonationPage'
 import { AuditLogPage } from './pages/admin/AuditLogPage'
+import { SystemSettingsPage } from './pages/admin/SystemSettingsPage'
 import { ChartOfAccountsPage } from './pages/accounting/ChartOfAccountsPage'
 import { PeriodsPage } from './pages/accounting/PeriodsPage'
 import { ManualJournalPage } from './pages/accounting/ManualJournalPage'
@@ -113,6 +114,7 @@ export function App() {
         <Route path="/admin/suppliers/pending" element={<ProtectedRoute roles={FINANCE}><PendingSuppliersPage /></ProtectedRoute>} />
         <Route path="/admin/impersonation" element={<ProtectedRoute roles={FINANCE}><ImpersonationPage /></ProtectedRoute>} />
         <Route path="/admin/audit" element={<ProtectedRoute roles={['admin']}><AuditLogPage /></ProtectedRoute>} />
+        <Route path="/admin/system-settings" element={<ProtectedRoute roles={['admin']} perm="system.settings.manage"><SystemSettingsPage /></ProtectedRoute>} />
         <Route path="/assistant/gaps" element={<ProtectedRoute roles={['admin']}><KnowledgeGapsPage /></ProtectedRoute>} />
 
         <Route path="/accounting/chart" element={<ProtectedRoute roles={FINANCE}><ChartOfAccountsPage /></ProtectedRoute>} />

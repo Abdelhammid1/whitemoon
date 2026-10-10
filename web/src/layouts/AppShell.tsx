@@ -35,6 +35,7 @@ const GROUPS: NavGroup[] = [
       { to: '/admin/users', label: 'المستخدمون', icon: 'group' },
       { to: '/admin/suppliers/pending', label: 'الموردون المعلقون', icon: 'how_to_reg' },
       { to: '/admin/audit', label: 'سجل التدقيق', icon: 'history' },
+      { to: '/admin/system-settings', label: 'إعدادات النظام', icon: 'tune', perm: 'system.settings.manage' },
       { to: '/assistant', label: 'مساعد المدير', icon: 'smart_toy', roles: ['admin'] },
       { to: '/assistant/gaps', label: 'فجوات المعرفة', icon: 'quiz', roles: ['admin'] },
       { to: '/comm/moderation', label: 'مراقبة المحادثات', icon: 'gpp_maybe' },

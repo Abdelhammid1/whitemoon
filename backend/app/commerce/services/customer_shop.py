@@ -14,6 +14,7 @@ from ...common.errors import Conflict, NotFound
 from ...common.money import to_money
 from ...extensions import db
 from ...inventory.models import Product
+from ...settings import service as settings
 from ..models import Order, OrderLine, OrderSubOrder
 from . import cart as cart_svc
 from . import catalog as catalog_svc
@@ -101,14 +102,12 @@ def usual_items(*, customer_id: int, limit: int = 20) -> list[dict[str, Any]]:
     return out
 
 
-USUAL_CATEGORY_WINDOW_DAYS = 90
-
-
 def usual_categories(*, customer_id: int, limit: int = 8) -> list[dict[str, Any]]:
-    """The categories the customer buys from most over the last 90 days (T-32).
+    """The categories the customer buys from most over the last N days (T-32;
+    N = `customer.usual_window_days`, tunable in «إعدادات النظام» — T-37).
     A new customer (no history) falls back to the platform's most-ordered
     categories («الأكثر طلبًا»)."""
-    cutoff = datetime.now(UTC) - timedelta(days=USUAL_CATEGORY_WINDOW_DAYS)
+    cutoff = datetime.now(UTC) - timedelta(days=settings.get_int("customer.usual_window_days"))
     base = (
         select(Product.category, func.count().label("n"))
         .join(OrderLine, OrderLine.product_id == Product.id)

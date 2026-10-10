@@ -98,6 +98,7 @@ from .sales.models import (
     EscalationEvent,
     PaymentApproval,
 )
+from .settings.models import SystemSetting, SystemSettingChange
 
 __all__ = [
     "Account",
@@ -167,6 +168,8 @@ __all__ = [
     "StockBalance",
     "SupplierOffer",
     "SupplierProfile",
+    "SystemSetting",
+    "SystemSettingChange",
     "UserPermission",
     "TotpSecret",
     "TransferOrder",

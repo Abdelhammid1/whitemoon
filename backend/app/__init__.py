@@ -62,6 +62,7 @@ def _register_blueprints(app: Flask) -> None:
     from .pos.routes import bp as pos_bp
     from .production.routes import bp as production_bp
     from .sales.routes import bp as credit_bp
+    from .settings.routes import bp as system_settings_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp)
@@ -79,6 +80,7 @@ def _register_blueprints(app: Flask) -> None:
     app.register_blueprint(logistics_bp)
     app.register_blueprint(notifications_bp)
     app.register_blueprint(onboarding_bp)
+    app.register_blueprint(system_settings_bp)
 
 
 def _register_error_handlers(app: Flask) -> None:

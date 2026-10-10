@@ -19,6 +19,7 @@ from ...common.errors import BadRequest, Forbidden, NotFound
 from ...common.money import to_money
 from ...extensions import db
 from ...identity.models import CustomerProfile, User
+from ...settings import service as settings
 from ..models import CreditOverride, CreditTierSetting, CustomerCreditTier, CustomerDue
 
 # tier -> (default credit limit EGP, deferred % allowed). These are the coded
@@ -70,11 +71,8 @@ def all_tier_settings() -> list[dict[str, Any]]:
         out.append({"tier": tier, "credit_limit": str(limit), "deferred_pct": str(pct)})
     return out
 
-WINDOW_DAYS = 365
-MIN_HISTORY = 3
-NEW_ACCOUNT_DAYS = 90
-GREEN_SCORE = Decimal("85")
-YELLOW_SCORE = Decimal("50")
+# Tunable credit constants now live in «إعدادات النظام» (T-37) — read at
+# call-time via `settings.get_int(...)`, keys under `credit.*`.
 
 # Dues are judged against the business calendar day (Egypt), not UTC — a
 # client at UTC+2 sending "today" must not be rejected as a future date.
@@ -112,7 +110,7 @@ def _today() -> date:
 
 
 def _dues_in_window(customer_id: int) -> list[CustomerDue]:
-    cutoff = _today() - timedelta(days=WINDOW_DAYS)
+    cutoff = _today() - timedelta(days=settings.get_int("credit.rating_window_days"))
     stmt = select(CustomerDue).where(
         CustomerDue.customer_id == customer_id, CustomerDue.due_date >= cutoff
     )
@@ -129,13 +127,14 @@ def classify(customer_id: int) -> Classification:
     open_dues = [d for d in dues if d.status == "open"]
     today = _today()
 
+    new_account_days = settings.get_int("credit.new_account_days")
     account_age = (
-        (today - user.created_at.date()).days if user.created_at else NEW_ACCOUNT_DAYS
+        (today - user.created_at.date()).days if user.created_at else new_account_days
     )
     oldest_open_days = max(((today - d.due_date).days for d in open_dues), default=0)
 
     # White: brand-new or too little history to score.
-    if len(settled) < MIN_HISTORY or account_age < NEW_ACCOUNT_DAYS:
+    if len(settled) < settings.get_int("credit.min_history") or account_age < new_account_days:
         return Classification(tier="white", score=None)
 
     total = len(settled)
@@ -163,9 +162,9 @@ def classify(customer_id: int) -> Classification:
         score = Decimal("100")
 
     # Strictest condition wins.
-    if score < YELLOW_SCORE or oldest_open_days > 60 or defaults >= 1:
+    if score < settings.get_int("credit.yellow_score") or oldest_open_days > 60 or defaults >= 1:
         tier = "red"
-    elif score >= GREEN_SCORE and oldest_open_days <= 30:
+    elif score >= settings.get_int("credit.green_score") and oldest_open_days <= 30:
         tier = "green"
     else:
         tier = "yellow"
@@ -181,7 +180,6 @@ _DOWNGRADE = {"green": "yellow", "white": "yellow", "yellow": "red", "red": "red
 # One-step de-escalation recovery toward green: red → yellow; yellow (or better)
 # is released so the score decides white/green ("أحمر → أصفر → أبيض/أخضر").
 _RECOVER = {"red": "yellow"}
-DEESCALATE_AFTER_HOURS = 24
 
 
 def _severity(tier: str) -> int:
@@ -240,7 +238,7 @@ def de_escalate(customer_id: int) -> bool:
         return False  # still delinquent — no recovery
     if row.floor_set_at and (
         datetime.now(UTC) - row.floor_set_at
-    ) < timedelta(hours=DEESCALATE_AFTER_HOURS):
+    ) < timedelta(hours=settings.get_int("credit.deescalate_after_hours")):
         return False
     recovered = _RECOVER.get(row.escalation_floor)
     if recovered is None:
@@ -307,10 +305,7 @@ def active_override(customer_id: int) -> CreditOverride | None:
 
 
 # docs/04 §2 — order-blocking escalation thresholds (days overdue on open dues).
-ESC_L2_MIN_DAYS = 8  # L2 trigger: a due ≥8 days overdue (cumulative to L4)
-ESC_L4_MIN_DAYS = 31  # L4 trigger: ≥31 days → reject all new orders until settled
-ESC_TWO_DUES_MIN_DAYS = 7  # two open dues ≥ 7 days overdue → L2
-ESC_LIMIT_CUT = Decimal("0.50")  # L2 halves the effective limit
+# Thresholds are tunable in «إعدادات النظام» (T-37), keys under `credit.*`.
 
 
 def _open_dues(customer_id: int) -> list[CustomerDue]:
@@ -344,10 +339,10 @@ def order_block_level(customer_id: int) -> int:
     overdue_days = [n for n in ((today - d.due_date).days for d in _open_dues(customer_id)) if n > 0]
     if not overdue_days:
         return 0
-    if max(overdue_days) >= ESC_L4_MIN_DAYS:
+    if max(overdue_days) >= settings.get_int("credit.escalation_l4_min_days"):
         return 4  # freeze all orders — not lifted by an override
-    two_dues = sum(1 for n in overdue_days if n >= ESC_TWO_DUES_MIN_DAYS) >= 2
-    if max(overdue_days) >= ESC_L2_MIN_DAYS or two_dues:
+    two_dues = sum(1 for n in overdue_days if n >= settings.get_int("credit.escalation_two_dues_min_days")) >= 2
+    if max(overdue_days) >= settings.get_int("credit.escalation_l2_min_days") or two_dues:
         # An active override lifts the L2 auto-actions (but not the L4 freeze).
         return 0 if active_override(customer_id) is not None else 2
     return 0
@@ -361,7 +356,7 @@ def effective_limit(customer_id: int) -> Decimal:
         return to_money(ov.credit_limit)
     base = to_money(get_tier(customer_id).credit_limit)
     if order_block_level(customer_id) >= 2:
-        base = (base * (Decimal("1") - ESC_LIMIT_CUT)).quantize(
+        base = (base * (Decimal("1") - settings.get_decimal("credit.escalation_l2_limit_cut_fraction"))).quantize(
             Decimal("0.0001"), rounding=ROUND_HALF_UP
         )
     return base
@@ -574,18 +569,16 @@ def dunning_list(*, min_days: int = 0, tier: str | None = None) -> list[dict[str
     return out
 
 
-REMINDER_DAYS_BEFORE = 3
-
-
 def due_reminders() -> int:
     """Proactive reminder (docs/04 §2): notify customers of open dues coming due
-    in REMINDER_DAYS_BEFORE days. In-app by default (switch the channel once the
-    SMS/WhatsApp provider is configured). Returns the count sent. Intended to run
-    once per day from Beat (not idempotent — a second run the same day
-    re-reminds, so the task acks early and is not retried)."""
+    in `credit.payment_reminder_days_before` days (T-37). In-app by default
+    (switch the channel once the SMS/WhatsApp provider is configured). Returns
+    the count sent. Intended to run once per day from Beat (not idempotent — a
+    second run the same day re-reminds, so the task acks early and is not
+    retried)."""
     from ...notifications.services import notify as notify_svc
 
-    target_date = _today() + timedelta(days=REMINDER_DAYS_BEFORE)
+    target_date = _today() + timedelta(days=settings.get_int("credit.payment_reminder_days_before"))
     dues = list(
         db.session.execute(
             select(CustomerDue).where(
