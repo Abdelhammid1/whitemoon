@@ -112,8 +112,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { to: '/home', label: 'لوحة التحكم', icon: 'space_dashboard', end: true },
       { to: '/supplier/orders', label: 'طلبات واردة', icon: 'inbox' },
-      { to: '/inventory/offers', label: 'عروضي', icon: 'sell' },
-      { to: '/inventory/stock', label: 'مخزوني', icon: 'warehouse' },
+      { to: '/supplier/products', label: 'منتجاتي', icon: 'inventory_2' },
     ],
   },
   {

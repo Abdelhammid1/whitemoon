@@ -96,6 +96,7 @@ def _reset_db(app: Flask) -> Iterator[None]:
                 "inventory.transfer_order_lines, "
                 "inventory.transfer_orders, "
                 "inventory.stock_balances, "
+                "inventory.product_coding_requests, "
                 "inventory.supplier_offers, "
                 "inventory.products, "
                 "inventory.categories, "

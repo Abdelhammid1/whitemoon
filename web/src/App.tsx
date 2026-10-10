@@ -66,6 +66,7 @@ import { ProductsPage } from './pages/inventory/ProductsPage'
 import { ProductFormPage } from './pages/inventory/ProductFormPage'
 import { OffersPage } from './pages/inventory/OffersPage'
 import { StockPage } from './pages/inventory/StockPage'
+import { SupplierProductsPage } from './pages/inventory/SupplierProductsPage'
 import { ReorderAlertsPage } from './pages/inventory/ReorderAlertsPage'
 import { CategoriesPage } from './pages/inventory/CategoriesPage'
 import { TransfersPage } from './pages/inventory/TransfersPage'
@@ -129,6 +130,7 @@ export function App() {
         <Route path="/inventory/products" element={<ProtectedRoute roles={FINANCE}><ProductsPage /></ProtectedRoute>} />
         <Route path="/inventory/products/new" element={<ProtectedRoute roles={FINANCE}><ProductFormPage /></ProtectedRoute>} />
         <Route path="/inventory/products/:id/edit" element={<ProtectedRoute roles={FINANCE}><ProductFormPage /></ProtectedRoute>} />
+        <Route path="/supplier/products" element={<ProtectedRoute roles={['supplier']}><SupplierProductsPage /></ProtectedRoute>} />
         <Route path="/inventory/offers" element={<ProtectedRoute roles={['supplier']}><OffersPage /></ProtectedRoute>} />
         <Route path="/inventory/stock" element={<StockPage />} />
         <Route path="/inventory/reorder" element={<ProtectedRoute roles={FINANCE}><ReorderAlertsPage /></ProtectedRoute>} />

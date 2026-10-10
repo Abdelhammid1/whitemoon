@@ -56,6 +56,7 @@ from .identity.models import (
 from .inventory.models import (
     Batch,
     Product,
+    ProductCodingRequest,
     ProductVariant,
     ReorderAlert,
     Shortage,
@@ -152,6 +153,7 @@ __all__ = [
     "PosSaleLine",
     "PriceLock",
     "Product",
+    "ProductCodingRequest",
     "ProductVariant",
     "ReorderAlert",
     "Rfq",

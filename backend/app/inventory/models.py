@@ -267,8 +267,52 @@ class SupplierOffer(Base, TimestampMixin):
     # Price-lock support for Phase 4 — a locked offer rejects price raises
     # on the locked qty.
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Optional promotional discount (T-30). 'none' | 'percent' | 'price':
+    #   percent → discount_value is a % off unit_price
+    #   price   → discount_value is the discounted unit price directly
+    # A discount is only valid while it achieves the platform-best price, and is
+    # active between discount_start..discount_end (inclusive; nulls = open-ended).
+    discount_kind: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="none", server_default="none"
+    )
+    discount_value: Mapped[Decimal | None] = mapped_column(Numeric(18, 4))
+    discount_start: Mapped[date | None] = mapped_column(Date)
+    discount_end: Mapped[date | None] = mapped_column(Date)
 
     product: Mapped[Product] = relationship()
+
+
+class ProductCodingRequest(Base, TimestampMixin):
+    """A supplier's request to have a new item coded into the catalog (T-30).
+
+    The supplier submits the item's identity (name/barcode/brand/category/image);
+    an admin reviews and codes it into a real Product. The full review queue and
+    barcode identity resolution are T-31 — here we create the request + notify.
+    """
+
+    __tablename__ = "product_coding_requests"
+    __table_args__ = (
+        CheckConstraint(
+            "status in ('new','in_review','coded','rejected')",
+            name="ck_product_coding_requests_status",
+        ),
+        Index("ix_product_coding_requests_status", "status"),
+        {"schema": "inventory"},
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    supplier_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("identity.users.id"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    barcode: Mapped[str | None] = mapped_column(String(60))
+    brand: Mapped[str | None] = mapped_column(String(120))
+    category: Mapped[str | None] = mapped_column(String(40))
+    image_url: Mapped[str | None] = mapped_column(String(500))
+    note: Mapped[str | None] = mapped_column(String(1000))
+    status: Mapped[str] = mapped_column(String(12), nullable=False, default="new", server_default="new")
+    reject_reason: Mapped[str | None] = mapped_column(String(1000))
+    product_id: Mapped[int | None] = mapped_column(BigInteger)
 
 
 # ---------------------------------------------------------------- Stock balances

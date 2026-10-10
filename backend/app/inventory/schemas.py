@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 from pydantic import BaseModel, Field, field_validator
@@ -48,6 +49,34 @@ class OfferIn(BaseModel):
     @classmethod
     def _no_float(cls, v: object) -> object:
         return _reject_float(v)
+
+
+class SupplierProductIn(BaseModel):
+    """Unified one-call update of a supplier's product (T-30): offer + qty."""
+
+    unit_price: Decimal = Field(gt=0)
+    on_hand: Decimal | None = Field(default=None, ge=0)
+    moq: Decimal = Decimal("0")
+    is_active: bool = True
+    discount_kind: str = Field(default="none", pattern="^(none|percent|price)$")
+    discount_value: Decimal | None = None
+    discount_start: date | None = None
+    discount_end: date | None = None
+    reorder_point: Decimal | None = None
+
+    @field_validator("unit_price", "on_hand", "moq", "discount_value", "reorder_point", mode="before")
+    @classmethod
+    def _no_float(cls, v: object) -> object:
+        return _reject_float(v)
+
+
+class CodingRequestIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+    barcode: str | None = Field(default=None, max_length=60)
+    brand: str | None = Field(default=None, max_length=120)
+    category: str | None = Field(default=None, max_length=40)
+    image_url: str | None = Field(default=None, max_length=500)
+    note: str | None = Field(default=None, max_length=1000)
 
 
 class StockAdjustIn(BaseModel):

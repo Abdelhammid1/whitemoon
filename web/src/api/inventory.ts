@@ -227,6 +227,76 @@ export async function upsertOffer(body: {
 }) {
   return api<Offer>('/inventory/offers', { method: 'POST', body })
 }
+// --- unified supplier products (T-30) ---
+export interface SupplierOfferDetail {
+  id: number
+  product_id: number
+  unit_price: string
+  moq: string
+  is_active: boolean
+  currency: string
+  discount_kind: 'none' | 'percent' | 'price'
+  discount_value: string | null
+  discount_start: string | null
+  discount_end: string | null
+  effective_price: string
+  lower_price_exists: boolean
+}
+export interface SupplierProduct {
+  product_id: number
+  name: string
+  barcode: string | null
+  image_url: string | null
+  category: string | null
+  on_hand: string
+  available: string
+  reorder_point: string | null
+  offer: SupplierOfferDetail | null
+}
+export async function supplierProducts() {
+  return api<{ items: SupplierProduct[] }>('/inventory/supplier/products')
+}
+export async function setSupplierProduct(
+  productId: number,
+  body: {
+    unit_price: string
+    on_hand?: string
+    moq?: string
+    is_active?: boolean
+    discount_kind?: 'none' | 'percent' | 'price'
+    discount_value?: string | null
+    discount_start?: string | null
+    discount_end?: string | null
+    reorder_point?: string | null
+  },
+) {
+  return api<{ offer: SupplierOfferDetail }>(`/inventory/supplier/products/${productId}`, { method: 'PUT', body })
+}
+export interface CodingRequest {
+  id: number
+  name: string
+  barcode: string | null
+  brand: string | null
+  category: string | null
+  status: string
+  reject_reason: string | null
+  product_id: number | null
+  created_at: string
+}
+export async function createCodingRequest(body: {
+  name: string
+  barcode?: string
+  brand?: string
+  category?: string
+  image_url?: string
+  note?: string
+}) {
+  return api<CodingRequest>('/inventory/coding-requests', { method: 'POST', body })
+}
+export async function myCodingRequests() {
+  return api<{ items: CodingRequest[] }>('/inventory/coding-requests/mine')
+}
+
 export async function stockBalances(params: { supplier_id?: number; location_type?: string }) {
   return api<{ items: StockBalance[] }>('/inventory/stock-balances', { query: params })
 }

@@ -16,14 +16,17 @@ from ..identity.services.audit import emit as audit_emit
 from ..identity.services.rbac import has_permission, require_permission
 from .models import TransferOrder
 from .schemas import (
+    CodingRequestIn,
     OfferIn,
     ShortageIn,
     ShortageResolveIn,
     StockAdjustIn,
+    SupplierProductIn,
     TransferOrderIn,
     VariantIn,
 )
 from .services import categories as categories_svc
+from .services import coding as coding_svc
 from .services import offers as offers_svc
 from .services import products as products_svc
 
@@ -254,6 +257,76 @@ def upsert_offer():
 def my_offers():
     items = offers_svc.list_offers_for_supplier(_uid())
     return jsonify({"items": [offers_svc.serialize_own(o) for o in items]})
+
+
+# ================================================================ unified supplier products (T-30)
+
+
+@bp.get("/supplier/products")
+@require_permission("offer.manage")
+def supplier_products():
+    """«منتجاتي» — every product the supplier offers or stocks, with price,
+    discount, moq, active and on-hand in one view."""
+    return jsonify({"items": offers_svc.supplier_products(_uid())})
+
+
+@bp.put("/supplier/products/<int:product_id>")
+@require_permission("offer.manage")
+def set_supplier_product(product_id: int):
+    """Set price + discount + moq + active + quantity for the supplier's own
+    product in one call. The discount is validated for platform-best price."""
+    p = _parse(SupplierProductIn)
+    supplier_id = _uid()
+    result = offers_svc.set_supplier_product(
+        supplier_id=supplier_id,
+        product_id=product_id,
+        unit_price=Decimal(str(p.unit_price)),
+        on_hand=Decimal(str(p.on_hand)) if p.on_hand is not None else None,
+        moq=Decimal(str(p.moq)),
+        is_active=p.is_active,
+        discount_kind=p.discount_kind,
+        discount_value=Decimal(str(p.discount_value)) if p.discount_value is not None else None,
+        discount_start=p.discount_start,
+        discount_end=p.discount_end,
+        reorder_point=Decimal(str(p.reorder_point)) if p.reorder_point is not None else None,
+    )
+    audit_emit(
+        "inventory.supplier_product.set",
+        actor_user_id=supplier_id,
+        target_type="product",
+        target_id=product_id,
+    )
+    return jsonify(result)
+
+
+@bp.post("/coding-requests")
+@require_permission("offer.manage")
+def create_coding_request():
+    p = _parse(CodingRequestIn)
+    supplier_id = _uid()
+    row = coding_svc.create_request(
+        supplier_id=supplier_id,
+        name=p.name,
+        barcode=p.barcode,
+        brand=p.brand,
+        category=p.category,
+        image_url=p.image_url,
+        note=p.note,
+    )
+    audit_emit(
+        "inventory.coding_request.created",
+        actor_user_id=supplier_id,
+        target_type="coding_request",
+        target_id=row.id,
+    )
+    return jsonify(coding_svc.serialize(row)), 201
+
+
+@bp.get("/coding-requests/mine")
+@require_permission("offer.manage")
+def my_coding_requests():
+    items = coding_svc.list_for_supplier(_uid())
+    return jsonify({"items": [coding_svc.serialize(r) for r in items]})
 
 
 # ================================================================ stock
