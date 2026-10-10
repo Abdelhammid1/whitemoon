@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Pill, Spinner, InlineError, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
-import { listOrders, type Order } from '../../api/commerce'
+import { listOrders, reorder, type Order } from '../../api/commerce'
 import { ApiError } from '../../api/client'
+import { useToast } from '../../components/Toast'
 import { formatDate, formatMoney } from '../../lib/format'
 import { PageHelp } from '../../components/PageHelp'
 
@@ -17,9 +18,27 @@ const STATUS: Record<string, { ar: string; tone: 'signal' | 'warning' | 'neutral
 
 export function OrdersPage() {
   const navigate = useNavigate()
+  const toast = useToast()
   const [rows, setRows] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(0)
+
+  async function doReorder(id: number) {
+    setBusy(id)
+    try {
+      const r = await reorder(id)
+      const changed = r.warnings.filter((w) => w.reason === 'price_changed').length
+      const gone = r.warnings.filter((w) => w.reason === 'unavailable').length
+      let msg = `أُضيف ${r.added} صنف للسلة.`
+      if (changed) msg += ` تغيّر سعر ${changed}.`
+      if (gone) msg += ` ${gone} غير متاح.`
+      toast.success(msg)
+      navigate('/cart')
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'تعذّرت إعادة الطلب')
+    } finally { setBusy(0) }
+  }
 
   useEffect(() => {
     listOrders()
@@ -50,6 +69,18 @@ export function OrdersPage() {
                 { header: 'الإجمالي', align: 'end', cell: (o) => <Mono>{formatMoney(o.payment_mode === 'deferred' ? o.total_deferred : o.total_cash)}</Mono> },
                 { header: 'الحالة', align: 'center', cell: (o) => <Pill tone={STATUS[o.status]?.tone ?? 'neutral'}>{STATUS[o.status]?.ar ?? o.status}</Pill> },
                 { header: 'التاريخ', align: 'end', cell: (o) => <Mono>{formatDate(o.placed_at)}</Mono> },
+                {
+                  header: '', align: 'end',
+                  cell: (o) => o.status !== 'cancelled' ? (
+                    <button
+                      className="text-primary font-small-medium hover:underline disabled:opacity-40"
+                      disabled={busy === o.id}
+                      onClick={(e) => { e.stopPropagation(); void doReorder(o.id) }}
+                    >
+                      {busy === o.id ? '…' : 'اطلب مجددًا'}
+                    </button>
+                  ) : null,
+                },
               ]}
             />
           </Card>

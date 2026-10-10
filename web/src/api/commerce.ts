@@ -158,6 +158,36 @@ export async function getOrder(id: number) {
   return api<Order>(`/commerce/orders/${id}`)
 }
 
+// ---------------------------------------------------------------- reorder / usual (T-42, T-32)
+export interface ReorderWarning {
+  product_id: number
+  reason: 'price_changed' | 'unavailable' | 'already_in_cart' | 'could_not_add'
+  old_price?: string
+  new_price?: string
+}
+export async function reorder(orderId: number) {
+  return api<{ added: number; warnings: ReorderWarning[] }>(`/commerce/orders/${orderId}/reorder`, { method: 'POST' })
+}
+export interface UsualItem {
+  product_id: number
+  name_ar: string
+  image_url: string | null
+  best_price: string
+  best_offer_id: number
+  usual_qty: string
+}
+export async function getUsualItems() {
+  return api<{ items: UsualItem[] }>('/commerce/usual-items')
+}
+export interface UsualCategory {
+  category: string
+  count: number
+  fallback: boolean
+}
+export async function getUsualCategories() {
+  return api<{ items: UsualCategory[] }>('/commerce/usual-categories')
+}
+
 // ---------------------------------------------------------------- RFQ
 
 export interface Rfq {

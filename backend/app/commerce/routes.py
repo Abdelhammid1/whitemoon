@@ -129,6 +129,33 @@ def checkout():
     return jsonify(orders_svc.serialize_order(order, for_customer=True)), 201
 
 
+@bp.post("/commerce/orders/<int:order_id>/reorder")
+@jwt_required()
+def reorder(order_id: int):
+    """T-42: add a past order's items to the cart at current prices + warnings."""
+    from .services import customer_shop as shop_svc
+
+    return jsonify(shop_svc.reorder(customer_id=_uid(), order_id=order_id))
+
+
+@bp.get("/commerce/usual-items")
+@jwt_required()
+def usual_items():
+    """T-42: the customer's most-ordered items with usual qty + current price."""
+    from .services import customer_shop as shop_svc
+
+    return jsonify({"items": shop_svc.usual_items(customer_id=_uid())})
+
+
+@bp.get("/commerce/usual-categories")
+@jwt_required()
+def usual_categories():
+    """T-32: the customer's most-bought categories (last 90 days), else trending."""
+    from .services import customer_shop as shop_svc
+
+    return jsonify({"items": shop_svc.usual_categories(customer_id=_uid())})
+
+
 @bp.get("/commerce/orders")
 @jwt_required()
 def list_orders():

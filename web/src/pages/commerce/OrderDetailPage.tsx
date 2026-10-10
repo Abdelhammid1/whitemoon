@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Narrow } from '../../layouts/AppShell'
 import { PageTitle, Pill, Button, Spinner, InlineError, SectionHeader, EmptyState, Card } from '../../components/ui'
 import { Modal } from '../../components/Overlay'
@@ -13,6 +13,7 @@ import {
   fulfillOrder,
   cancelOrder,
   openOrderInvoice,
+  reorder,
   type Order,
   type OrderAction,
 } from '../../api/commerce'
@@ -54,6 +55,7 @@ const ACTION_DONE: Record<OrderAction, string> = {
 export function OrderDetailPage() {
   const { id } = useParams()
   const oid = Number(id)
+  const navigate = useNavigate()
   const toast = useToast()
   const { user } = useAuth()
   const isStaff = user?.kind === 'admin' || user?.kind === 'staff'
@@ -111,6 +113,23 @@ export function OrderDetailPage() {
     }
   }
 
+  const [reordering, setReordering] = useState(false)
+  async function doReorder() {
+    setReordering(true)
+    try {
+      const r = await reorder(oid)
+      const changed = r.warnings.filter((w) => w.reason === 'price_changed').length
+      const gone = r.warnings.filter((w) => w.reason === 'unavailable').length
+      let msg = `أُضيف ${r.added} صنف للسلة.`
+      if (changed) msg += ` تغيّر سعر ${changed}.`
+      if (gone) msg += ` ${gone} غير متاح حاليًا.`
+      toast.success(msg)
+      navigate('/cart')
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'تعذّرت إعادة الطلب')
+    } finally { setReordering(false) }
+  }
+
   async function doTransition(action: OrderAction) {
     setActing(true)
     try {
@@ -155,9 +174,16 @@ export function OrderDetailPage() {
             {order.source.type !== 'company' ? ` — ${order.source.name}` : ''}
           </Pill>
         )}
-        <Button className="ms-auto" iconRight="picture_as_pdf" onClick={() => void openInvoice()}>
-          فاتورة PDF
-        </Button>
+        <div className="ms-auto flex items-center gap-space-sm">
+          {!isStaff && (
+            <Button iconRight="replay" disabled={reordering} onClick={() => void doReorder()}>
+              {reordering ? '…' : 'اطلب مجددًا'}
+            </Button>
+          )}
+          <Button iconRight="picture_as_pdf" onClick={() => void openInvoice()}>
+            فاتورة PDF
+          </Button>
+        </div>
       </div>
 
       {/* Admin/staff actions — only the valid transitions for the current status. */}
