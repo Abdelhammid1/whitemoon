@@ -327,7 +327,7 @@ def test_clear_cart_empties_and_releases_locks(client) -> None:
     """T-36: «إفراغ السلة» removes every item and its price lock in one call."""
     from app.commerce.services import pricelock
 
-    _, (_a, oa), (_b, ob) = _setup_two_suppliers(category="clear", price_a="100", price_b="90")
+    _, (_a, oa), (_b, ob) = _setup_two_suppliers(category="food", price_a="100", price_b="90")
     cust = create_user(kind="customer", phone="+201000000311", roles=("customer",))
     db.session.commit()
     headers = auth_header(client, phone="+201000000311")

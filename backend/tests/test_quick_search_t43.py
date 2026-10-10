@@ -36,9 +36,9 @@ def _mk(*, name, barcode=None, brand=None, category="food", price="100", supplie
 
 
 def test_search_by_barcode_and_name(client) -> None:
-    p, _ = _mk(name="سكر ناعم", barcode="6223000000011", brand="الدلتا")
+    p, _ = _mk(name="سكر ناعم", barcode="4006381333931", brand="الدلتا")  # valid EAN-13
     # Exact barcode.
-    by_code = catalog_svc.quick_search(q="6223000000011")
+    by_code = catalog_svc.quick_search(q="4006381333931")
     assert any(r["product_id"] == p.id for r in by_code)
     # Name substring.
     by_name = catalog_svc.quick_search(q="سكر")

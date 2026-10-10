@@ -66,6 +66,11 @@ def release_lock_for_cart_item(cart_item_id: int) -> None:
     lock = lock_for_cart_item(cart_item_id)
     if lock is not None:
         lock.released_at = _now()
+        # Detach from the cart item so the item can be deleted (remove / empty
+        # cart) without tripping the price_locks → cart_items FK. A released lock
+        # is never looked up by cart_item_id again (lock_for_cart_item filters to
+        # active locks), so this is safe and keeps the row for history.
+        lock.cart_item_id = None
         db.session.flush()
 
 
