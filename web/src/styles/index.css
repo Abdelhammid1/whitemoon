@@ -15,40 +15,32 @@
     color: #1a2140; /* ink / on-surface */
   }
   /* Default: hide scrollbars (clean look) on in-component scrollers like the
-     export. The page and the sidebar opt back in to a slim styled bar below. */
+     export. Elements marked .wm-scrollbar (the sidebar nav + the main content
+     scroller) opt back in to a slim, always-present, styled bar. The main
+     content is its own RTL scroll container, so in RTL its scrollbar renders on
+     the LEFT edge — opposite the right-hand sidebar. */
   ::-webkit-scrollbar {
     display: none;
   }
 
-  /* Main screen (page viewport) + any element marked .wm-scrollbar (the
-     sidebar) get a slim, always-present, styled scrollbar. */
-  html,
   .wm-scrollbar {
     scrollbar-width: thin; /* Firefox */
     scrollbar-color: rgba(43, 58, 103, 0.35) transparent;
   }
-  html::-webkit-scrollbar,
-  body::-webkit-scrollbar,
   .wm-scrollbar::-webkit-scrollbar {
     display: block;
     width: 10px;
     height: 10px;
   }
-  html::-webkit-scrollbar-track,
-  body::-webkit-scrollbar-track,
   .wm-scrollbar::-webkit-scrollbar-track {
     background: transparent;
   }
-  html::-webkit-scrollbar-thumb,
-  body::-webkit-scrollbar-thumb,
   .wm-scrollbar::-webkit-scrollbar-thumb {
     background: rgba(43, 58, 103, 0.35);
     border-radius: 9999px;
     border: 2px solid transparent;
     background-clip: content-box;
   }
-  html::-webkit-scrollbar-thumb:hover,
-  body::-webkit-scrollbar-thumb:hover,
   .wm-scrollbar::-webkit-scrollbar-thumb:hover {
     background: rgba(43, 58, 103, 0.55);
     background-clip: content-box;

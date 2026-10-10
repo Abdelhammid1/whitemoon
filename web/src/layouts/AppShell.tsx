@@ -214,7 +214,7 @@ export function AppShell() {
   }
 
   return (
-    <div className="min-h-screen bg-surface">
+    <div className="h-screen overflow-hidden bg-surface">
       <aside className="fixed top-space-md bottom-space-md right-space-md w-[244px] z-40 bg-surface-container-lowest border border-surface-container-high rounded-2xl shadow-card flex flex-col select-none overflow-hidden">
         {/* Brand */}
         <div className="flex items-center gap-space-sm px-space-md pt-space-md pb-space-sm">
@@ -298,10 +298,12 @@ export function AppShell() {
         </div>
       </aside>
 
-      <div className="mr-[276px]">
+      {/* The main content is its own scroll container (not the page/body), so in
+          RTL its vertical scrollbar sits on the LEFT edge, opposite the sidebar. */}
+      <div className="wm-scrollbar mr-[276px] h-screen overflow-y-auto">
         <ImpersonationBanner />
         {role === 'customer' && <CustomerCreditBar />}
-        <main className="max-w-[1040px] mx-auto pt-[40px] px-[32px] pb-[96px] min-h-screen">
+        <main className="max-w-[1040px] mx-auto pt-[40px] px-[32px] pb-[96px] min-h-full">
           <Outlet />
         </main>
       </div>
