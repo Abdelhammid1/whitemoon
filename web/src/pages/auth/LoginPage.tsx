@@ -15,6 +15,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [totp, setTotp] = useState('')
   const [requires2fa, setRequires2fa] = useState(false)
+  const [remember, setRemember] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -29,6 +30,7 @@ export function LoginPage() {
         ...(mode === 'phone' ? { phone: identifier } : { email: identifier }),
         password,
         ...(requires2fa && totp ? { totp_code: totp } : {}),
+        remember_me: remember,
       })
       if (resp.requires_2fa) {
         setRequires2fa(true)
@@ -101,6 +103,21 @@ export function LoginPage() {
             required
           />
         )}
+        {/* T-46: remember-me — honoured server-side only for customer/supplier. */}
+        <label className="flex items-start gap-space-sm cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={remember}
+            onChange={(e) => setRemember(e.target.checked)}
+          />
+          <span className="flex flex-col">
+            <span className="font-small-medium text-small-medium text-on-surface">تذكرني على هذا الجهاز</span>
+            <span className="font-small text-small text-secondary">
+              فعّلها لتدخل مباشرة في المرات القادمة. لا تفعّلها على جهاز مشترك. (غير متاحة لحسابات الإدارة.)
+            </span>
+          </span>
+        </label>
         {error && <InlineError message={error} />}
         <Button variant="primary" type="submit" disabled={busy} iconRight="arrow_left_alt" className="w-full">
           {busy ? 'جار الدخول…' : 'تسجيل الدخول'}

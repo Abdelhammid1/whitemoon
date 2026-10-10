@@ -248,6 +248,11 @@ export function AppShell() {
             <Icon name="password" size={18} className="shrink-0" />
             <span className="flex-1 min-w-0 truncate">تغيير كلمة المرور</span>
           </NavLink>
+          {/* My remembered devices — every role */}
+          <NavLink to="/account/devices" className={({ isActive }) => navItem(isActive)}>
+            <Icon name="devices" size={18} className="shrink-0" />
+            <span className="flex-1 min-w-0 truncate">أجهزتي</span>
+          </NavLink>
 
           {GROUPS.filter((g) => g.roles.includes(role)).map((g) => (
             <div key={g.label} className="flex flex-col">

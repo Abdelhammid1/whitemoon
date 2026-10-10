@@ -100,6 +100,7 @@ def login():
         email=payload.email,
         password=payload.password,
         totp_code=payload.totp_code,
+        remember_me=payload.remember_me,
     )
     body: dict[str, Any] = {
         "user_id": result.user_id,
@@ -108,6 +109,7 @@ def login():
     if not result.requires_2fa:
         body["access_token"] = result.access_token
         body["refresh_token"] = result.refresh_token
+        body["remembered"] = result.remembered
     return jsonify(body)
 
 
@@ -152,6 +154,34 @@ def me():
     if user is None:
         raise Unauthorized("User not found", code="user_not_found")
     return jsonify(auth_svc.user_summary(user))
+
+
+def _current_uid() -> int:
+    raw = get_jwt_identity()
+    if raw is None:
+        raise Unauthorized("No identity", code="no_identity")
+    return int(raw)
+
+
+@bp.get("/devices")
+@jwt_required()
+def list_devices():
+    """T-46 «أجهزتي» — the user's remembered devices."""
+    return jsonify({"items": auth_svc.list_devices(_current_uid())})
+
+
+@bp.delete("/devices/<int:session_id>")
+@jwt_required()
+def revoke_device(session_id: int):
+    auth_svc.revoke_device(user_id=_current_uid(), session_id=session_id)
+    return jsonify({"status": "revoked"})
+
+
+@bp.delete("/devices")
+@jwt_required()
+def revoke_all_devices():
+    n = auth_svc.revoke_all_devices(user_id=_current_uid())
+    return jsonify({"status": "revoked", "count": n})
 
 
 # ---------------------------------------------------------------- 2FA

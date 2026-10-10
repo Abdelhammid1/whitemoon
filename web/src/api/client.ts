@@ -11,42 +11,61 @@ export const API_BASE = '/api'
 const ACCESS_KEY = 'wm.access'
 const REFRESH_KEY = 'wm.refresh'
 
+/**
+ * T-46: tokens live in localStorage when the user chose «تذكرني على هذا الجهاز»
+ * (persist across browser restarts) and in sessionStorage otherwise (cleared
+ * when the tab/browser closes, so the user signs in again next session). Reads
+ * accept either store; every access is guarded for private mode / blocked
+ * storage.
+ */
+function _get(store: Storage, key: string): string | null {
+  try {
+    return store.getItem(key)
+  } catch {
+    return null
+  }
+}
+function _activeStore(): Storage | null {
+  // Whichever store currently holds the refresh token is the active one.
+  if (_get(localStorage, REFRESH_KEY)) return localStorage
+  if (_get(sessionStorage, REFRESH_KEY)) return sessionStorage
+  return null
+}
+
 export const tokenStore = {
   getAccess(): string | null {
-    try {
-      return localStorage.getItem(ACCESS_KEY)
-    } catch {
-      return null
-    }
+    return _get(localStorage, ACCESS_KEY) ?? _get(sessionStorage, ACCESS_KEY)
   },
   getRefresh(): string | null {
-    try {
-      return localStorage.getItem(REFRESH_KEY)
-    } catch {
-      return null
-    }
+    return _get(localStorage, REFRESH_KEY) ?? _get(sessionStorage, REFRESH_KEY)
   },
-  setPair(access: string, refresh: string | null): void {
+  /** `persist` true → localStorage (remembered device); false → sessionStorage. */
+  setPair(access: string, refresh: string | null, persist = false): void {
+    this.clear()
+    const store = persist ? localStorage : sessionStorage
     try {
-      localStorage.setItem(ACCESS_KEY, access)
-      if (refresh) localStorage.setItem(REFRESH_KEY, refresh)
+      store.setItem(ACCESS_KEY, access)
+      if (refresh) store.setItem(REFRESH_KEY, refresh)
     } catch {
       /* storage disabled; ignore */
     }
   },
   setAccess(access: string): void {
+    const store = _activeStore() ?? sessionStorage
     try {
-      localStorage.setItem(ACCESS_KEY, access)
+      store.setItem(ACCESS_KEY, access)
     } catch {
       /* ignore */
     }
   },
   clear(): void {
-    try {
-      localStorage.removeItem(ACCESS_KEY)
-      localStorage.removeItem(REFRESH_KEY)
-    } catch {
-      /* ignore */
+    for (const store of [localStorage, sessionStorage]) {
+      try {
+        store.removeItem(ACCESS_KEY)
+        store.removeItem(REFRESH_KEY)
+      } catch {
+        /* ignore */
+      }
     }
   },
 }

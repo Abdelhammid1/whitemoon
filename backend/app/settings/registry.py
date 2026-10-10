@@ -169,6 +169,16 @@ REGISTRY: tuple[SettingDef, ...] = (
         value_type="int", default="24", unit="ساعة", minimum="1", maximum="168",
         source="inventory/services/reorder.py:ESCALATE_AFTER_HOURS",
     ),
+    # ---- الأمان والدخول ----
+    SettingDef(
+        key="auth.remember_me_days",
+        group="الأمان والدخول",
+        label="مدة «تذكرني على هذا الجهاز»",
+        description="عدد الأيام التي تبقى فيها جلسة العميل/المورد مفتوحة على جهاز متذكَّر قبل طلب الدخول من جديد.",
+        example="بقيمة 30: يبقى المستخدم داخلًا 30 يومًا على الجهاز المتذكَّر.",
+        value_type="int", default="30", unit="يوم", minimum="1", maximum="365",
+        source="identity/services/auth.py (T-46)",
+    ),
     # ---- المورد والعميل ----
     SettingDef(
         key="supplier.discount_expiry_soon_days",

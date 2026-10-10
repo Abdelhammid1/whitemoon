@@ -327,6 +327,13 @@ class Session(Base):
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # T-46: a "remembered" refresh session (the user ticked «تذكرني على هذا
+    # الجهاز») — these are the rows listed on «أجهزتي». `last_used_at` advances
+    # on each refresh so the list can show recency.
+    remembered: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class ImpersonationGrant(Base):

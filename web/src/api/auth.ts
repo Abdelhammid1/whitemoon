@@ -38,6 +38,7 @@ export interface LoginBody {
   email?: string
   password: string
   totp_code?: string
+  remember_me?: boolean
 }
 
 export interface LoginResponse {
@@ -45,6 +46,7 @@ export interface LoginResponse {
   requires_2fa: boolean
   access_token?: string
   refresh_token?: string
+  remembered?: boolean
 }
 
 export async function registerCustomer(body: RegisterCustomerBody) {
@@ -78,9 +80,29 @@ export async function login(body: LoginBody): Promise<LoginResponse> {
     anonymous: true,
   })
   if (!resp.requires_2fa && resp.access_token && resp.refresh_token) {
-    tokenStore.setPair(resp.access_token, resp.refresh_token)
+    // Persist across restarts only when the server confirmed the device is
+    // remembered (customer/supplier + «تذكرني»); otherwise session-only.
+    tokenStore.setPair(resp.access_token, resp.refresh_token, resp.remembered === true)
   }
   return resp
+}
+
+// T-46 «أجهزتي» device management.
+export interface Device {
+  id: number
+  device: string | null
+  ip: string | null
+  issued_at: string | null
+  last_used_at: string | null
+}
+export async function listDevices() {
+  return api<{ items: Device[] }>('/auth/devices')
+}
+export async function revokeDevice(id: number) {
+  return api<{ status: string }>(`/auth/devices/${id}`, { method: 'DELETE' })
+}
+export async function revokeAllDevices() {
+  return api<{ status: string; count: number }>('/auth/devices', { method: 'DELETE' })
 }
 
 export async function me() {

@@ -6,6 +6,7 @@ import { UserGuidePage } from './pages/UserGuidePage'
 import { AssistantPage } from './pages/AssistantPage'
 import { KnowledgeGapsPage } from './pages/KnowledgeGapsPage'
 import { ChangePasswordPage } from './pages/ChangePasswordPage'
+import { MyDevicesPage } from './pages/account/MyDevicesPage'
 import { HomePage } from './pages/HomePage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { LoginPage } from './pages/auth/LoginPage'
@@ -96,6 +97,7 @@ export function App() {
         <Route path="/start" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
         <Route path="/2fa" element={<TotpEnrollPage />} />
         <Route path="/account/password" element={<ChangePasswordPage />} />
+        <Route path="/account/devices" element={<MyDevicesPage />} />
 
         <Route path="/catalog" element={<CatalogPage />} />
         <Route path="/quick-order" element={<QuickOrderPage />} />

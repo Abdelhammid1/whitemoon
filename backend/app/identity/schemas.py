@@ -70,6 +70,7 @@ class LoginIn(BaseModel):
     email: EmailStr | None = None
     password: str = Field(min_length=1, max_length=128)
     totp_code: str | None = None
+    remember_me: bool = False  # T-46 — honoured only for customer/supplier
 
 
 class TotpEnrollFinishIn(BaseModel):
