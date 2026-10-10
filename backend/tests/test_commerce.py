@@ -323,4 +323,26 @@ def test_cart_endpoint_hides_supplier(client) -> None:
     assert "supplier_id" not in str(r.get_json())
 
 
+def test_clear_cart_empties_and_releases_locks(client) -> None:
+    """T-36: «إفراغ السلة» removes every item and its price lock in one call."""
+    from app.commerce.services import pricelock
+
+    _, (_a, oa), (_b, ob) = _setup_two_suppliers(category="clear", price_a="100", price_b="90")
+    cust = create_user(kind="customer", phone="+201000000311", roles=("customer",))
+    db.session.commit()
+    headers = auth_header(client, phone="+201000000311")
+    client.post("/commerce/cart/items", headers=headers, json={"offer_id": oa.id, "qty": "2"})
+    item = client.post("/commerce/cart/items", headers=headers, json={"offer_id": ob.id, "qty": "3"}).get_json()
+    first_item_id = item["items"][0]["item_id"]
+    assert len(item["items"]) == 2
+
+    r = client.delete("/commerce/cart/items", headers=headers)
+    assert r.status_code == 200
+    body = r.get_json()
+    assert body["items"] == []
+    assert body["total"] == "0"
+    # The lock for a now-deleted item must be gone.
+    assert pricelock.lock_for_cart_item(first_item_id) is None
+
+
 _ = (Product, SupplierOffer)  # keep imports referenced

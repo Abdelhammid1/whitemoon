@@ -60,6 +60,9 @@ export async function updateCartItem(item_id: number, qty: string) {
 export async function removeCartItem(item_id: number) {
   return api<Cart>(`/commerce/cart/items/${item_id}`, { method: 'DELETE' })
 }
+export async function clearCart() {
+  return api<Cart>('/commerce/cart/items', { method: 'DELETE' })
+}
 
 // ---------------------------------------------------------------- orders
 

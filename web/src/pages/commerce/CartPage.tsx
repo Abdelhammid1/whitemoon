@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Wide } from '../../layouts/AppShell'
 import { Button, Spinner, EmptyState, InlineError, Pill, Card } from '../../components/ui'
@@ -6,7 +6,7 @@ import { DataTable, Mono } from '../../components/DataTable'
 import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/Overlay'
 import { useToast } from '../../components/Toast'
-import { checkout, getCart, removeCartItem, updateCartItem, type Cart } from '../../api/commerce'
+import { checkout, clearCart, getCart, removeCartItem, updateCartItem, type Cart, type CartItem } from '../../api/commerce'
 import { getDeferredQuote, getDeferredOptions, getMyCredit, type DeferredQuote, type DeferredOptions, type MyCredit } from '../../api/credit'
 import { ApiError } from '../../api/client'
 import { formatMoney } from '../../lib/format'
@@ -27,6 +27,14 @@ export function CartPage() {
   const [quote, setQuote] = useState<DeferredQuote | null>(null)
   const [quoteLoading, setQuoteLoading] = useState(false)
   const [credit, setCredit] = useState<MyCredit | null>(null)
+  // T-36: soft delete with an undo window. `pending` is hidden from the list
+  // and only really removed on the server after the window elapses (or when the
+  // user checks out / leaves). Undo just cancels — nothing was sent, so the
+  // price lock stays intact. We keep refs so the unmount flush sees the latest.
+  const [pending, setPending] = useState<CartItem | null>(null)
+  const [confirmClear, setConfirmClear] = useState(false)
+  const pendingRef = useRef<CartItem | null>(null)
+  const timerRef = useRef<number | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -69,10 +77,52 @@ export function CartPage() {
     return () => { active = false }
   }, [confirm, deferredDays, cart])
 
-  async function remove(itemId: number) {
+  // Commit the pending (soft-deleted) item to the server for real.
+  const flushPending = useCallback(async () => {
+    const p = pendingRef.current
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+    if (!p) return
+    pendingRef.current = null
+    setPending(null)
+    try { setCart(await removeCartItem(p.item_id)) }
+    catch (err) { toast.error(err instanceof ApiError ? err.message : 'تعذّر الحذف'); void load() }
+  }, [load, toast])
+
+  async function remove(item: CartItem) {
+    // If another item is already mid-undo, commit it before starting a new one.
+    if (pendingRef.current && pendingRef.current.item_id !== item.item_id) await flushPending()
+    if (timerRef.current) clearTimeout(timerRef.current)
+    pendingRef.current = item
+    setPending(item)
+    timerRef.current = window.setTimeout(() => { void flushPending() }, 6000)
+  }
+
+  function undoRemove() {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+    pendingRef.current = null
+    setPending(null)
+  }
+
+  // On unmount, commit any still-pending delete (best-effort) so it isn't lost.
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    const p = pendingRef.current
+    if (p) void removeCartItem(p.item_id).catch(() => {})
+  }, [])
+
+  // Checkout must see an accurate server total, so flush first.
+  async function openConfirm(mode: 'cash' | 'deferred') {
+    await flushPending()
+    setConfirm(mode)
+  }
+
+  async function emptyCart() {
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+    pendingRef.current = null
+    setPending(null)
     setBusy(true)
-    try { setCart(await removeCartItem(itemId)) }
-    catch (err) { toast.error(err instanceof ApiError ? err.message : 'تعذّر الحذف') }
+    try { setCart(await clearCart()); setConfirmClear(false) }
+    catch (err) { toast.error(err instanceof ApiError ? err.message : 'تعذّر إفراغ السلة') }
     finally { setBusy(false) }
   }
 
@@ -101,9 +151,14 @@ export function CartPage() {
     }
   }
 
-  const items = cart?.items ?? []
+  // The soft-deleted item is hidden from the list and excluded from the totals
+  // until its undo window lapses.
+  const items = (cart?.items ?? []).filter((i) => i.item_id !== pending?.item_id)
   const distinctCount = items.length
   const totalUnits = items.reduce((sum, i) => sum + Number(i.qty), 0)
+  const grandTotal: string | number = pending
+    ? items.reduce((sum, i) => sum + Number(i.line_total), 0)
+    : cart?.total ?? '0'
 
   return (
     <Wide>
@@ -134,6 +189,18 @@ export function CartPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-xl items-start">
           {/* Main ledger */}
           <div className="lg:col-span-8 flex flex-col gap-space-lg">
+            <div className="flex items-center justify-between">
+              <span className="font-small text-small text-secondary">{distinctCount} صنف في السلة</span>
+              <button
+                type="button"
+                onClick={() => setConfirmClear(true)}
+                disabled={busy || items.length === 0}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-small text-small text-secondary hover:text-error hover:bg-error/5 transition-colors disabled:opacity-40"
+              >
+                <Icon name="delete_sweep" size={16} />
+                <span>إفراغ السلة</span>
+              </button>
+            </div>
             <Card padded={false} className="overflow-hidden">
             <DataTable
               rows={items}
@@ -197,16 +264,16 @@ export function CartPage() {
                 {
                   header: '',
                   align: 'center',
-                  width: '3rem',
+                  width: '5rem',
                   cell: (i) => (
                     <button
                       type="button"
-                      className="text-secondary hover:text-error transition-colors p-1.5 disabled:opacity-40"
-                      onClick={() => remove(i.item_id)}
+                      className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-small text-small text-secondary hover:text-error hover:bg-error/5 transition-colors disabled:opacity-40"
+                      onClick={() => remove(i)}
                       disabled={busy}
-                      title="حذف الصنف"
                     >
-                      <Icon name="delete_outline" size={18} />
+                      <Icon name="delete_outline" size={16} />
+                      <span>حذف</span>
                     </button>
                   ),
                 },
@@ -254,17 +321,17 @@ export function CartPage() {
                     الإجمالي الكلي
                   </span>
                   <span className="font-display text-headline-1 text-primary font-medium tracking-tight">
-                    <Mono className="text-primary">{formatMoney(cart!.total)} ج.م</Mono>
+                    <Mono className="text-primary">{formatMoney(grandTotal)} ج.م</Mono>
                   </span>
                 </div>
               </div>
 
               <div className="flex flex-col gap-space-sm mt-space-lg">
-                <Button variant="primary" className="w-full py-3" onClick={() => setConfirm('cash')} disabled={busy}>
+                <Button variant="primary" className="w-full py-3" onClick={() => void openConfirm('cash')} disabled={busy}>
                   <Icon name="payments" size={18} />
                   <span>إتمام طلب نقدي فوري</span>
                 </Button>
-                <Button className="w-full py-3" onClick={() => setConfirm('deferred')} disabled={busy}>
+                <Button className="w-full py-3" onClick={() => void openConfirm('deferred')} disabled={busy}>
                   <Icon name="account_balance_wallet" size={18} />
                   <span>طلب آجل (تسهيلات معتمدة)</span>
                 </Button>
@@ -383,6 +450,42 @@ export function CartPage() {
           </p>
         )}
       </Modal>
+
+      {/* T-36: empty-cart confirmation */}
+      <Modal
+        open={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        title="إفراغ السلة"
+        footer={
+          <>
+            <Button onClick={() => setConfirmClear(false)}>إلغاء</Button>
+            <Button variant="primary" onClick={() => void emptyCart()} disabled={busy}>
+              نعم، أفرغ السلة
+            </Button>
+          </>
+        }
+      >
+        <p className="font-body text-body text-secondary">
+          سيتم حذف كل الأصناف من سلتك ({distinctCount} صنف). لا يمكن التراجع بعد التأكيد.
+        </p>
+      </Modal>
+
+      {/* T-36: undo snackbar — a short window to restore the last deleted item */}
+      {pending && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[70] flex justify-center px-space-lg">
+          <div className="pointer-events-auto overlay-shadow flex items-center gap-space-md rounded-full border border-surface-container-high bg-surface-container-lowest px-space-md py-space-sm font-body text-body text-on-surface">
+            <span>تم حذف «{pending.name_ar ?? `#${pending.product_id}`}»</span>
+            <button
+              type="button"
+              onClick={undoRemove}
+              className="inline-flex items-center gap-1 font-body-medium text-body-medium text-primary hover:underline"
+            >
+              <Icon name="undo" size={16} />
+              <span>تراجع</span>
+            </button>
+          </div>
+        </div>
+      )}
     </Wide>
   )
 }

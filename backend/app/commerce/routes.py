@@ -114,6 +114,13 @@ def delete_cart_item(item_id: int):
     return jsonify(cart_svc.serialize_cart(_uid()))
 
 
+@bp.delete("/commerce/cart/items")
+@jwt_required()
+def clear_cart():
+    cart_svc.clear_cart(customer_id=_uid())
+    return jsonify(cart_svc.serialize_cart(_uid()))
+
+
 # ================================================================ checkout + orders
 
 

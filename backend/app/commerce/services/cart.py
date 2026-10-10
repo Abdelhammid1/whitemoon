@@ -96,6 +96,16 @@ def remove_item(*, customer_id: int, item_id: int) -> None:
     db.session.commit()
 
 
+def clear_cart(*, customer_id: int) -> None:
+    """Empty the active cart in one go (T-36 «إفراغ السلة»). Releases every
+    item's price lock first so no stale locks linger."""
+    cart = get_or_create_active_cart(customer_id)
+    for item in list(cart.items):
+        pricelock.release_lock_for_cart_item(item.id)
+        db.session.delete(item)
+    db.session.commit()
+
+
 def _owned_item(customer_id: int, item_id: int) -> CartItem:
     item = db.session.get(CartItem, item_id)
     if item is None:
