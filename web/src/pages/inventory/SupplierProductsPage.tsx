@@ -2,11 +2,12 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Wide } from '../../layouts/AppShell'
 import { PageTitle, Button, Field, Pill, Spinner, Card } from '../../components/ui'
 import { DataTable, Mono } from '../../components/DataTable'
+import { Icon } from '../../components/Icon'
 import { Modal } from '../../components/Overlay'
 import { PageHelp } from '../../components/PageHelp'
 import { useToast } from '../../components/Toast'
 import {
-  supplierProducts, setSupplierProduct, createCodingRequest,
+  supplierProducts, setSupplierProduct, patchSupplierProduct, bulkAdjustProducts, createCodingRequest,
   downloadProductsTemplate, exportMyProducts, bulkPreviewProducts, bulkApplyProducts,
   type SupplierProduct, type BulkPreview,
 } from '../../api/inventory'
@@ -35,6 +36,66 @@ const EMPTY: EditForm = {
   discount_kind: 'none', discount_value: '', discount_start: '', discount_end: '',
 }
 
+/** T-40 inline cell: click the value to edit it; Enter or blur auto-saves and
+ *  shows a brief «تم الحفظ ✓». Escape cancels. No dialog. */
+function InlineNumber({
+  value, onSave, prefix,
+}: { value: string; onSave: (next: string) => Promise<void>; prefix?: string }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  useEffect(() => { setDraft(value) }, [value])
+
+  async function commit() {
+    setEditing(false)
+    const next = draft.trim()
+    if (next === '' || next === value) { setDraft(value); return }
+    setState('saving')
+    try {
+      await onSave(next)
+      setState('saved')
+      setTimeout(() => setState('idle'), 2000)
+    } catch {
+      setDraft(value)
+      setState('error')
+      setTimeout(() => setState('idle'), 2500)
+    }
+  }
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        dir="ltr"
+        inputMode="decimal"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={() => void commit()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') { e.preventDefault(); void commit() }
+          else if (e.key === 'Escape') { setDraft(value); setEditing(false) }
+        }}
+        className="w-24 bg-transparent border-b border-primary py-0.5 text-end font-mono-body text-mono-body text-on-surface focus:outline-none"
+      />
+    )
+  }
+  return (
+    <span className="inline-flex items-center justify-end gap-1">
+      {state === 'saved' && <Icon name="check_circle" size={14} className="text-signal" />}
+      {state === 'saving' && <Icon name="progress_activity" size={14} className="text-secondary animate-spin" />}
+      {state === 'error' && <Icon name="error" size={14} className="text-error" />}
+      <button
+        type="button"
+        onClick={() => { setDraft(value); setEditing(true) }}
+        className="font-mono-body text-mono-body text-on-surface rounded px-1 hover:bg-surface-container hover:ring-1 hover:ring-surface-container-high transition-colors"
+        title="اضغط للتعديل"
+      >
+        {prefix}{value}
+      </button>
+    </span>
+  )
+}
+
 export function SupplierProductsPage() {
   const toast = useToast()
   const [rows, setRows] = useState<SupplierProduct[]>([])
@@ -48,12 +109,79 @@ export function SupplierProductsPage() {
   const [bulkFile, setBulkFile] = useState<File | null>(null)
   const [bulkPreview, setBulkPreview] = useState<BulkPreview | null>(null)
   const [bulkBusy, setBulkBusy] = useState(false)
+  // T-40: multi-select + percentage bulk adjust.
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const [adjustPct, setAdjustPct] = useState('5')
+  const [adjusting, setAdjusting] = useState(false)
 
   async function load() {
     setLoading(true)
     try { setRows((await supplierProducts()).items) }
     catch (err) { toast.error(err instanceof ApiError ? err.message : 'تعذّر التحميل') }
     finally { setLoading(false) }
+  }
+
+  /** Merge a single patched row (from an inline edit) into local state without
+   *  a full reload — keeps the cursor/flow on the table. */
+  function mergeRow(productId: number, patched: { on_hand: string; offer: SupplierProduct['offer'] }) {
+    setRows((prev) => prev.map((r) => (r.product_id === productId ? { ...r, on_hand: patched.on_hand, offer: patched.offer } : r)))
+  }
+
+  async function patchField(productId: number, body: { unit_price?: string; on_hand?: string; is_active?: boolean }) {
+    const r = await patchSupplierProduct(productId, body)
+    mergeRow(productId, { on_hand: r.on_hand, offer: r.offer })
+  }
+
+  /** Inline-save that also surfaces the reason (e.g. a discount that no longer
+   *  beats the platform, or a price locked in a live cart) and re-throws so the
+   *  cell reverts and shows its error mark. */
+  async function saveField(productId: number, body: { unit_price?: string; on_hand?: string }) {
+    try {
+      await patchField(productId, body)
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'تعذّر الحفظ')
+      throw err
+    }
+  }
+
+  async function togglePause(p: SupplierProduct) {
+    if (!p.offer) return
+    const next = !p.offer.is_active
+    try {
+      await patchField(p.product_id, { is_active: next })
+      toast.success(next ? 'أُعيد الصنف للبيع.' : 'أُوقف الصنف (نفد من عندك).')
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'تعذّر تغيير الحالة')
+    }
+  }
+
+  function toggleSelect(pid: number) {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(pid)) next.delete(pid); else next.add(pid)
+      return next
+    })
+  }
+  function toggleAll() {
+    setSelected((prev) => {
+      const withOffer = rows.filter((r) => r.offer).map((r) => r.product_id)
+      return prev.size === withOffer.length ? new Set() : new Set(withOffer)
+    })
+  }
+
+  async function runBulk(direction: 'increase' | 'decrease') {
+    const pct = adjustPct.trim()
+    if (!pct || Number(pct) <= 0) { toast.error('أدخل نسبة موجبة.'); return }
+    setAdjusting(true)
+    try {
+      const r = await bulkAdjustProducts({ product_ids: [...selected], direction, percent: pct })
+      if (r.failed.length) toast.info(`حُدِّث ${r.updated} من ${r.total}؛ تعذّر ${r.failed.length} (غالبًا سعر مثبّت في سلة).`)
+      else toast.success(`حُدِّث سعر ${r.updated} صنف.`)
+      setSelected(new Set())
+      await load()
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'تعذّر التعديل الجماعي')
+    } finally { setAdjusting(false) }
   }
   useEffect(() => { void load() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -138,6 +266,9 @@ export function SupplierProductsPage() {
     } finally { setBusy(false) }
   }
 
+  const offerCount = rows.filter((r) => r.offer).length
+  const allSelected = offerCount > 0 && selected.size === offerCount
+
   return (
     <Wide>
       <div className="flex flex-wrap items-start justify-between gap-space-sm">
@@ -154,9 +285,35 @@ export function SupplierProductsPage() {
 
       <PageHelp pageKey="supplier-products" />
 
-      <Card padded={false} className="mt-space-xl overflow-hidden">
+      {/* T-40: bulk % adjust on the selected offers. */}
+      {selected.size > 0 && (
+        <div className="mt-space-md flex flex-wrap items-center gap-space-sm rounded-xl border border-primary/30 bg-primary/5 px-space-md py-space-sm">
+          <span className="font-body-medium text-body-medium text-primary">محدد {selected.size}</span>
+          <span className="text-secondary">—</span>
+          <label className="flex items-center gap-1 font-small text-small text-secondary">
+            النسبة
+            <input
+              dir="ltr" inputMode="decimal" value={adjustPct} onChange={(e) => setAdjustPct(e.target.value)}
+              className="w-16 bg-transparent border-b border-surface-container-high py-1 text-center font-mono-body text-mono-body focus:outline-none focus:border-primary"
+            />
+            %
+          </label>
+          <Button onClick={() => void runBulk('increase')} disabled={adjusting} iconRight="trending_up">زيادة السعر</Button>
+          <Button onClick={() => void runBulk('decrease')} disabled={adjusting} iconRight="trending_down">خفض السعر</Button>
+          <button type="button" className="font-small-medium text-secondary hover:text-primary" onClick={() => setSelected(new Set())}>إلغاء التحديد</button>
+        </div>
+      )}
+
+      <Card padded={false} className="mt-space-md overflow-hidden">
         {loading ? <Spinner /> : (
           <DataTable rows={rows} rowKey={(p) => p.product_id} empty="لا توجد منتجات بعد — أضف منتجًا أو اطلب تكويد صنف." columns={[
+            {
+              header: <input type="checkbox" aria-label="تحديد الكل" checked={allSelected} onChange={toggleAll} />,
+              align: 'center', width: '2.5rem',
+              cell: (p) => p.offer
+                ? <input type="checkbox" aria-label="تحديد الصنف" checked={selected.has(p.product_id)} onChange={() => toggleSelect(p.product_id)} />
+                : null,
+            },
             {
               header: 'المنتج',
               cell: (p) => (
@@ -169,16 +326,40 @@ export function SupplierProductsPage() {
                 </span>
               ),
             },
-            { header: 'السعر', align: 'end', cell: (p) => <Mono>{p.offer ? formatMoney(p.offer.unit_price) : '—'}</Mono> },
+            {
+              header: 'السعر', align: 'end',
+              cell: (p) => p.offer
+                ? <InlineNumber value={String(Number(p.offer.unit_price))} onSave={(v) => saveField(p.product_id, { unit_price: v })} />
+                : <span className="text-secondary">—</span>,
+            },
             {
               header: 'الخصم', align: 'center',
               cell: (p) => p.offer && p.offer.discount_kind !== 'none'
                 ? <Pill tone="signal">{formatMoney(p.offer.effective_price)}</Pill>
                 : <span className="text-secondary">—</span>,
             },
-            { header: 'المخزون', align: 'end', cell: (p) => <Mono>{Number(p.on_hand)}</Mono> },
+            {
+              header: 'المخزون', align: 'end',
+              cell: (p) => <InlineNumber value={String(Number(p.on_hand))} onSave={(v) => saveField(p.product_id, { on_hand: v })} />,
+            },
             { header: 'الحالة', align: 'center', cell: (p) => <Pill tone={p.offer?.is_active ? 'signal' : 'neutral'}>{p.offer?.is_active ? 'متاح' : (p.offer ? 'موقوف' : 'بدون عرض')}</Pill> },
-            { header: '', align: 'end', cell: (p) => <button className="text-primary font-small-medium hover:underline" onClick={() => openEdit(p)}>تعديل</button> },
+            {
+              header: '', align: 'end',
+              cell: (p) => (
+                <span className="inline-flex items-center justify-end gap-space-sm">
+                  {p.offer && (
+                    <button
+                      type="button"
+                      className={`font-small-medium hover:underline ${p.offer.is_active ? 'text-secondary hover:text-error' : 'text-signal'}`}
+                      onClick={() => void togglePause(p)}
+                    >
+                      {p.offer.is_active ? 'نفد من عندي' : 'أعِده للبيع'}
+                    </button>
+                  )}
+                  <button type="button" className="text-primary font-small-medium hover:underline" onClick={() => openEdit(p)}>تعديل</button>
+                </span>
+              ),
+            },
           ]} />
         )}
       </Card>

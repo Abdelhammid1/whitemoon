@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from flask import Blueprint, jsonify, request
@@ -314,6 +314,62 @@ def set_supplier_product(product_id: int):
         actor_user_id=supplier_id,
         target_type="product",
         target_id=product_id,
+    )
+    return jsonify(result)
+
+
+@bp.patch("/supplier/products/<int:product_id>")
+@require_permission("offer.manage")
+def patch_supplier_product(product_id: int):
+    """T-40 inline edit: change only price / on-hand / active, one field at a
+    time, without disturbing the offer's discount or moq."""
+    body = request.get_json(silent=True) or {}
+    kwargs: dict[str, Any] = {}
+    try:
+        if body.get("unit_price") is not None:
+            kwargs["unit_price"] = Decimal(str(body["unit_price"]))
+        if body.get("on_hand") is not None:
+            kwargs["on_hand"] = Decimal(str(body["on_hand"]))
+    except (InvalidOperation, ValueError) as e:
+        raise BadRequest("قيمة رقمية غير صالحة.", code="bad_number") from e
+    if "is_active" in body and body["is_active"] is not None:
+        kwargs["is_active"] = bool(body["is_active"])
+    if not kwargs:
+        raise BadRequest("لا تغييرات.", code="no_fields")
+    result = offers_svc.patch_supplier_product(supplier_id=_uid(), product_id=product_id, **kwargs)
+    audit_emit(
+        "inventory.supplier_product.patch",
+        actor_user_id=_uid(),
+        target_type="product",
+        target_id=product_id,
+    )
+    return jsonify(result)
+
+
+@bp.post("/supplier/products/bulk-adjust")
+@require_permission("offer.manage")
+def bulk_adjust_products():
+    """T-40: raise/lower the price of several selected offers by a percentage."""
+    body = request.get_json(silent=True) or {}
+    ids = body.get("product_ids")
+    if not isinstance(ids, list) or not ids:
+        raise BadRequest("حدّد منتجًا واحدًا على الأقل.", code="no_products")
+    try:
+        product_ids = [int(x) for x in ids]
+        percent = Decimal(str(body.get("percent")))
+    except (InvalidOperation, ValueError, TypeError) as e:
+        raise BadRequest("بيانات غير صالحة.", code="bad_input") from e
+    result = offers_svc.bulk_adjust_prices(
+        supplier_id=_uid(),
+        product_ids=product_ids,
+        direction=str(body.get("direction")),
+        percent=percent,
+    )
+    audit_emit(
+        "inventory.supplier_product.bulk_adjust",
+        actor_user_id=_uid(),
+        target_type="supplier",
+        target_id=_uid(),
     )
     return jsonify(result)
 

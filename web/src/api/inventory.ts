@@ -273,6 +273,32 @@ export async function setSupplierProduct(
 ) {
   return api<{ offer: SupplierOfferDetail }>(`/inventory/supplier/products/${productId}`, { method: 'PUT', body })
 }
+
+/** T-40: inline single-field update (price / on-hand / active) — leaves the
+ *  offer's discount and moq untouched. Returns the refreshed row. */
+export async function patchSupplierProduct(
+  productId: number,
+  body: { unit_price?: string; on_hand?: string; is_active?: boolean },
+) {
+  return api<{ product_id: number; on_hand: string; offer: SupplierOfferDetail | null }>(
+    `/inventory/supplier/products/${productId}`,
+    { method: 'PATCH', body },
+  )
+}
+
+export interface BulkAdjustResult {
+  updated: number
+  total: number
+  failed: { product_id: number; reason: string }[]
+}
+/** T-40: raise/lower the price of several offers by a percentage. */
+export async function bulkAdjustProducts(body: {
+  product_ids: number[]
+  direction: 'increase' | 'decrease'
+  percent: string
+}) {
+  return api<BulkAdjustResult>('/inventory/supplier/products/bulk-adjust', { method: 'POST', body })
+}
 export interface CodingRequest {
   id: number
   name: string

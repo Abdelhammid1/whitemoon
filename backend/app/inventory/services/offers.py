@@ -9,12 +9,12 @@ Supplier-isolation rules:
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 
 from sqlalchemy import select
 
-from ...common.errors import BadRequest, NotFound
+from ...common.errors import BadRequest, Conflict, NotFound
 from ...common.money import to_money
 from ...extensions import db
 from ..models import Product, SupplierOffer
@@ -343,3 +343,118 @@ def set_supplier_product(
             reorder_point=reorder_point,
         )
     return {"offer": serialize_own(offer)}
+
+
+def _own_offer(supplier_id: int, product_id: int) -> SupplierOffer | None:
+    return db.session.execute(
+        select(SupplierOffer).where(
+            SupplierOffer.supplier_id == supplier_id,
+            SupplierOffer.product_id == product_id,
+        )
+    ).scalar_one_or_none()
+
+
+def patch_supplier_product(
+    *,
+    supplier_id: int,
+    product_id: int,
+    unit_price: Decimal | None = None,
+    on_hand: Decimal | None = None,
+    is_active: bool | None = None,
+) -> dict[str, Any]:
+    """Inline single-field update for «منتجاتي» (T-40): change only price,
+    on-hand, and/or active, leaving the offer's discount/moq untouched. Price
+    and active require an existing offer; on-hand is the supplier's own stock
+    and can be set with or without an offer. Returns the refreshed row so the
+    caller can update just that cell."""
+    from . import stock as stock_svc
+
+    offer = _own_offer(supplier_id, product_id)
+    if (unit_price is not None or is_active is not None):
+        if offer is None:
+            raise BadRequest("لا يوجد عرض لهذا المنتج — أضف عرضًا أولًا.", code="no_offer")
+        # Reuse upsert_offer so the price-lock guard, best-price re-validation
+        # (an active discount is re-checked against the new base price) and the
+        # undercut notification all still apply. Discount/moq are preserved.
+        offer = upsert_offer(
+            supplier_id=supplier_id,
+            product_id=product_id,
+            unit_price=to_money(unit_price) if unit_price is not None else offer.unit_price,
+            moq=offer.moq,
+            is_active=is_active if is_active is not None else offer.is_active,
+            discount_kind=offer.discount_kind,
+            discount_value=offer.discount_value,
+            discount_start=offer.discount_start,
+            discount_end=offer.discount_end,
+        )
+    if on_hand is not None:
+        current = stock_svc.get_balance(
+            supplier_id=supplier_id, product_id=product_id, location_type="supplier", location_id=None
+        )
+        have = to_money(current.on_hand) if current is not None else Decimal("0")
+        stock_svc.manual_adjust(
+            supplier_id=supplier_id,
+            product_id=product_id,
+            location_type="supplier",
+            location_id=None,
+            delta=to_money(on_hand) - have,
+        )
+        new_on_hand = to_money(on_hand)
+    else:
+        current = stock_svc.get_balance(
+            supplier_id=supplier_id, product_id=product_id, location_type="supplier", location_id=None
+        )
+        new_on_hand = to_money(current.on_hand) if current is not None else Decimal("0")
+
+    return {
+        "product_id": product_id,
+        "on_hand": str(new_on_hand),
+        "offer": serialize_own(offer) if offer is not None else None,
+    }
+
+
+def bulk_adjust_prices(
+    *, supplier_id: int, product_ids: list[int], direction: str, percent: Decimal
+) -> dict[str, Any]:
+    """Raise or lower the price of several of the supplier's own offers by a
+    percentage in one action (T-40). Each offer keeps its discount/moq/active;
+    the new price goes through upsert_offer, so a product whose raise is blocked
+    by a live price lock (or any rejection) is skipped and reported, never
+    aborting the rest."""
+    if direction not in ("increase", "decrease"):
+        raise BadRequest("اتجاه غير صالح.", code="bad_direction")
+    pct = to_money(percent)
+    if pct <= 0:
+        raise BadRequest("النسبة يجب أن تكون موجبة.", code="bad_percent")
+    if direction == "decrease" and pct >= 100:
+        raise BadRequest("نسبة الخفض يجب أن تكون أقل من 100%.", code="bad_percent")
+    factor = (Decimal("1") + pct / 100) if direction == "increase" else (Decimal("1") - pct / 100)
+
+    updated = 0
+    failed: list[dict[str, Any]] = []
+    for pid in dict.fromkeys(product_ids):  # de-dupe, keep order
+        offer = _own_offer(supplier_id, pid)
+        if offer is None:
+            failed.append({"product_id": pid, "reason": "لا يوجد عرض لهذا المنتج."})
+            continue
+        new_price = (to_money(offer.unit_price) * factor).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        if new_price <= 0:
+            failed.append({"product_id": pid, "reason": "السعر الناتج غير موجب."})
+            continue
+        try:
+            upsert_offer(
+                supplier_id=supplier_id,
+                product_id=pid,
+                unit_price=new_price,
+                moq=offer.moq,
+                is_active=offer.is_active,
+                discount_kind=offer.discount_kind,
+                discount_value=offer.discount_value,
+                discount_start=offer.discount_start,
+                discount_end=offer.discount_end,
+            )
+            updated += 1
+        except (Conflict, BadRequest) as e:
+            db.session.rollback()
+            failed.append({"product_id": pid, "reason": getattr(e, "message", "تعذّر التحديث")})
+    return {"updated": updated, "failed": failed, "total": len(dict.fromkeys(product_ids))}
