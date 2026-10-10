@@ -232,7 +232,7 @@ export function AppShell() {
 
         {/* Nav */}
         <div className="relative flex-1 min-h-0">
-        <nav ref={navRef} className="h-full overflow-y-auto px-space-sm pb-space-sm flex flex-col gap-space-xs">
+        <nav ref={navRef} className="wm-scrollbar h-full overflow-y-auto px-space-sm pb-space-sm flex flex-col gap-space-xs">
           {/* Onboarding — first entry, every role, outside the role-gated groups */}
           <NavLink to="/start" className={({ isActive }) => navItem(isActive)}>
             <Icon name="rocket_launch" size={18} className="shrink-0" />
