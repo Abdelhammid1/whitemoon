@@ -173,6 +173,32 @@ def supplier_orders():
     return jsonify({"items": orders_svc.supplier_dashboard(uid)})
 
 
+@bp.get("/commerce/supplier/summary")
+@jwt_required()
+def supplier_summary():
+    """T-41: the supplier home's three «needs action now» cards."""
+    uid = _uid()
+    if not has_permission(uid, "offer.manage"):
+        raise Forbidden("للموردين فقط", code="suppliers_only")
+    from .services import supplier_home as sh_svc
+
+    return jsonify(sh_svc.action_summary(uid))
+
+
+@bp.post("/commerce/supplier/sub-orders/<int:sub_order_id>/<action>")
+@jwt_required()
+def supplier_advance_suborder(sub_order_id: int, action: str):
+    """T-41: the supplier confirms or marks-ready their own sub-order."""
+    uid = _uid()
+    if not has_permission(uid, "offer.manage"):
+        raise Forbidden("للموردين فقط", code="suppliers_only")
+    from .services import supplier_home as sh_svc
+
+    sub = sh_svc.advance_suborder(supplier_id=uid, sub_order_id=sub_order_id, action=action)
+    audit_emit("commerce.suborder.supplier_advance", actor_user_id=uid, target_type="sub_order", target_id=sub.id, reason=action)
+    return jsonify({"sub_order_id": sub.id, "status": sub.status})
+
+
 def _statement_access(customer_id: int) -> None:
     """Statement access: the customer, finance/admin, or an agent/branch inside
     the customer's geo territory (T-01/T-04)."""

@@ -7,13 +7,14 @@ import { PageHelp } from '../components/PageHelp'
 import { useAuth } from '../auth/AuthContext'
 import { listPendingSuppliers } from '../api/admin'
 import { getDashboard, type Dashboard } from '../api/bi'
+import { getSupplierSummary, advanceSubOrder, type SupplierSummary } from '../api/commerce'
 import { ApiError } from '../api/client'
-import { formatNumber } from '../lib/format'
+import { useToast } from '../components/Toast'
+import { formatMoney, formatNumber } from '../lib/format'
 
 const QUICK_LINKS_SUPPLIER = [
   { to: '/supplier/orders', label: 'طلبات واردة', icon: 'inbox' },
-  { to: '/inventory/offers', label: 'إدارة عروضي التوريدية', icon: 'sell' },
-  { to: '/inventory/stock', label: 'استعراض مخزوني', icon: 'inventory_2' },
+  { to: '/supplier/products', label: 'منتجاتي (السعر والكمية والخصم)', icon: 'inventory_2' },
 ]
 const QUICK_LINKS_CUSTOMER = [
   { to: '/catalog', label: 'تصفّح السوق', icon: 'storefront' },
@@ -201,6 +202,83 @@ function AdminDashboard() {
   )
 }
 
+/* ---------------------------------------------------------- supplier dashboard (T-41) */
+function SupplierDashboard() {
+  const navigate = useNavigate()
+  const toast = useToast()
+  const [s, setS] = useState<SupplierSummary | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(0)
+
+  async function load() {
+    try { setS(await getSupplierSummary()) } catch { /* keep quick links only */ }
+    finally { setLoading(false) }
+  }
+  useEffect(() => { void load() }, [])
+
+  async function act(subId: number, action: 'confirm' | 'ready') {
+    setBusy(subId)
+    try { await advanceSubOrder(subId, action); toast.success(action === 'confirm' ? 'تم تأكيد الطلب.' : 'تم وسمه جاهزًا للتسليم.'); await load() }
+    catch (err) { toast.error(err instanceof ApiError ? err.message : 'تعذّرت العملية') }
+    finally { setBusy(0) }
+  }
+
+  return (
+    <Wide>
+      <header className="flex flex-col">
+        <h1 className="font-display text-display text-on-surface font-medium tracking-tight">{greeting()} <span className="text-gold">🌙</span></h1>
+        <p className="font-body text-body text-secondary mt-space-xs">تعرض هذه الصفحة ما يحتاج إجراءً منك الآن. اضغط على أي بطاقة للانتقال مباشرة.</p>
+      </header>
+      <PageHelp pageKey="supplier-home" />
+
+      {loading ? <div className="mt-space-xl"><Spinner /></div> : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-space-md mt-space-xl">
+            <button onClick={() => navigate('/supplier/orders')} className="text-start">
+              <Tile icon="inbox" accent label="طلبات جديدة تنتظر التأكيد" value={arNum(s?.counts.new_orders ?? 0)} tone="warning" hint="اضغط للانتقال" />
+            </button>
+            <button onClick={() => navigate('/supplier/products')} className="text-start">
+              <Tile icon="warning" label="أصناف قاربت على النفاد" value={arNum(s?.counts.low_stock ?? 0)} tone="error" hint="راجع المخزون" />
+            </button>
+            <button onClick={() => navigate('/supplier/products')} className="text-start">
+              <Tile icon="schedule" label="خصومات ستنتهي قريبًا" value={arNum(s?.counts.expiring_discounts ?? 0)} tone="neutral" hint="خلال ٧ أيام" />
+            </button>
+          </div>
+
+          {s && s.new_orders.length > 0 && (
+            <Card className="mt-space-md flex flex-col gap-space-sm">
+              <h3 className="font-headline-2 text-headline-2 text-on-surface">طلبات تنتظر إجراءك</h3>
+              <div className="flex flex-col divide-y divide-surface-container">
+                {s.new_orders.map((o) => (
+                  <div key={o.sub_order_id} className="flex items-center justify-between py-space-sm gap-space-md">
+                    <span className="font-body text-body text-on-surface">طلب {o.order_number} — <span className="font-mono-body" dir="ltr">{formatMoney(o.subtotal)} ج.م</span></span>
+                    <span className="flex items-center gap-space-md">
+                      <button className="text-primary font-small-medium hover:underline disabled:opacity-40" disabled={busy === o.sub_order_id} onClick={() => void act(o.sub_order_id, 'confirm')}>تأكيد</button>
+                      <button className="text-primary font-small-medium hover:underline disabled:opacity-40" disabled={busy === o.sub_order_id} onClick={() => void act(o.sub_order_id, 'ready')}>جاهز للتسليم</button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          <nav className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-space-md mt-space-md">
+            {QUICK_LINKS_SUPPLIER.map((l) => (
+              <Link key={l.to} to={l.to} className="group">
+                <Card padded={false} className="h-full p-space-lg flex items-center gap-space-md transition-shadow group-hover:shadow-overlay">
+                  <span className="w-10 h-10 rounded-xl bg-brand-weak flex items-center justify-center shrink-0"><Icon name={l.icon} size={20} className="text-primary" /></span>
+                  <span className="font-body-medium text-body-medium text-on-surface flex-1 min-w-0">{l.label}</span>
+                  <Icon name="arrow_back" size={18} className="text-outline group-hover:text-primary transition-colors" />
+                </Card>
+              </Link>
+            ))}
+          </nav>
+        </>
+      )}
+    </Wide>
+  )
+}
+
 /* ---------------------------------------------------------- quick links (non-admin) */
 function QuickLinks({ links }: { links: { to: string; label: string; icon: string }[] }) {
   return (
@@ -237,5 +315,6 @@ export function HomePage() {
 
   if (!user) return null
   if (isAdmin) return <AdminDashboard />
-  return <QuickLinks links={user.kind === 'supplier' ? QUICK_LINKS_SUPPLIER : QUICK_LINKS_CUSTOMER} />
+  if (user.kind === 'supplier') return <SupplierDashboard />
+  return <QuickLinks links={QUICK_LINKS_CUSTOMER} />
 }

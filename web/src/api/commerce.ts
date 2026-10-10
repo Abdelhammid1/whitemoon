@@ -188,6 +188,20 @@ export async function getUsualCategories() {
   return api<{ items: UsualCategory[] }>('/commerce/usual-categories')
 }
 
+// ---------------------------------------------------------------- supplier home (T-41)
+export interface SupplierSummary {
+  new_orders: { sub_order_id: number; order_number: string; status: string; subtotal: string; placed_at: string }[]
+  low_stock: { product_id: number; name: string; on_hand: string; reorder_point: string | null }[]
+  expiring_discounts: { product_id: number; name: string; discount_end: string | null }[]
+  counts: { new_orders: number; low_stock: number; expiring_discounts: number }
+}
+export async function getSupplierSummary() {
+  return api<SupplierSummary>('/commerce/supplier/summary')
+}
+export async function advanceSubOrder(subOrderId: number, action: 'confirm' | 'ready') {
+  return api<{ sub_order_id: number; status: string }>(`/commerce/supplier/sub-orders/${subOrderId}/${action}`, { method: 'POST' })
+}
+
 // ---------------------------------------------------------------- RFQ
 
 export interface Rfq {
