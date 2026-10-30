@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { Brand } from '../components/Brand'
 import { Button } from '../components/ui'
 import { Icon } from '../components/Icon'
+import { Footer } from '../components/Footer'
 
 /**
  * Public marketing landing page — same "Nightfall" system as the app
@@ -250,6 +251,7 @@ export function LandingPage() {
           </div>
         </div>
       </footer>
+      <Footer />
     </div>
   )
 }
