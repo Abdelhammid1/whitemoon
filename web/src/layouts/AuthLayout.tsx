@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import logoUrl from '../assets/white-moon-logo.png'
+import { Footer } from '../components/Footer'
 
 /** Branded split layout: a midnight-navy hero panel beside a white form card.
  *  Stacks to one column on mobile. Shared by login / register / OTP / 2FA. */
@@ -44,8 +45,8 @@ export function AuthLayout({
       </aside>
 
       {/* Form side (left in RTL) */}
-      <section className="flex items-center justify-center px-space-lg py-space-xl">
-        <div className="w-full max-w-[380px] flex flex-col">
+      <section className="flex flex-col items-center justify-center px-space-lg py-space-xl">
+        <div className="w-full max-w-[380px] flex-1 flex flex-col justify-center">
           <div className="mb-space-xl">
             <h1 className="font-headline-1 text-headline-1 text-on-surface font-medium mb-1">{title}</h1>
             {subtitle && <p className="font-small text-small text-secondary">{subtitle}</p>}
@@ -57,6 +58,7 @@ export function AuthLayout({
             </div>
           )}
         </div>
+        <Footer />
       </section>
     </main>
   )

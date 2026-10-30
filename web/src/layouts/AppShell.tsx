@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { Icon } from '../components/Icon'
 import logoUrl from '../assets/white-moon-logo.png'
 import { ImpersonationBanner } from '../components/ImpersonationBanner'
+import { Footer } from '../components/Footer'
 import { AssistantWidget } from '../components/assistant/AssistantWidget'
 import { getMyCredit, type MyCredit } from '../api/credit'
 import { formatMoney } from '../lib/format'
@@ -311,6 +312,7 @@ export function AppShell() {
         <main className="max-w-[1040px] mx-auto pt-[40px] px-[32px] pb-[96px] min-h-full">
           <Outlet />
         </main>
+        <Footer />
       </div>
       {/* Admin AI assistant dock — self-gates to admins, carries the current route */}
       <AssistantWidget />
